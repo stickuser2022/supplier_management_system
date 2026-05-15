@@ -123,3 +123,183 @@ npx prisma studio          # 数据库可视化管理
 npx prisma migrate dev     # 应用 schema 变更到数据库
 npx prisma generate        # 重新生成 Prisma Client
 ```
+
+---
+
+## 数据模型设计
+
+### 核心实体一览
+
+本系统的数据模型围绕"供应商"这一核心实体展开,关联以下实体:
+
+| 实体 | 中文名 | 与 Supplier 的关系 | 阶段 |
+|------|-------|------------------|------|
+| Supplier | 供应商 | 核心实体 | 阶段 1 |
+| Tag | 标签 | 多对多 | 阶段 1 |
+| Contact | 联系人 | 一对多 | 阶段 1 |
+| User | 用户 | 一对多(created_by) | 阶段 2 |
+| Quote | 报价记录 | 一对多 | 阶段 4 |
+| Note | 沟通记录 | 一对多 | 阶段 4 |
+| Transaction | 交易记录 | 一对多 | 阶段 5 |
+| File | 文件 | 一对多 | 阶段 5 |
+
+### 双语策略(贯穿所有表)
+
+数据库中需要双语显示的字段,采用**四种不同机制**,根据数据性质区分:
+
+| 类别 | 例子 | 录入方式 | 数据库结构 |
+|------|------|---------|-----------|
+| 界面文字 | 按钮、菜单、表单标签 | 项目初始化时翻译 | `messages/zh.json` + `messages/ru.json` |
+| **标签库** | 品类、资质、能力等 | Admin 录入时**强制填中俄两份**,AI 仅提供"建议"按钮 | Tag 表 `name_zh` + `name_ru` 都必填 |
+| **供应商核心数据** | 公司名、城市、地址、备注 | Admin 仅录中文,系统**自动 AI 翻译**填俄文 | `xxx_zh` + `xxx_ru` + `xxx_ru_auto_translated` 三件套 |
+| 自由文本(沟通记录) | 备注流水 | Admin 仅录中文,Viewer 看时**按需点翻译按钮**实时翻译 | 数据库只存原文,翻译不持久化 |
+
+### 双语字段命名约定
+
+凡是需要双语的字段,统一遵循:
+
+```
+[字段名]_zh                       中文版本(主)
+[字段名]_ru                       俄文版本(可空,可自动)
+[字段名]_ru_auto_translated       是否由 AI 自动翻译(仅供应商类数据需要)
+```
+
+加新双语字段时按此模板套用,无需每次单独设计。
+
+---
+
+### Supplier 表(供应商)
+
+供应商是系统的核心实体,代表一家公司。
+
+**字段定义:**
+
+```
+Supplier(供应商)
+├── id                                  Int        主键,自增
+│
+├── # 身份信息
+├── code                                String?    自定义编号(如 GZ-001)
+├── name_zh                             String     中文全名,必填
+├── name_ru                             String?    俄文全名(可自动翻译)
+├── short_name_zh                       String?    中文简称
+├── short_name_ru                       String?    俄文简称(可自动翻译)
+│
+├── # 地理位置
+├── province_zh                         String     省份(中文),必填
+├── province_ru                         String?    省份(俄文,可自动翻译)
+├── city_zh                             String     城市(中文),必填
+├── city_ru                             String?    城市(俄文,可自动翻译)
+├── district_zh                         String?    区县(中文)
+├── district_ru                         String?    区县(俄文,可自动翻译)
+├── address_zh                          String?    详细地址(中文)
+├── address_ru                          String?    详细地址(俄文,可自动翻译)
+├── latitude                            Float      纬度,必填
+├── longitude                           Float      经度,必填
+│
+├── # 业务描述
+├── cooperation_level                   Enum       合作深度,默认 INITIAL_CONTACT
+├── description_zh                      Text?      中文描述/备注
+├── description_ru                      Text?      俄文描述(可自动翻译)
+├── discovered_via                      String?    认识渠道(自由文本)
+├── website                             String?    主官网链接
+├── logo_path                           String?    Logo 文件路径
+│
+├── # 自动翻译标记(7 个)
+├── name_ru_auto_translated             Boolean    默认 true
+├── short_name_ru_auto_translated       Boolean    默认 true
+├── province_ru_auto_translated         Boolean    默认 true
+├── city_ru_auto_translated             Boolean    默认 true
+├── district_ru_auto_translated         Boolean    默认 true
+├── address_ru_auto_translated          Boolean    默认 true
+├── description_ru_auto_translated      Boolean    默认 true
+│
+└── # 元数据
+    ├── created_at                      DateTime   创建时间(自动)
+    ├── updated_at                      DateTime   更新时间(自动)
+    ├── created_by_id                   Int        创建人(外键 → User)
+    └── is_active                       Boolean    是否启用(逻辑删除),默认 true
+```
+
+**枚举 CooperationLevel:**
+
+```
+INITIAL_CONTACT   初步接触(尚未下单)
+TRIAL_ORDER       试单阶段(下过 1-2 单试水)
+REGULAR           常规合作(稳定下单)
+STRATEGIC         战略合作(主力供应商)
+INACTIVE          已暂停(目前未合作但未拉黑)
+```
+
+**关联到其他表:**
+
+- Supplier ↔ Tag : 多对多(通过 SupplierTag 中间表)
+- Supplier → Contact : 一对多
+- Supplier → Quote : 一对多
+- Supplier → Note : 一对多
+- Supplier → Transaction : 一对多
+- Supplier → File : 一对多
+- Supplier → User(created_by) : 多对一
+
+**重要设计决策:**
+
+- **逻辑删除而非物理删除**:删除操作仅设置 `is_active = false`,数据永久保留
+- **质量评级不做静态字段**:不设 `quality_rating` 枚举;质量评估属于事件性数据,通过 Note(沟通记录)和 Transaction(交易记录)的时间线体现
+- **付款条件、规格属性不做字段**:这些是订单维度的动态属性,落在 Quote / Transaction 表中
+- **公司规模、营业执照等低频信息**:写入 `description_zh`,日后若发现高频再拎出来成字段
+
+---
+
+### Tag 表(标签)
+
+标签用于灵活地给供应商打多维度的属性标记,与品类、资质、能力等相关。
+
+**字段定义:**
+
+```
+Tag(标签)
+├── id                Int        主键,自增
+├── category          Enum       标签分组(TagCategory)
+├── name_zh           String     中文名,必填
+├── name_ru           String     俄文名,必填
+├── color             String?    颜色(7 位 hex,如 "#3B82F6")
+├── icon              String?    图标标识符(Emoji / 图标库名 / 路径,延迟解读)
+├── is_system         Boolean    是否系统预置,默认 false
+├── needs_review      Boolean    是否需要审核(就地创建时为 true),默认 false
+├── is_active         Boolean    是否启用,默认 true
+├── created_at        DateTime   创建时间(自动)
+├── updated_at        DateTime   更新时间(自动)
+└── created_by_id     Int        创建人(外键 → User)
+```
+
+**枚举 TagCategory:**
+
+```
+PRODUCT     产品品类      (玩具、机械、电子、纺织等)
+EXPORT      出口能力      (已出口俄罗斯、欧盟、中亚等)
+CERT        认证资质      (EAC、CE、FCC、ISO 9001、FDA 等)
+CAPACITY    生产能力      (OEM、ODM、自有品牌、打样快速、小批量等)
+CUSTOM      其他/自定义   (兜底分组)
+```
+
+**重要设计决策:**
+
+- **新建标签必须填中俄两份**:不依赖 AI 自动翻译;新建表单提供"AI 建议俄文"按钮,最终保存的必须是人工确认值
+- **就地创建 + 后续审核**:录入供应商时遇到缺失标签可立即创建,自动标记 `needs_review = true`;管理页面有"待审核"过滤器,Admin 定期治理
+- **系统预置标签不可删**:`is_system = true` 的标签可改可停,但不能删,防止误操作
+- **`icon` 字段延迟解读**:数据库仅存字符串,具体解读规则(Emoji / 图标库 / 图片路径)在 UI 阶段(阶段 4)确定
+
+---
+
+### SupplierTag 表(供应商-标签关联)
+
+Supplier 与 Tag 的多对多关系通过此中间表实现。
+
+```
+SupplierTag(供应商-标签关联)
+├── supplier_id    Int        外键 → Supplier
+├── tag_id         Int        外键 → Tag
+├── created_at     DateTime   关联创建时间
+└── (复合主键: supplier_id + tag_id)
+```
+此表由 Prisma 自动管理,业务代码通常无需直接操作。
