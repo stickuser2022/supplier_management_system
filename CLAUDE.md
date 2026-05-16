@@ -351,3 +351,113 @@ SupplierTag(供应商-标签关联)
 - **决策优先于动手**:每张表先聊清字段含义和取舍,再写 Prisma 代码
 - **每个小里程碑做 Git 提交**:养成习惯
 - **CLAUDE.md 是项目大脑**:每次结束前更新"项目进度日志"段
+
+
+### Contact 表(联系人)
+
+联系人是供应商下的具体人,一个供应商可有多个联系人,其中至多 1 个为主要联系人。
+
+**字段定义:**
+
+```
+Contact(联系人)
+├── id                                 Int        主键,自增
+├── supplier_id                        Int        外键 → Supplier,必填
+│
+├── # 身份信息
+├── name_zh                            String     中文姓名,必填
+├── name_ru                            String?    俄文姓名(可自动翻译)
+├── role_zh                            String?    职位(中文,自由文本)
+├── role_ru                            String?    职位(俄文,可自动翻译)
+│
+├── # 联系方式(全 nullable,允许 "/" 分隔多个号码)
+├── phone                              String?    手机号
+├── wechat                             String?    微信号
+├── email                              String?    邮箱
+├── whatsapp                           String?    WhatsApp
+├── telegram                           String?    Telegram
+├── qq                                 String?    QQ
+│
+├── # 状态
+├── is_primary                         Boolean    是否主要联系人,默认 false
+├── status                             Enum       ContactStatus,默认 ACTIVE
+│
+├── # 自动翻译标记
+├── name_ru_auto_translated            Boolean    默认 true
+├── role_ru_auto_translated            Boolean    默认 true
+│
+└── # 元数据
+    ├── created_at                     DateTime   创建时间(自动)
+    ├── updated_at                     DateTime   更新时间(自动)
+    └── created_by_id                  Int        创建人(外键 → User)
+```
+
+**枚举 ContactStatus:**
+
+```
+ACTIVE     活跃
+ARCHIVED   已归档(离职 / 失联 / 暂停往来等)
+```
+
+**关联到其他表:**
+
+- Contact → Supplier : 多对一(必填)
+- Contact → User(created_by) : 多对一
+- Contact → Quote / Note : 一对多(后续表设计时建立)
+
+**重要设计决策:**
+
+- **每供应商至多 1 名主要联系人**:`is_primary` 的唯一性不在数据库层强制,在应用层保证。保存新主要联系人时,先把同一 supplier 下其他联系人的 `is_primary` 全部置为 false,再保存当前记录为 true,整个动作在一个 Prisma 事务里完成
+- **联系方式 6 字段全可空,UI 层做"按需添加"体验**:数据模型保持单表 6 字段,但录入界面不一次性铺开 6 个输入框;管理者点"+ 添加联系方式" → 弹出可选类型 → 选了对应类型才显示该字段的输入框。已填字段保留,未填字段不显示
+- **同一种联系方式有多个号码**:用 `/` 分隔放在同一字段里(如 `phone: "138.../139..."`)。将来真有需要给每个号码打备注的场景,再迁移到 ContactMethod 子表
+- **软删而非硬删**:离职/失联/暂停往来都走 `status = ARCHIVED`,从默认视图隐藏但保留历史。物理删除仅在"录错想撤销"时提供
+- **职位字段为自由文本且可空**:不用枚举,适配小作坊职责不清的实际情况
+- **维护入口**:不分前台/后台,直接在供应商详情页内行内编辑联系人
+- **不设联系人级备注字段**:此类零碎信息变动频繁、录入维护成本高,Admin 心里有数即可,不进入数据持久层
+
+---
+````
+
+## 二、进度日志整段替换(替换文件最下面那段 `## 2026.5.15 项目进度日志` 及以下全部)
+
+## 2026.5.15 项目进度日志
+
+> 此区域是"项目接力棒",每次结束工作前更新。下次开新对话,把整个 CLAUDE.md 粘给 Claude,即可无缝续接上下文。
+
+### 当前阶段:阶段 1 — 项目骨架 + 数据模型雏形
+
+### 已完成
+
+- ✅ Next.js 16.2.6 项目初始化(TypeScript + Tailwind + App Router + Turbopack)
+- ✅ Git 仓库初始化和首次提交,用户配置完成
+- ✅ CLAUDE.md 第 1 段(项目概览 + 用户角色 + 语言策略 + 关键设计决策)
+- ✅ CLAUDE.md 第 2 段(技术栈 + 项目目录结构 + 常用命令)
+- ✅ 数据模型:Supplier 表 + Tag 表 + SupplierTag 中间表
+- ✅ 数据模型:Contact 表(联系人)
+
+### 进行中
+
+- 🔄 数据模型设计:Quote(报价)表 — 待开始讨论业务场景与字段
+
+### 待办(按顺序)
+
+1. 完成 Quote(报价)表设计
+2. 完成 Note(沟通记录)表设计
+3. 完成 Transaction(交易)表设计
+4. 完成 File(文件)表设计
+5. 完成 User(用户)表设计
+6. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
+7. 跑 `prisma migrate dev` 生成数据库
+8. 用 Prisma Studio 手动塞测试数据
+9. 写第一个最简页面:从数据库读供应商列表显示为文字
+
+### 下次开始时,需要决策的 Quote 表问题
+
+(本轮讨论中,待填充)
+
+### 合作模式备忘
+
+- **混合模式**:Claude 给思路、指示、关键片段,用户主导写代码、做架构决策
+- **决策优先于动手**:每张表先聊清字段含义和取舍,再写 Prisma 代码
+- **每个小里程碑做 Git 提交**:养成习惯
+- **CLAUDE.md 是项目大脑**:每次结束前更新"项目进度日志"段
