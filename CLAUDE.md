@@ -370,9 +370,125 @@ ARCHIVED   已归档(离职 / 失联 / 暂停往来等)
 - **不设联系人级备注字段**:此类零碎信息变动频繁、录入维护成本高,Admin 心里有数即可,不进入数据持久层
 
 ---
-````
 
-## 二、进度日志整段替换(替换文件最下面那段 `## 2026.5.15 项目进度日志` 及以下全部)
+
+### Quote 表(报价记录)
+
+每条 Quote 是"某供应商在某个时间点针对某产品给出的一份报价快照"。系统的比价能力基于此表。
+
+**字段定义:**
+
+```
+Quote(报价记录)
+├── id                                       Int        主键,自增
+├── supplier_id                              Int        外键 → Supplier,必填
+├── contact_id                               Int?       外键 → Contact,可空(口报可能没具体人)
+│
+├── # 产品信息(直接落字段,不引用 Product 表)
+├── product_name_zh                          String     产品名/产品描述(中文),必填
+├── product_name_ru                          String?    产品名(俄文,可自动翻译)
+├── product_spec_zh                          String?    规格描述(中文,自由文本)
+├── product_spec_ru                          String?    规格(俄文,可自动翻译)
+│
+├── # 价格信息(比价核心)
+├── unit_price                               Decimal    单价,必填
+├── currency                                 Enum       Currency,默认 CNY
+├── unit                                     String?    单位(自由文本:件/个/套/打/箱)
+├── moq                                      Int?       起订量(Minimum Order Quantity)
+│
+├── # 报价上下文
+├── quoted_at                                Date       报价日期,必填
+├── valid_until                              Date?      报价有效期
+├── payment_terms                            String?    付款条件(自由文本)
+├── lead_time_days                           Int?       交货天数
+├── source                                   String?    报价来源(自由文本)
+├── quote_batch_id                           String?    报价批次号(预留扩展口)
+│
+├── # 状态
+├── status                                   Enum       QuoteStatus,默认 ACTIVE
+│
+├── # 自动翻译标记
+├── product_name_ru_auto_translated          Boolean    默认 true
+├── product_spec_ru_auto_translated          Boolean    默认 true
+│
+└── # 元数据
+    ├── created_at                           DateTime   创建时间(自动)
+    ├── updated_at                           DateTime   更新时间(自动)
+    └── created_by_id                        Int        外键 → User
+```
+
+**枚举 Currency:**
+
+```
+CNY   人民币
+USD   美元
+RUB   俄罗斯卢布
+EUR   欧元
+```
+
+**枚举 QuoteStatus:**
+
+```
+ACTIVE     有效(默认,出现在比价视图中)
+ARCHIVED   已归档(主动作废:供应商撤回、合作终止、价格已变)
+```
+
+**关联到其他表:**
+
+- Quote → Supplier : 多对一(必填)
+- Quote → Contact : 多对一(可空)
+- Quote → User(created_by) : 多对一
+- Quote ↔ Tag : 多对多(通过 QuoteTag 中间表,Tag 限定 category=PRODUCT)
+- Quote → QuoteImage : 一对多
+
+**重要设计决策:**
+
+- **不建 Product 表**:产品品类靠 Quote ↔ Tag 多对多解决(关联 PRODUCT 类型 Tag),具体产品描述以 `product_name_zh` 和 `product_spec_zh` 自由文本承载。比价靠"按 Tag 聚合 + 全文搜索 + 缩略图肉眼判断"。等业务出现"SKU 级精确比价"或"品类挂图说明"的需求时,再引入 Product 表
+- **单项录入为主,扩展口预留**:第一版只做单项录入(一条 Quote 一个产品),`quote_batch_id` 字段保留备用。未来一张报价单录入多个产品时,生成同一批次号关联,无需改表结构
+- **状态字段两档,过期实时算**:`status` 只区分 ACTIVE / ARCHIVED,管理员手动维护;"过期"不存进 status,运行时按 `valid_until` 字段实时判断。比价视图默认条件:`status = 'ACTIVE' AND (valid_until IS NULL OR valid_until > today)`
+- **比价的核心结构**:三件套——产品名字段全文索引(模糊搜索)、QuoteImage 缩略图(肉眼判断同款)、按 Tag 聚合的比价视图(查询页)
+- **货币用枚举,单位用自由文本**:货币种类有限且需要按种类归一化比价(将来可加汇率表);单位发散且不需要归一化,自由文本即可
+- **不设报价级备注字段**:与 Contact 表一致,避免低频字段。关键补充信息通过 `payment_terms` / `source` 字段承载
+
+---
+
+### QuoteImage 表(报价图片)
+
+Quote 的多图通过子表实现,支持排序和主图标记。
+
+```
+QuoteImage(报价图片)
+├── id              Int        主键,自增
+├── quote_id        Int        外键 → Quote
+├── path            String     图片文件路径
+├── sort_order      Int        显示顺序,默认 0
+├── is_cover        Boolean    是否封面/主图(比价视图缩略图取此张),默认 false
+└── created_at      DateTime   创建时间(自动)
+```
+
+**重要设计决策:**
+
+- **每张 Quote 至多 1 个 `is_cover = true`**:应用层保证,与 `is_primary` 同理。封面用于比价视图的缩略图
+- **`sort_order` 支持自定义顺序**:管理员可拖拽调整图片显示顺序
+- **未来迁移路径**:阶段 5 上线统一的 File 表后,此表可整体迁移为 File 的一类记录(`File.type = 'quote_image'`),业务层零感知
+
+---
+
+### QuoteTag 表(报价-标签关联)
+
+Quote 与 Tag 的多对多关系通过此中间表实现。Tag 限定为 `category = PRODUCT` 类型(产品品类标签)。
+
+```
+QuoteTag(报价-标签关联)
+├── quote_id     Int        外键 → Quote
+├── tag_id       Int        外键 → Tag(category=PRODUCT)
+├── created_at   DateTime   关联创建时间
+└── (复合主键: quote_id + tag_id)
+```
+
+由 Prisma 自动管理。业务层添加 Tag 时校验 `tag.category === 'PRODUCT'`,防止误关联其他类型标签。
+
+---
 
 ## 2026.5.15 项目进度日志
 
@@ -388,24 +504,24 @@ ARCHIVED   已归档(离职 / 失联 / 暂停往来等)
 - ✅ CLAUDE.md 第 2 段(技术栈 + 项目目录结构 + 常用命令)
 - ✅ 数据模型:Supplier 表 + Tag 表 + SupplierTag 中间表
 - ✅ 数据模型:Contact 表(联系人)
+- ✅ 数据模型:Quote 表 + QuoteImage 子表 + QuoteTag 中间表
 
 ### 进行中
 
-- 🔄 数据模型设计:Quote(报价)表 — 待开始讨论业务场景与字段
+- 🔄 数据模型设计:Note(沟通记录)表 — 待开始讨论
 
 ### 待办(按顺序)
 
-1. 完成 Quote(报价)表设计
-2. 完成 Note(沟通记录)表设计
-3. 完成 Transaction(交易)表设计
-4. 完成 File(文件)表设计
-5. 完成 User(用户)表设计
-6. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
-7. 跑 `prisma migrate dev` 生成数据库
-8. 用 Prisma Studio 手动塞测试数据
-9. 写第一个最简页面:从数据库读供应商列表显示为文字
+1. 完成 Note(沟通记录)表设计
+2. 完成 Transaction(交易)表设计
+3. 完成 File(文件)表设计
+4. 完成 User(用户)表设计
+5. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
+6. 跑 `prisma migrate dev` 生成数据库
+7. 用 Prisma Studio 手动塞测试数据
+8. 写第一个最简页面:从数据库读供应商列表显示为文字
 
-### 下次开始时,需要决策的 Quote 表问题
+### 下次开始时,需要决策的 Note 表问题
 
 (本轮讨论中,待填充)
 
