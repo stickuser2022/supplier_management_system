@@ -490,6 +490,58 @@ QuoteTag(报价-标签关联)
 
 ---
 
+### Note 表(沟通记录)
+
+Note 记录"关于供应商的事件流"——具体的沟通(电话、微信、邮件、面谈)+ Admin 的内部观察备忘。它是供应商"软档案"的载体,与 Quote(报价)和 Transaction(交易)在供应商时间线上并列展示。
+
+**字段定义:**
+
+```
+Note(沟通记录)
+├── id                       Int        主键,自增
+├── supplier_id              Int        外键 → Supplier,必填
+├── contact_id               Int?       外键 → Contact,可空
+├── quote_id                 Int?       外键 → Quote,可空(关联具体报价的后续讨论)
+│
+├── # 内容
+├── content_zh               Text       记录正文(中文,必填,自由文本)
+├── content_ru               Text?      俄文版本(可空)
+│
+├── # 时间
+├── happened_at              Date       事件实际发生时间(必填,默认今天)
+│
+├── # 状态
+├── is_active                Boolean    软删除标记,默认 true
+│
+└── # 元数据
+    ├── created_at           DateTime   系统录入时间(自动)
+    ├── updated_at           DateTime   更新时间(自动)
+    └── created_by_id        Int        外键 → User
+```
+
+**关联到其他表:**
+
+- Note → Supplier : 多对一(必填)
+- Note → Contact : 多对一(可空)
+- Note → Quote : 多对一(可空,关联具体报价)
+- Note → User(created_by) : 多对一
+
+**重要设计决策:**
+
+- **双时间字段:`happened_at` 与 `created_at` 分离**:前者是事件实际发生的时间(管理员录入时可填过去日期,补录历史不影响时间轴),后者是系统记录时间(自动生成不可改)。时间线视图按 `happened_at` 排序
+- **范围:沟通 + 内部观察备忘**:不限制 Note 的内容形态,真实沟通(电话/微信/面谈)、Admin 的判断、备忘都进同一张表。"想到什么记什么"是设计意图
+- **不分 type、不做重要标记、不做附件**:第一版保持最小集。附件(微信截图、录音、合同照片)等阶段 5 File 表上线后通过通用文件系统接入
+- **`content_ru` 字段是"按需翻译"模式的人工逃生通道**:与双语策略中"自由文本不入库"的默认行为兼容——默认留空,Viewer 看时由 API 实时翻译不持久化;特殊情况下(API 不稳定 / 翻译质量差 / 重要 Note 需人工把关)Admin 可手动填入俄文版本。显示逻辑:`content_ru` 有值优先用,没值才调 API
+- **不需要 `content_ru_auto_translated` 标记**:Note 的 `content_ru` 一旦有值必然是 Admin 手填(API 翻译永远不入库),来源单一无需溯源。这与 Supplier 表"机翻+人工双源"的设计形成对照
+- **`quote_id` 是轻接触关联**:绝大多数 Note 不关联具体 Quote(留空);仅当 Note 明确是某次报价的后续讨论(对方还价、撤回、答应给样等)时关联。UI 录入入口默认不关联,有"+ 关联到报价"小按钮主动触发
+- **删除策略用 `is_active: Boolean`**:Note 只有"误录想撤销"一种删除场景,无"归档"业务语义,Boolean 够用,与 Supplier 表一致
+
+---
+````
+
+## 二、进度日志整段替换
+
+```markdown
 ## 2026.5.15 项目进度日志
 
 > 此区域是"项目接力棒",每次结束工作前更新。下次开新对话,把整个 CLAUDE.md 粘给 Claude,即可无缝续接上下文。
@@ -505,23 +557,23 @@ QuoteTag(报价-标签关联)
 - ✅ 数据模型:Supplier 表 + Tag 表 + SupplierTag 中间表
 - ✅ 数据模型:Contact 表(联系人)
 - ✅ 数据模型:Quote 表 + QuoteImage 子表 + QuoteTag 中间表
+- ✅ 数据模型:Note 表(沟通记录)
 
 ### 进行中
 
-- 🔄 数据模型设计:Note(沟通记录)表 — 待开始讨论
+- 🔄 数据模型设计:Transaction(交易)表 — 待开始讨论
 
 ### 待办(按顺序)
 
-1. 完成 Note(沟通记录)表设计
-2. 完成 Transaction(交易)表设计
-3. 完成 File(文件)表设计
-4. 完成 User(用户)表设计
-5. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
-6. 跑 `prisma migrate dev` 生成数据库
-7. 用 Prisma Studio 手动塞测试数据
-8. 写第一个最简页面:从数据库读供应商列表显示为文字
+1. 完成 Transaction(交易)表设计
+2. 完成 File(文件)表设计
+3. 完成 User(用户)表设计
+4. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
+5. 跑 `prisma migrate dev` 生成数据库
+6. 用 Prisma Studio 手动塞测试数据
+7. 写第一个最简页面:从数据库读供应商列表显示为文字
 
-### 下次开始时,需要决策的 Note 表问题
+### 下次开始时,需要决策的 Transaction 表问题
 
 (本轮讨论中,待填充)
 
@@ -531,3 +583,4 @@ QuoteTag(报价-标签关联)
 - **决策优先于动手**:每张表先聊清字段含义和取舍,再写 Prisma 代码
 - **每个小里程碑做 Git 提交**:养成习惯
 - **CLAUDE.md 是项目大脑**:每次结束前更新"项目进度日志"段
+
