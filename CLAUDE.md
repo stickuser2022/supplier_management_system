@@ -537,6 +537,137 @@ Note(沟通记录)
 - **删除策略用 `is_active: Boolean`**:Note 只有"误录想撤销"一种删除场景,无"归档"业务语义,Boolean 够用,与 Supplier 表一致
 
 ---
+
+### Transaction 表(订单)
+
+Transaction 记录"真实成交"——订单已下、款已开始付的实际交易。与 Quote(报价)和 Note(沟通)在供应商时间线上并列展示,是供应商关系最"硬"的数据(金额、时间、量都已确定)。
+
+**字段定义:**
+
+```
+Transaction(订单)
+├── id                            Int        主键,自增
+├── supplier_id                   Int        外键 → Supplier,必填
+├── contact_id                    Int?       外键 → Contact,可空(经手联系人)
+│
+├── # 订单基本信息
+├── ordered_at                    Date       下单日期,必填
+├── total_amount                  Decimal    订单总额(管理员录入,与单据一致)
+├── currency                      Enum       Currency,一笔订单统一一个币种
+│
+├── # 描述
+├── notes_zh                      Text?      订单备注(中文,自由文本)
+├── notes_ru                      Text?      订单备注(俄文,可自动翻译)
+│
+├── # 状态
+├── status                        Enum       TransactionStatus,默认 IN_PROGRESS
+├── is_active                     Boolean    软删除标记,默认 true
+│
+├── # 自动翻译标记
+├── notes_ru_auto_translated      Boolean    默认 true
+│
+└── # 元数据
+    ├── created_at                DateTime   自动
+    ├── updated_at                DateTime   自动
+    └── created_by_id             Int        外键 → User
+```
+
+**枚举 TransactionStatus(极简三档):**
+
+```
+IN_PROGRESS   进行中(已下单但未完结,涵盖生产/发货/付款全过程)
+COMPLETED     已完结(到货 + 全款已结)
+CANCELLED     已取消(订单作废)
+```
+
+**关联到其他表:**
+
+- Transaction → Supplier : 多对一(必填)
+- Transaction → Contact : 多对一(可空)
+- Transaction → User(created_by) : 多对一
+- Transaction → TransactionItem : 一对多
+- Transaction → Payment : 一对多
+
+**重要设计决策:**
+
+- **主从模型 vs Quote 的扁平模型不对称是有意为之**:Quote 用扁平 + `quote_batch_id` 软关联(因为多产品报价是偶发场景),Transaction 用主从模型(因为多产品订单是常态)。两张表设计不对称,因为业务现实就不对称,设计应贴合现实
+- **TransactionItem 不引用 Product 表**:产品信息(name/spec)直接落字段,与 Quote 表一致;不建 Product 表的整体策略延续
+- **所有数值字段都是"录入即存储",系统不计算、不校验**:`subtotal`、`total_amount` 等按订单单据原值录入。订单上写啥就是啥(允许打包折扣、整数约定、特殊处理等真实业务情形),系统不强制 `SUM(subtotal) = total_amount`,不强制 `subtotal = quantity × unit_price`。UI 阶段可加"快速填充"按钮作为录入便利,但数据模型层面所有字段都是录入字段
+- **不设物流字段**:中俄跨境采购中物流是货代的独立业务,与工厂订单(Transaction)是两条线索;`expected_delivery_date` / `actual_delivery_date` / `delivery_address` 等字段不放在 Transaction 表
+- **不设自定义订单号 `order_no`**:用系统主键 `id` 即可,需要外部沟通时格式化显示(如 `#20260515-1`)
+- **`notes_zh` 是订单属性级备注,与 Note 表职责不同**:Note 表是"与供应商互动的事件流"(跨越多个事件,时间维度强);Transaction.notes_zh 是"这张订单本身的属性"(含税/运费/特殊约定,紧绑订单)。两者不重复,按 Supplier.description 的双语三件套处理
+- **删除策略用 `is_active: Boolean`**:与 Supplier / Note 一致,只有"误录想撤销"一种删除场景
+
+---
+
+### TransactionItem 表(订单明细)
+
+```
+TransactionItem(订单明细)
+├── id                                       Int      主键,自增
+├── transaction_id                           Int      外键 → Transaction,必填
+├── quote_id                                 Int?     可选关联到具体 Quote(业务链条上下文)
+│
+├── # 产品信息(直接落字段,不引用 Product 表)
+├── product_name_zh                          String   产品名(中文),必填
+├── product_name_ru                          String?  产品名(俄文,可自动翻译)
+├── product_spec_zh                          String?  规格(中文)
+├── product_spec_ru                          String?  规格(俄文,可自动翻译)
+│
+├── # 数量与单价(全部录入字段)
+├── quantity                                 Int      数量(录入)
+├── unit                                     String?  单位(录入,自由文本)
+├── unit_price                               Decimal  单价(录入)
+├── subtotal                                 Decimal  小计(录入,与单据一致)
+│
+├── # 排序
+├── sort_order                               Int      明细行显示顺序,默认 0
+│
+├── # 自动翻译标记
+├── product_name_ru_auto_translated          Boolean  默认 true
+├── product_spec_ru_auto_translated          Boolean  默认 true
+│
+└── # 元数据
+    └── created_at                           DateTime 自动
+```
+
+**重要设计决策:**
+
+- **`quote_id` 在 TransactionItem 层级而非 Transaction 主表**:多产品订单可能跨多个 Quote(同一笔订单买的 3 种产品来自 3 个不同 Quote),把 `quote_id` 放在明细层级才能精确还原业务链条
+- **`quote_id` 是"业务链条上下文",不影响数据**:关联 Quote 仅为追溯成交是从哪个报价谈来的,**价格永远以 TransactionItem 自身的 `unit_price` 为准**,不读 Quote。允许成交价跟 Quote 不一致(谈判常态)
+- **UI 下拉的复合识别信息**:录入 TransactionItem 时关联 Quote 的下拉框,默认按"日期 + 产品名 + 规格 + 价格 + 联系人"复合展示,管理员秒识别。下拉数据已被系统按 supplier_id 和 `status=ACTIVE` 过滤
+
+---
+
+### Payment 表(付款流水)
+
+每笔 Transaction 的付款由一条或多条 Payment 记录承载(定金 / 中款 / 尾款分多次)。
+
+```
+Payment(付款流水)
+├── id                       Int        主键,自增
+├── transaction_id           Int        外键 → Transaction,必填
+│
+├── # 付款信息
+├── paid_at                  Date       付款日期,必填
+├── amount                   Decimal    付款金额,必填
+├── currency                 Enum       Currency,默认与订单一致
+├── method                   String?    付款方式(自由文本:微信/对公转账/现金/支付宝)
+├── purpose_zh               String?    用途(自由文本:定金/中款/尾款)
+├── screenshot_path          String?    付款截图路径(单字段,等 File 表上线后统一接入)
+│
+└── # 元数据
+    ├── created_at           DateTime   自动
+    └── created_by_id        Int        外键 → User
+```
+
+**重要设计决策:**
+
+- **每次付款一条记录**:支持"定金 30% + 中款 30% + 尾款 40%"等多次付款场景。一笔 Transaction 多次付款是常态,子表自然处理
+- **`screenshot_path` 是临时单字段**:等阶段 5 File 表上线后,此字段会迁移为 File 关联(`File.type = 'payment_screenshot'`),业务层零感知
+- **`method` 和 `purpose_zh` 用自由文本**:付款方式和用途的表达千变万化("微信群里说的"、"老李代付"、"补差价"),枚举不灵活;自由文本最贴合实际
+
+---
 ````
 
 ## 二、进度日志整段替换
@@ -558,22 +689,22 @@ Note(沟通记录)
 - ✅ 数据模型:Contact 表(联系人)
 - ✅ 数据模型:Quote 表 + QuoteImage 子表 + QuoteTag 中间表
 - ✅ 数据模型:Note 表(沟通记录)
+- ✅ 数据模型:Transaction + TransactionItem + Payment
 
 ### 进行中
 
-- 🔄 数据模型设计:Transaction(交易)表 — 待开始讨论
+- 🔄 数据模型设计:File(文件)表 — 待开始讨论
 
 ### 待办(按顺序)
 
-1. 完成 Transaction(交易)表设计
-2. 完成 File(文件)表设计
-3. 完成 User(用户)表设计
-4. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
-5. 跑 `prisma migrate dev` 生成数据库
-6. 用 Prisma Studio 手动塞测试数据
-7. 写第一个最简页面:从数据库读供应商列表显示为文字
+1. 完成 File(文件)表设计
+2. 完成 User(用户)表设计
+3. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
+4. 跑 `prisma migrate dev` 生成数据库
+5. 用 Prisma Studio 手动塞测试数据
+6. 写第一个最简页面:从数据库读供应商列表显示为文字
 
-### 下次开始时,需要决策的 Transaction 表问题
+### 下次开始时,需要决策的 File 表问题
 
 (本轮讨论中,待填充)
 
@@ -583,4 +714,5 @@ Note(沟通记录)
 - **决策优先于动手**:每张表先聊清字段含义和取舍,再写 Prisma 代码
 - **每个小里程碑做 Git 提交**:养成习惯
 - **CLAUDE.md 是项目大脑**:每次结束前更新"项目进度日志"段
+```
 
