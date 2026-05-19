@@ -38,6 +38,44 @@
 - **翻译服务:** 通过抽象层接入,当前使用 DeepL,可热切换至 DeepSeek 等其他提供商
 - **部署形态:** 短期跑在 Admin 笔记本上,中长期迁移至国内云服务器
 
+## AI 协作约定
+
+本章节是给所有 AI 协作者(Claude、GPT、Gemini 等)的工作准则。每次开新对话,把整份 CLAUDE.md 粘给 AI 时,这些约定保证协作风格稳定、输出格式正确。
+
+### 合作模式
+
+- **混合模式**:AI 给思路、指示、关键片段,用户主导写代码、做架构决策
+- **决策优先于动手**:每张表、每个功能,先聊清字段含义和取舍,再写 Prisma 或业务代码
+- **每个小里程碑做 Git 提交**:养成习惯,便于回滚和追溯
+- **CLAUDE.md 是项目大脑**:每次结束前更新"项目进度日志"段;阶段性里程碑同步更新本章节及其他相关章节
+
+### Markdown 输出规范(重要)
+
+当 AI 输出**供用户粘贴到 CLAUDE.md 的内容**时,必须遵守以下格式约定,否则用户在 md 预览里看到的内容会渲染错乱:
+
+1. **整段用长代码围栏(7 个及以上反引号 + `markdown` 语言标识)包裹**——形如:
+
+```````markdown
+       ...内容...
+```````
+
+   理由:内部往往嵌套普通 3 反引号代码块(字段定义、枚举值等),外层围栏必须更长,否则会被内部反引号"刺穿"导致围栏提前关闭
+
+2. **字段定义、枚举值用普通 3 反引号代码块包裹**:树形字符(`├── │ └──`)如果不放在代码块里,markdown 解析器可能将其当成特殊语义,导致缩进和对齐被破坏
+
+3. **markdown 表格放在代码块外**:表格语法依赖 markdown 原生解析,在代码块里反而失效
+
+4. **末尾元数据子项保持 4 空格缩进**:CLAUDE.md 现有所有表字段定义里,末尾"元数据"区子项前面有 4 个空格,新增表必须保持一致风格
+
+5. **粘贴边界要清晰**:输出时明确说明"复制这一整段,粘贴到 CLAUDE.md 的哪个位置",避免用户不知道边界
+
+不遵守此规范的常见后果:用户复制后在 md 预览看到树形结构错乱、表格不渲染、缩进丢失,需要回过头来人工修复,浪费双方时间。
+
+### 不确定时的处理
+
+- AI 对项目业务细节有疑问时,**先问再做**,不要靠"合理推测"自己编
+- 用户的"这个我懂了"和"按你说的来"在含义上不同——前者只是确认理解,后者才是授权动手;AI 模糊地带优先确认意图
+- 字段命名、术语选择不一致时,AI 主动指出,不要静默修补
 ---
 
 ## 技术栈
@@ -203,7 +241,6 @@ Supplier(供应商)
 ├── description_ru                      Text?      俄文描述(可自动翻译)
 ├── discovered_via                      String?    认识渠道(自由文本)
 ├── website                             String?    主官网链接
-├── logo_path                           String?    Logo 文件路径
 │
 ├── # 自动翻译标记(7 个)
 ├── name_ru_auto_translated             Boolean    默认 true
@@ -452,27 +489,6 @@ ARCHIVED   已归档(主动作废:供应商撤回、合作终止、价格已变)
 
 ---
 
-### QuoteImage 表(报价图片)
-
-Quote 的多图通过子表实现,支持排序和主图标记。
-
-```
-QuoteImage(报价图片)
-├── id              Int        主键,自增
-├── quote_id        Int        外键 → Quote
-├── path            String     图片文件路径
-├── sort_order      Int        显示顺序,默认 0
-├── is_cover        Boolean    是否封面/主图(比价视图缩略图取此张),默认 false
-└── created_at      DateTime   创建时间(自动)
-```
-
-**重要设计决策:**
-
-- **每张 Quote 至多 1 个 `is_cover = true`**:应用层保证,与 `is_primary` 同理。封面用于比价视图的缩略图
-- **`sort_order` 支持自定义顺序**:管理员可拖拽调整图片显示顺序
-- **未来迁移路径**:阶段 5 上线统一的 File 表后,此表可整体迁移为 File 的一类记录(`File.type = 'quote_image'`),业务层零感知
-
----
 
 ### QuoteTag 表(报价-标签关联)
 
@@ -654,7 +670,8 @@ Payment(付款流水)
 ├── currency                 Enum       Currency,默认与订单一致
 ├── method                   String?    付款方式(自由文本:微信/对公转账/现金/支付宝)
 ├── purpose_zh               String?    用途(自由文本:定金/中款/尾款)
-├── screenshot_path          String?    付款截图路径(单字段,等 File 表上线后统一接入)
+├── purpose_ru               String?    用途(俄文,可自动翻译)
+├── purpose_ru_auto_translated      Boolean    默认 true
 │
 └── # 元数据
     ├── created_at           DateTime   自动
@@ -668,12 +685,108 @@ Payment(付款流水)
 - **`method` 和 `purpose_zh` 用自由文本**:付款方式和用途的表达千变万化("微信群里说的"、"老李代付"、"补差价"),枚举不灵活;自由文本最贴合实际
 
 ---
+
+### File 表(文件)
+
+File 是系统的统一文件载体,服务所有业务实体的文件附件——供应商 Logo / 画册 / 视频 / 资质文档、报价图、付款截图、沟通附件、订单单据等。
+
+**字段定义:**
+
+```
+File(文件)
+├── id                                  Int        主键,自增
+│
+├── # 业务挂载点(每条记录至多 1 个外键非空)
+├── supplier_id                         Int?       外键 → Supplier(可空)
+├── quote_id                            Int?       外键 → Quote(可空)
+├── payment_id                          Int?       外键 → Payment(可空)
+├── note_id                             Int?       外键 → Note(可空,阶段 5 启用)
+├── transaction_id                      Int?       外键 → Transaction(可空,阶段 5 启用)
+├── type                                Enum       FileType,必填
+│
+├── # 文件本体
+├── file_name                           String     原始文件名,必填
+├── storage_key                         String     存储 key(相对路径或对象 key),必填
+├── mime_type                           String     MIME 类型,必填
+├── size_bytes                          Int        文件大小(字节),必填
+├── thumbnail_key                       String?    缩略图 storage_key(图片/视频)
+│
+├── # 显示标题(全可空,UI 按 type 决定显示规则)
+├── title_zh                            String?    中文标题
+├── title_ru                            String?    俄文标题
+├── title_ru_auto_translated            Boolean    默认 true
+│
+├── # 排序与封面(仅部分 type 使用,UI 按需暴露)
+├── sort_order                          Int        显示顺序,默认 0
+├── is_cover                            Boolean    是否封面/主图,默认 false
+│
+├── # 状态
+├── is_active                           Boolean    软删除标记,默认 true
+│
+└── # 元数据
+    ├── created_at                      DateTime   创建时间(自动)
+    ├── updated_at                      DateTime   更新时间(自动)
+    └── created_by_id                   Int        创建人(外键 → User)
+```
+
+**枚举 FileType:**
+
+```
+SUPPLIER_LOGO          供应商 Logo(挂在 supplier_id,每个 supplier 至多 1 个)
+SUPPLIER_BROCHURE      供应商画册 / 产品目录(挂在 supplier_id)
+SUPPLIER_VIDEO         供应商工厂视频 / 产线展示(挂在 supplier_id)
+SUPPLIER_DOC           供应商资质 / 营业执照 / 其他文档(挂在 supplier_id)
+QUOTE_IMAGE            报价图 / 产品照(挂在 quote_id,有 sort_order + is_cover)
+PAYMENT_SCREENSHOT     付款截图(挂在 payment_id)
+NOTE_ATTACHMENT        沟通记录附件(挂在 note_id,阶段 5 启用)
+TRANSACTION_DOC        订单单据 / 合同 / 发票 / 装箱单(挂在 transaction_id,阶段 5 启用)
+OTHER                  其他(兜底)
+```
+
+**关联到其他表:**
+
+- File → Supplier : 多对一(可空)
+- File → Quote : 多对一(可空)
+- File → Payment : 多对一(可空)
+- File → Note : 多对一(可空,阶段 5 启用)
+- File → Transaction : 多对一(可空,阶段 5 启用)
+- File → User(created_by) : 多对一
+
+**UI 层 title 显示规则(数据库字段统一,UI 差异化处理):**
+
+| type | UI 显示 title 输入框 | title 显示时来源 |
+|------|--------------------|----------------|
+| `SUPPLIER_LOGO` | ❌ 不显示 | fallback 到 `Supplier.name_zh / name_ru` |
+| `SUPPLIER_BROCHURE` | ✅ 推荐填 | `title_zh / title_ru` |
+| `SUPPLIER_VIDEO` | ✅ 可选 | `title_zh` 优先,否则 `file_name` |
+| `SUPPLIER_DOC` | ✅ 推荐填 | `title_zh / title_ru` |
+| `QUOTE_IMAGE` | ✅ 可选 | `title_zh` 优先,否则 `file_name` |
+| `PAYMENT_SCREENSHOT` | ❌ 不显示 | fallback 到 `Payment.purpose_zh / purpose_ru` |
+| `NOTE_ATTACHMENT` | ✅ 可选 | `title_zh` 优先,否则 `file_name` |
+| `TRANSACTION_DOC` | ✅ 可选 | `title_zh` 优先,否则固定文案"交易凭证 / Транзакционный документ" |
+| `OTHER` | ✅ 可选 | `title_zh` 优先,否则 `file_name` |
+
+**重要设计决策:**
+
+- **挂载点用"多个 nullable 外键"方案**:File 表上为每个业务表准备一个 nullable FK(`supplier_id` / `quote_id` / `payment_id` / `note_id` / `transaction_id`),每条 File 记录至多 1 个外键非空,由应用层保证。相比多态关联(`owner_type + owner_id`)的优势是**真正的数据库外键约束 + Prisma 关系类型安全**;相比中间表方案的优势是"一份文件挂多处"的需求不明显,不为不需要的能力付出表数量翻倍的代价
+- **`type` 字段是业务用途分类,与 MIME 类型不重叠**:`mime_type` 描述"这是 PDF / 图片 / 视频"(技术维度),`type` 描述"这是画册 / Logo / 报价图"(业务维度)。UI 层根据 type 决定布局(Logo 当头像、画册当画廊、视频用播放器、文档用列表)
+- **`title` 三件套全可空,UI 按 type 决定显示规则**:数据库结构统一(所有 File 都有 `title_zh / title_ru / title_ru_auto_translated`),UI 层差异化处理(部分 type 不显示输入框,部分 type 推荐填,部分 type 留空时 fallback 到关联表字段)。与 Contact 表"按需添加联系方式"、`is_cover` 字段的"按 type 暴露"风格一致——**数据库一致,UI 差异化**是本项目反复出现的设计哲学
+- **`storage_key` 而非 `path`**:字段名抽象,与存储后端解耦。本地存储下 `storage_key` = 相对于 `./storage` 根目录的相对路径(如 `suppliers/1/brochures/xxx.pdf`),OSS 存储下 `storage_key` = 对象 key。业务代码统一通过存储抽象层 `storage.url(file.storage_key)` 拿可访问 URL,底层切换零感知。**永不存绝对路径**,避免环境耦合
+- **`sort_order` + `is_cover` 统一放在 File 表**:虽然只有 `QUOTE_IMAGE` 等少数 type 真正用到,字段本身的存储代价极低(几个字节),换来代码层面无差异处理,远比"为部分 type 单独开子表"经济
+- **应用层保证两个 invariant**:① 每个 supplier 至多 1 个 `SUPPLIER_LOGO` ② 每个 quote 至多 1 个 `is_cover=true` 的 `QUOTE_IMAGE`。两者在 Prisma 事务里处理——写新 LOGO/封面前,先把同一关联下其他记录的对应字段清掉,与 `Contact.is_primary` 同模式
+- **删除策略用 `is_active: Boolean`**:与 Supplier / Note / Transaction 一致,只有"误录想撤销"一种删除场景。物理删除文件本体的时机另议(阶段 5 上线 OSS 后才有意义)
+- **三处临时设计一次性删除**:同步删除 `Supplier.logo_path` 字段、`Payment.screenshot_path` 字段、`QuoteImage` 整张表。当前项目 0 数据,改 schema 零成本
+
+---
+
+
+
 ````
 
 ## 二、进度日志整段替换
 
 ```markdown
-## 2026.5.15 项目进度日志
+## 2026.5.18 项目进度日志
 
 > 此区域是"项目接力棒",每次结束工作前更新。下次开新对话,把整个 CLAUDE.md 粘给 Claude,即可无缝续接上下文。
 
@@ -687,32 +800,34 @@ Payment(付款流水)
 - ✅ CLAUDE.md 第 2 段(技术栈 + 项目目录结构 + 常用命令)
 - ✅ 数据模型:Supplier 表 + Tag 表 + SupplierTag 中间表
 - ✅ 数据模型:Contact 表(联系人)
-- ✅ 数据模型:Quote 表 + QuoteImage 子表 + QuoteTag 中间表
+- ✅ 数据模型:Quote 表 + QuoteTag 中间表(QuoteImage 子表已废,功能并入 File 表)
 - ✅ 数据模型:Note 表(沟通记录)
 - ✅ 数据模型:Transaction + TransactionItem + Payment
+- ✅ 数据模型:**File(文件)表**(统一文件载体,挂载到 Supplier / Quote / Payment / Note / Transaction)
+- ✅ 临时设计清理:删除 `Supplier.logo_path`、`Payment.screenshot_path`、`QuoteImage` 表整张
+- ✅ 字段命名修正:`Payment.purpose_zh` 补齐双语三件套(`purpose_ru` + `purpose_ru_auto_translated`)
 
 ### 进行中
 
-- 🔄 数据模型设计:File(文件)表 — 待开始讨论
+- 🔄 数据模型设计:**User(用户)表** — 待开始讨论
 
 ### 待办(按顺序)
 
-1. 完成 File(文件)表设计
-2. 完成 User(用户)表设计
+1. 完成 User(用户)表设计
+2. **历史字段双语审计**(装 Prisma 前必做):Quote.payment_terms / Quote.source / Quote.unit / Quote.discovered_via / Payment.method 等当前"无 _zh 后缀"的自由文本字段,逐个评估是否升级为双语三件套
 3. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
 4. 跑 `prisma migrate dev` 生成数据库
 5. 用 Prisma Studio 手动塞测试数据
 6. 写第一个最简页面:从数据库读供应商列表显示为文字
 
-### 下次开始时,需要决策的 File 表问题
+### 下次开始时,需要决策的 User 表问题
 
-(本轮讨论中,待填充)
+(初步罗列,具体取舍下次讨论时展开)
 
-### 合作模式备忘
-
-- **混合模式**:Claude 给思路、指示、关键片段,用户主导写代码、做架构决策
-- **决策优先于动手**:每张表先聊清字段含义和取舍,再写 Prisma 代码
-- **每个小里程碑做 Git 提交**:养成习惯
-- **CLAUDE.md 是项目大脑**:每次结束前更新"项目进度日志"段
+- **角色字段**:用枚举 `ADMIN / VIEWER` 直接落字段,还是依赖 Auth.js 的角色管理机制?
+- **认证方式**:用户名 + 密码?邮箱 + 密码?或者让 Auth.js 接管整套认证流程?(关系到密码 hash、登录入口、找回密码等)
+- **语言偏好字段**:用户登录后切换中文 / 俄语界面,这个偏好存哪里?字段命名?是枚举还是字符串?
+- **个人信息字段**:姓名、头像、时区(青格力 +8 vs 家人 +3)是否需要?
+- **User 表自身是否需要双语处理**:每个用户看自己的界面,理论上不需要双语;但 Admin 在系统其他位置(如供应商详情里的"创建人")可能被俄语 Viewer 看到,这种"用户名展示"要不要双语?
 ```
 
