@@ -778,19 +778,74 @@ OTHER                  其他(兜底)
 - **三处临时设计一次性删除**:同步删除 `Supplier.logo_path` 字段、`Payment.screenshot_path` 字段、`QuoteImage` 整张表。当前项目 0 数据,改 schema 零成本
 
 ---
+### User 表(用户)
 
+User 是系统的登录身份载体,被所有业务表的 `created_by_id` 引用,记录"是谁录入了这条数据"。本系统用户规模为 1 Admin + 若干 Viewer(3-5 人量级),设计上极简。
 
+**字段定义:**
 
-````
+```
+User(用户)
+├── id                       Int        主键,自增
+├── username                 String     登录名(英文/拼音),unique,必填
+├── password_hash            String     密码哈希,必填
+├── role                     Enum       Role,默认 VIEWER
+├── locale                   Enum       Locale,默认 ZH
+├── is_active                Boolean    是否启用(软删除),默认 true
+│
+└── # 元数据
+    ├── created_at           DateTime   创建时间(自动)
+    └── updated_at           DateTime   更新时间(自动)
+```
+
+**枚举 Role:**
+
+```
+ADMIN     管理员(青格力,1 人,负责数据采集和维护)
+VIEWER    阅览者(海外家人,纯只读权限)
+```
+
+**枚举 Locale:**
+
+```
+ZH    中文
+RU    俄文
+```
+
+**关联到其他表(User 作为被引用方):**
+
+- User → Supplier(created_by_id) : 一对多
+- User → Tag(created_by_id) : 一对多
+- User → Contact(created_by_id) : 一对多
+- User → Quote(created_by_id) : 一对多
+- User → Note(created_by_id) : 一对多
+- User → Transaction(created_by_id) : 一对多
+- User → Payment(created_by_id) : 一对多
+- User → File(created_by_id) : 一对多
+
+**重要设计决策:**
+
+- **极简主义,只保留必需字段**:登录必需(`username` / `password_hash` / `role`)+ 功能必需(`locale` / `is_active`)+ 元数据。不设头像、时区、邮箱、电话、双语显示名等"看似有用"的字段——本系统用户规模 3-5 人,Admin 直接分发账号,这些字段会长期闲置。需要时再加,一个字段而已
+- **`password_hash` 而非 `password`**:字段名明示存储的是哈希值,杜绝明文密码意外入库的可能。具体哈希算法(bcrypt / argon2 等)在阶段 2 接入认证库时决定
+- **不设双语显示名**:与其他业务表的双语策略不对称是有意为之。用户规模小、相互识别成本低,username 用英文/拼音(如 `qingger` / `katya`)即可承担显示名职责。供应商详情页显示「由 katya 创建」虽然朴素但完全够用
+- **`username` 约定为英文/拼音**:不强制数据库层正则约束(SQLite 支持有限),应用层在创建账号的表单校验。理由:登录名是 Latin 字符是行业标准,且与文件路径、URL 等兼容性好
+- **没有 `created_by_id`**:账号是 Admin 在 Prisma Studio / 数据库层直接创建的运维行为,不存在业务级"谁创建了谁"的关系,因此不设此字段。这是 User 表与所有业务表的结构区别
+- **`role` 落字段而非依赖 Auth.js 角色机制**:枚举字段是数据源,任何业务代码都能查询和判断;阶段 2 引入 Auth.js 时,它只是把 role 包装进 session/JWT,不改变数据本身。两者是分层关系而非互斥关系
+- **`Locale` 枚举跨表共用**:本枚举只在 User 表使用,但命名为系统级 `Locale`(而非 `UserLocale`),为将来其他需要语言标记的字段(如 Supplier 的内部备注语言)预留复用空间
+- **schema 设计属于阶段 1,认证流程接入是阶段 2**:本表此刻落地是为了让所有业务表的 `created_by_id` 外键有挂靠目标,Prisma migrate 能跑通;真正的登录页面、密码校验、session 管理在阶段 2 引入 Auth.js 时再做
+- **删除策略用 `is_active: Boolean`**:停用账号(亲戚不再使用 / 怀疑泄露 / 临时禁用)走 `is_active = false`,数据保留以维护历史 `created_by_id` 外键的完整性。物理删除仅在"录错想撤销"时考虑
+
+---
+
 
 ## 二、进度日志整段替换
 
 ```markdown
-## 2026.5.18 项目进度日志
+## 2026.5.19 项目进度日志
 
 > 此区域是"项目接力棒",每次结束工作前更新。下次开新对话,把整个 CLAUDE.md 粘给 Claude,即可无缝续接上下文。
 
-### 当前阶段:阶段 1 — 项目骨架 + 数据模型雏形
+### 当前阶段:阶段 1 — 数据模型设计收尾
 
 ### 已完成
 
@@ -800,34 +855,46 @@ OTHER                  其他(兜底)
 - ✅ CLAUDE.md 第 2 段(技术栈 + 项目目录结构 + 常用命令)
 - ✅ 数据模型:Supplier 表 + Tag 表 + SupplierTag 中间表
 - ✅ 数据模型:Contact 表(联系人)
-- ✅ 数据模型:Quote 表 + QuoteTag 中间表(QuoteImage 子表已废,功能并入 File 表)
+- ✅ 数据模型:Quote 表 + QuoteTag 中间表
 - ✅ 数据模型:Note 表(沟通记录)
 - ✅ 数据模型:Transaction + TransactionItem + Payment
-- ✅ 数据模型:**File(文件)表**(统一文件载体,挂载到 Supplier / Quote / Payment / Note / Transaction)
+- ✅ 数据模型:File(文件)表(统一文件载体)
+- ✅ 数据模型:**User(用户)表**(极简版,7 字段,Role + Locale 双枚举)
 - ✅ 临时设计清理:删除 `Supplier.logo_path`、`Payment.screenshot_path`、`QuoteImage` 表整张
-- ✅ 字段命名修正:`Payment.purpose_zh` 补齐双语三件套(`purpose_ru` + `purpose_ru_auto_translated`)
+- ✅ 字段命名修正:`Payment.purpose_zh` 补齐双语三件套
 
-### 进行中
+### 全部表完成度核对
 
-- 🔄 数据模型设计:**User(用户)表** — 待开始讨论
+| 表名 | 状态 | 备注 |
+|------|------|------|
+| User | ✅ | 阶段 1 schema 落地,阶段 2 接 Auth.js |
+| Supplier | ✅ | 核心实体 |
+| Tag + SupplierTag | ✅ | 多对多 |
+| Contact | ✅ | 一供应商至多 1 主要联系人 |
+| Quote + QuoteTag | ✅ | 报价快照,扁平模型 |
+| Note | ✅ | 沟通记录,双时间字段 |
+| Transaction + TransactionItem + Payment | ✅ | 主从模型,Payment 子表 |
+| File | ✅ | 统一文件载体,多 nullable FK |
+
+数据模型设计全部完成,可以进入 Prisma 落地阶段。
 
 ### 待办(按顺序)
 
-1. 完成 User(用户)表设计
-2. **历史字段双语审计**(装 Prisma 前必做):Quote.payment_terms / Quote.source / Quote.unit / Quote.discovered_via / Payment.method 等当前"无 _zh 后缀"的自由文本字段,逐个评估是否升级为双语三件套
-3. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
-4. 跑 `prisma migrate dev` 生成数据库
-5. 用 Prisma Studio 手动塞测试数据
-6. 写第一个最简页面:从数据库读供应商列表显示为文字
+1. **历史字段双语审计**(装 Prisma 前必做):逐个评估当前"无 `_zh` 后缀"的自由文本字段,确认是否升级为双语三件套。候选清单:
+   - `Supplier.discovered_via`(认识渠道)
+   - `Quote.payment_terms`(付款条件)
+   - `Quote.source`(报价来源)
+   - `Quote.unit`(单位)
+   - `TransactionItem.unit`(单位)
+   - `Payment.method`(付款方式)
+2. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
+3. 跑 `prisma migrate dev` 生成数据库
+4. 用 Prisma Studio 手动塞测试数据
+5. 写第一个最简页面:从数据库读供应商列表显示为文字
 
-### 下次开始时,需要决策的 User 表问题
+### 下一轮对话开始时的入口问题
 
-(初步罗列,具体取舍下次讨论时展开)
+打开下一轮对话,直接说:"开始历史字段双语审计",即可无缝续接。Claude 会按上面 6 个候选字段逐个抛取舍点(双语 vs 单语)+ 我的建议,你拍板即可。
 
-- **角色字段**:用枚举 `ADMIN / VIEWER` 直接落字段,还是依赖 Auth.js 的角色管理机制?
-- **认证方式**:用户名 + 密码?邮箱 + 密码?或者让 Auth.js 接管整套认证流程?(关系到密码 hash、登录入口、找回密码等)
-- **语言偏好字段**:用户登录后切换中文 / 俄语界面,这个偏好存哪里?字段命名?是枚举还是字符串?
-- **个人信息字段**:姓名、头像、时区(青格力 +8 vs 家人 +3)是否需要?
-- **User 表自身是否需要双语处理**:每个用户看自己的界面,理论上不需要双语;但 Admin 在系统其他位置(如供应商详情里的"创建人")可能被俄语 Viewer 看到,这种"用户名展示"要不要双语?
-```
+预计这一轮 15-30 分钟可以收尾,之后就是装 Prisma 的实操了。
 
