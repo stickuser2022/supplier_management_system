@@ -190,8 +190,30 @@ npx prisma generate        # 重新生成 Prisma Client
 | 界面文字 | 按钮、菜单、表单标签 | 项目初始化时翻译 | `messages/zh.json` + `messages/ru.json` |
 | **标签库** | 品类、资质、能力等 | Admin 录入时**强制填中俄两份**,AI 仅提供"建议"按钮 | Tag 表 `name_zh` + `name_ru` 都必填 |
 | **供应商核心数据** | 公司名、城市、地址、备注 | Admin 仅录中文,系统**自动 AI 翻译**填俄文 | `xxx_zh` + `xxx_ru` + `xxx_ru_auto_translated` 三件套 |
-| 自由文本(沟通记录) | 备注流水 | Admin 仅录中文,Viewer 看时**按需点翻译按钮**实时翻译 | 数据库只存原文,翻译不持久化 |
+| 自由文本(辅助/低频字段) | Note 内容、认识渠道、报价来源、付款方式 | Admin 仅录中文,Viewer 看时**按需点翻译按钮**实时翻译 | 数据库只存原文,翻译不持久化 |
 
+### 按需翻译模式的适用字段清单与 UI 优化
+
+走"按需翻译不入库"模式的字段(数据库只存中文原文,Viewer 视角下提供翻译按钮按需调 API 翻译,结果不持久化)目前包括:
+
+| 字段 | 长度 | Viewer 浏览频率 | 备注 |
+|------|------|---------------|------|
+| `Note.content` | 长 | **高** | 有 `content_ru` 人工逃生通道,Admin 可手填俄文版优先显示 |
+| `Supplier.discovered_via` | 短 | 低 | Admin 私人备忘性质 |
+| `Quote.source` | 短 | 中 | 录入溯源元数据 |
+| `Payment.method` | 短 | 中 | 已完成动作的描述 |
+
+**为什么这几个字段不走双语三件套?** 它们的共同特征是:**Viewer 看与不看不影响决策**(辅助信息 / Admin 私人备忘 / 已完成动作的描述),或**长文本经常修改、机翻入库容易导致中俄不一致**(如 Note.content)。机翻入库的存储和维护开销不划算,UI 按钮 + 实时翻译是更经济的方案。
+
+**UI 阶段需要做的流畅度优化**(影响 Viewer 体验,不影响 schema):
+
+- **前端 localStorage 缓存**:Viewer 翻译过的同一段文本,本地缓存,再次浏览同一页面直接显示俄文,无需再调 API
+- **批量翻译按钮**:Note 列表页提供「翻译当前页全部」一键按钮,Viewer 看完滚到底就够,避免逐条点击
+- **(可选)预翻译策略**:Viewer 打开供应商详情时,系统后台预翻译该供应商的全部 Note,降低交互延迟
+
+**API 用量评估**(以 DeepL 为参考基准):按 50 供应商 / 每供应商 10 条 Note / 每条 50 字 / 3 个 Viewer / 每人每天 20 条估算,月度翻译字符约 9 万,远低于 DeepL 免费版 50 万字符/月的限额。叠加 localStorage 缓存后实际调用更少。生产环境上正式平台时建议升级 DeepL Pro 或切换 DeepSeek(通过翻译抽象层一行配置切换)。
+
+---
 ### 双语字段命名约定
 
 凡是需要双语的字段,统一遵循:
@@ -284,6 +306,7 @@ INACTIVE          已暂停(目前未合作但未拉黑)
 - **质量评级不做静态字段**:不设 `quality_rating` 枚举;质量评估属于事件性数据,通过 Note(沟通记录)和 Transaction(交易记录)的时间线体现
 - **付款条件、规格属性不做字段**:这些是订单维度的动态属性,落在 Quote / Transaction 表中
 - **公司规模、营业执照等低频信息**:写入 `description_zh`,日后若发现高频再拎出来成字段
+- **`discovered_via` 字段保持单语 + UI 翻译按钮**(2026.5.19 双语审计结论):Admin 用中文录入认识渠道(如"广交会"、"朋友介绍"、"老李推荐"),Viewer 视角下提供「翻译这一项」按钮按需翻译,翻译结果不入库。理由:这是 Admin 私人备忘性质的字段,Viewer 即使翻译了「老李推荐」也不知道老李是谁,不值得开双语三件套
 
 ---
 
@@ -430,15 +453,16 @@ Quote(报价记录)
 ├── # 价格信息(比价核心)
 ├── unit_price                               Decimal    单价,必填
 ├── currency                                 Enum       Currency,默认 CNY
-├── unit                                     String?    单位(自由文本:件/个/套/打/箱)
+├── unit_zh                                  String?    单位(中文,UI 自动补全)
+├── unit_ru                                  String?    单位(俄文,UI 自动补全)
 ├── moq                                      Int?       起订量(Minimum Order Quantity)
 │
 ├── # 报价上下文
 ├── quoted_at                                Date       报价日期,必填
 ├── valid_until                              Date?      报价有效期
-├── payment_terms                            String?    付款条件(自由文本)
+├── payment_terms                            String?    付款条件(强制英文录入,详见设计决策)
 ├── lead_time_days                           Int?       交货天数
-├── source                                   String?    报价来源(自由文本)
+├── source                                   String?    报价来源(中文自由文本,UI 翻译按钮)
 ├── quote_batch_id                           String?    报价批次号(预留扩展口)
 │
 ├── # 状态
@@ -476,15 +500,18 @@ ARCHIVED   已归档(主动作废:供应商撤回、合作终止、价格已变)
 - Quote → Contact : 多对一(可空)
 - Quote → User(created_by) : 多对一
 - Quote ↔ Tag : 多对多(通过 QuoteTag 中间表,Tag 限定 category=PRODUCT)
-- Quote → QuoteImage : 一对多
+- Quote → File : 一对多(`type=QUOTE_IMAGE` 类型,挂载报价图/产品照)
 
 **重要设计决策:**
 
 - **不建 Product 表**:产品品类靠 Quote ↔ Tag 多对多解决(关联 PRODUCT 类型 Tag),具体产品描述以 `product_name_zh` 和 `product_spec_zh` 自由文本承载。比价靠"按 Tag 聚合 + 全文搜索 + 缩略图肉眼判断"。等业务出现"SKU 级精确比价"或"品类挂图说明"的需求时,再引入 Product 表
 - **单项录入为主,扩展口预留**:第一版只做单项录入(一条 Quote 一个产品),`quote_batch_id` 字段保留备用。未来一张报价单录入多个产品时,生成同一批次号关联,无需改表结构
 - **状态字段两档,过期实时算**:`status` 只区分 ACTIVE / ARCHIVED,管理员手动维护;"过期"不存进 status,运行时按 `valid_until` 字段实时判断。比价视图默认条件:`status = 'ACTIVE' AND (valid_until IS NULL OR valid_until > today)`
-- **比价的核心结构**:三件套——产品名字段全文索引(模糊搜索)、QuoteImage 缩略图(肉眼判断同款)、按 Tag 聚合的比价视图(查询页)
-- **货币用枚举,单位用自由文本**:货币种类有限且需要按种类归一化比价(将来可加汇率表);单位发散且不需要归一化,自由文本即可
+- **比价的核心结构**:三件套——产品名字段全文索引(模糊搜索)、File 表中 `type=QUOTE_IMAGE` 的缩略图(肉眼判断同款)、按 Tag 聚合的比价视图(查询页)
+- **货币用枚举,单位用受控双字段**:货币种类有限且需要按种类归一化比价(将来可加汇率表);单位虽词汇集中但允许扩展(特殊单位手填),用"双字段 + UI 自动补全"模式
+- **`unit` 字段双字段无 `_auto_translated` 标记**(2026.5.19 字段升级):`unit_zh` + `unit_ru` 双字段,UI 层维护一份"常见单位词表"(件/шт、个/шт、箱/коробка、打/дюжина、米/м、千克/кг 等)提供下拉自动补全;选下拉自动填中俄两份,特殊单位 Admin 手动填两份。无需 AI 翻译——单位词汇短小固定,机翻不可靠也不必要,Admin 录入即定
+- **`payment_terms` 强制英文录入约定**(2026.5.19 双语审计结论):必须用英文 + 国际贸易标准术语(EXW / FOB / CIF / T/T / L/C / 30% downpayment / Net 30 等)。理由:中俄双方都能直读,无需翻译,避免双语三件套的存储和维护开销。即使非标准化条件(如 "50 sample units first, full payment against B/L copy")也必须用英文表达,不允许中文录入。UI 录入表单可在 placeholder / 字段说明里给出术语示例提醒
+- **`source` 字段保持单语 + UI 翻译按钮**(2026.5.19 双语审计结论):Admin 用中文录入(如"微信语音 5.10"、"展会摊位现场"),Viewer 视角下提供「翻译这一项」小按钮按需翻译,翻译结果不入库。理由:source 是录入溯源的辅助元数据,Viewer 看不看都不影响比价决策,不值得为它开双语三件套
 - **不设报价级备注字段**:与 Contact 表一致,避免低频字段。关键补充信息通过 `payment_terms` / `source` 字段承载
 
 ---
@@ -632,7 +659,8 @@ TransactionItem(订单明细)
 │
 ├── # 数量与单价(全部录入字段)
 ├── quantity                                 Int      数量(录入)
-├── unit                                     String?  单位(录入,自由文本)
+├── unit_zh                                  String?  单位(中文,UI 自动补全)
+├── unit_ru                                  String?  单位(俄文,UI 自动补全)
 ├── unit_price                               Decimal  单价(录入)
 ├── subtotal                                 Decimal  小计(录入,与单据一致)
 │
@@ -652,6 +680,7 @@ TransactionItem(订单明细)
 - **`quote_id` 在 TransactionItem 层级而非 Transaction 主表**:多产品订单可能跨多个 Quote(同一笔订单买的 3 种产品来自 3 个不同 Quote),把 `quote_id` 放在明细层级才能精确还原业务链条
 - **`quote_id` 是"业务链条上下文",不影响数据**:关联 Quote 仅为追溯成交是从哪个报价谈来的,**价格永远以 TransactionItem 自身的 `unit_price` 为准**,不读 Quote。允许成交价跟 Quote 不一致(谈判常态)
 - **UI 下拉的复合识别信息**:录入 TransactionItem 时关联 Quote 的下拉框,默认按"日期 + 产品名 + 规格 + 价格 + 联系人"复合展示,管理员秒识别。下拉数据已被系统按 supplier_id 和 `status=ACTIVE` 过滤
+- **`unit` 字段与 Quote 表同策略**(2026.5.19 字段升级):`unit_zh` + `unit_ru` 双字段,UI 自动补全,无 `_auto_translated` 标记。详见 Quote 表的相应设计决策
 
 ---
 
@@ -683,6 +712,7 @@ Payment(付款流水)
 - **每次付款一条记录**:支持"定金 30% + 中款 30% + 尾款 40%"等多次付款场景。一笔 Transaction 多次付款是常态,子表自然处理
 - **`screenshot_path` 是临时单字段**:等阶段 5 File 表上线后,此字段会迁移为 File 关联(`File.type = 'payment_screenshot'`),业务层零感知
 - **`method` 和 `purpose_zh` 用自由文本**:付款方式和用途的表达千变万化("微信群里说的"、"老李代付"、"补差价"),枚举不灵活;自由文本最贴合实际
+- **`method` 字段保持单语 + UI 翻译按钮**(2026.5.19 双语审计结论):Admin 用中文录入(如"微信"、"对公转账"、"老李代付"),Viewer 视角下按需翻译。理由:付款方式是已完成动作的描述,主要给 Admin 自己记账用,Viewer 看了也不需要做决策。注意此条针对 `method` 字段;`purpose_zh` 字段已升级为双语三件套(见上面字段定义)
 
 ---
 
@@ -845,56 +875,52 @@ RU    俄文
 
 > 此区域是"项目接力棒",每次结束工作前更新。下次开新对话,把整个 CLAUDE.md 粘给 Claude,即可无缝续接上下文。
 
-### 当前阶段:阶段 1 — 数据模型设计收尾
+### 当前阶段:阶段 1 — 数据模型设计已完成,即将进入 Prisma 落地
 
 ### 已完成
 
 - ✅ Next.js 16.2.6 项目初始化(TypeScript + Tailwind + App Router + Turbopack)
 - ✅ Git 仓库初始化和首次提交,用户配置完成
-- ✅ CLAUDE.md 第 1 段(项目概览 + 用户角色 + 语言策略 + 关键设计决策)
-- ✅ CLAUDE.md 第 2 段(技术栈 + 项目目录结构 + 常用命令)
+- ✅ CLAUDE.md 项目大脑搭建(项目概览、用户角色、语言策略、技术栈、AI 协作约定、目录结构、常用命令)
 - ✅ 数据模型:Supplier 表 + Tag 表 + SupplierTag 中间表
 - ✅ 数据模型:Contact 表(联系人)
 - ✅ 数据模型:Quote 表 + QuoteTag 中间表
 - ✅ 数据模型:Note 表(沟通记录)
 - ✅ 数据模型:Transaction + TransactionItem + Payment
 - ✅ 数据模型:File(文件)表(统一文件载体)
-- ✅ 数据模型:**User(用户)表**(极简版,7 字段,Role + Locale 双枚举)
+- ✅ 数据模型:User(用户)表(极简版,7 字段,Role + Locale 双枚举)
 - ✅ 临时设计清理:删除 `Supplier.logo_path`、`Payment.screenshot_path`、`QuoteImage` 表整张
-- ✅ 字段命名修正:`Payment.purpose_zh` 补齐双语三件套
+- ✅ **历史字段双语审计完成**(2026.5.19):
+  - `Supplier.discovered_via` / `Quote.source` / `Payment.method`:保留单字段中文 + UI 翻译按钮
+  - `Quote.payment_terms`:保留单字段,强制英文 + 国际贸易标准术语录入
+  - `Quote.unit` / `TransactionItem.unit`:**字段结构升级**为 `unit_zh` + `unit_ru` 双字段(无 `_auto_translated` 标记),UI 自动补全
+  - 双语策略章节补强:新增「按需翻译模式的适用字段清单与 UI 优化」小节
+  - 顺手清理 Quote 表关联中遗留的 `QuoteImage` 引用(已迁移至 File 表)
 
-### 全部表完成度核对
+### 数据模型阶段全部完成 ✅
 
-| 表名 | 状态 | 备注 |
-|------|------|------|
-| User | ✅ | 阶段 1 schema 落地,阶段 2 接 Auth.js |
-| Supplier | ✅ | 核心实体 |
-| Tag + SupplierTag | ✅ | 多对多 |
-| Contact | ✅ | 一供应商至多 1 主要联系人 |
-| Quote + QuoteTag | ✅ | 报价快照,扁平模型 |
-| Note | ✅ | 沟通记录,双时间字段 |
-| Transaction + TransactionItem + Payment | ✅ | 主从模型,Payment 子表 |
-| File | ✅ | 统一文件载体,多 nullable FK |
-
-数据模型设计全部完成,可以进入 Prisma 落地阶段。
+所有表 schema 已定稿,可以进入 Prisma 落地阶段。
 
 ### 待办(按顺序)
 
-1. **历史字段双语审计**(装 Prisma 前必做):逐个评估当前"无 `_zh` 后缀"的自由文本字段,确认是否升级为双语三件套。候选清单:
-   - `Supplier.discovered_via`(认识渠道)
-   - `Quote.payment_terms`(付款条件)
-   - `Quote.source`(报价来源)
-   - `Quote.unit`(单位)
-   - `TransactionItem.unit`(单位)
-   - `Payment.method`(付款方式)
-2. 安装 Prisma + 初始化 SQLite + 写第一版 `schema.prisma`
-3. 跑 `prisma migrate dev` 生成数据库
-4. 用 Prisma Studio 手动塞测试数据
-5. 写第一个最简页面:从数据库读供应商列表显示为文字
+1. **安装 Prisma + 初始化 SQLite**:
+    - `npm install prisma --save-dev`
+    - `npm install @prisma/client`
+    - `npx prisma init --datasource-provider sqlite`
+2. **编写第一版 `prisma/schema.prisma`**:把 CLAUDE.md 里所有表的字段定义翻译成 Prisma DSL(可能要分批,因为表多)
+3. **跑 `npx prisma migrate dev --name init`**:生成 SQLite 数据库 + Prisma Client
+4. **用 `npx prisma studio` 手动塞测试数据**:1-2 个供应商 + 若干标签和联系人,验证关联关系
+5. **写第一个最简页面**:`/suppliers` 路由,从数据库读供应商列表显示为文字列表
+6. Git 提交节点:阶段 1 完整收尾
 
-### 下一轮对话开始时的入口问题
+### 下一轮对话开始时的入口
 
-打开下一轮对话,直接说:"开始历史字段双语审计",即可无缝续接。Claude 会按上面 6 个候选字段逐个抛取舍点(双语 vs 单语)+ 我的建议,你拍板即可。
+打开下一轮对话,把整个 CLAUDE.md 粘给 Claude,直接说:**"开始装 Prisma"**。Claude 会:
 
-预计这一轮 15-30 分钟可以收尾,之后就是装 Prisma 的实操了。
+1. 检查当前 `package.json` 和目录结构是否符合预期
+2. 给出 Prisma 安装 + 初始化的具体命令(逐条解释每条命令做什么)
+3. 协助把 CLAUDE.md 的表定义翻译成 `schema.prisma`(可能要分批,先核心表后中间表)
+4. 跑通第一次 migrate,在 Prisma Studio 里手塞测试数据
+
+预计 Prisma 落地阶段需要 1-2 轮对话。
 
