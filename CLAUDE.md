@@ -156,10 +156,15 @@ npm run build
 # 运行 ESLint 检查
 npm run lint
 
-# Prisma 相关(阶段 1 安装后才有)
-npx prisma studio          # 数据库可视化管理
-npx prisma migrate dev     # 应用 schema 变更到数据库
-npx prisma generate        # 重新生成 Prisma Client
+```bash
+# Prisma 相关
+npx prisma studio                                # 数据库可视化管理(浏览器打开 localhost:5555)
+npx prisma migrate dev --name <migration_name>   # 应用 schema 变更到数据库,带上本次变更的描述名
+npx prisma generate                              # 重新生成 Prisma Client(Prisma 7 中必须显式跑)
+npx prisma format                                # 自动格式化 schema.prisma 文件
+```
+
+> **Prisma 7 关键变化**:`migrate dev` 不再自动跑 `generate`(v6 旧版会自动跑)。改完 schema 后,**两条都要手动跑**:先 `migrate dev` 让数据库结构跟上,再 `generate` 让 TypeScript Client 代码跟上。如果只跑 migrate 不跑 generate,业务代码里的 `prisma.xxx.findMany(...)` 类型会过时报错。
 ```
 
 ---
@@ -866,56 +871,41 @@ RU    俄文
 
 ---
 
-## 2026.5.19 项目进度日志
+## 2026.5.20 项目进度日志
 
 > 此区域是"项目接力棒",每次结束工作前更新。下次开新对话,把整个 CLAUDE.md 粘给 Claude,即可无缝续接上下文。
 
-### 当前阶段:阶段 1 — 数据模型设计已完成,即将进入 Prisma 落地
+### 当前阶段:阶段 1 — Prisma 基础设施已落地,User 表已迁移
 
 ### 已完成
 
-- ✅ Next.js 16.2.6 项目初始化(TypeScript + Tailwind + App Router + Turbopack)
-- ✅ Git 仓库初始化和首次提交,用户配置完成
-- ✅ CLAUDE.md 项目大脑搭建(项目概览、用户角色、语言策略、技术栈、AI 协作约定、目录结构、常用命令)
-- ✅ 数据模型:Supplier 表 + Tag 表 + SupplierTag 中间表
-- ✅ 数据模型:Contact 表(联系人)
-- ✅ 数据模型:Quote 表 + QuoteTag 中间表
-- ✅ 数据模型:Note 表(沟通记录)
-- ✅ 数据模型:Transaction + TransactionItem + Payment
-- ✅ 数据模型:File(文件)表(统一文件载体)
-- ✅ 数据模型:User(用户)表(极简版,7 字段,Role + Locale 双枚举)
-- ✅ 临时设计清理:删除 `Supplier.logo_path`、`Payment.screenshot_path`、`QuoteImage` 表整张
-- ✅ **历史字段双语审计完成**(2026.5.19):
-  - `Supplier.discovered_via` / `Quote.source` / `Payment.method`:保留单字段中文 + UI 翻译按钮
-  - `Quote.payment_terms`:保留单字段,强制英文 + 国际贸易标准术语录入
-  - `Quote.unit` / `TransactionItem.unit`:**字段结构升级**为 `unit_zh` + `unit_ru` 双字段(无 `_auto_translated` 标记),UI 自动补全
-  - 双语策略章节补强:新增「按需翻译模式的适用字段清单与 UI 优化」小节
-  - 顺手清理 Quote 表关联中遗留的 `QuoteImage` 引用(已迁移至 File 表)
-
-### 数据模型阶段全部完成 ✅
-
-所有表 schema 已定稿,可以进入 Prisma 落地阶段。
+- ✅ 数据模型设计阶段全部收尾(11 张表 schema 定稿 + 历史字段双语审计)
+- ✅ Prisma 7 + SQLite 安装与配置完成:
+  - 装包:`prisma`、`@prisma/client`、`@prisma/adapter-better-sqlite3`、`better-sqlite3`、`@types/better-sqlite3`、`dotenv`
+  - 项目命名约定拍板:**方案 A**(代码 camelCase + 数据库 snake_case,`@map` 映射)
+- ✅ 首张表 User 落地:
+  - `prisma/schema.prisma`:Role + Locale 枚举 + User model 写完
+  - `npx prisma migrate dev --name init_user` 跑通,生成 `prisma/dev.db` + `prisma/migrations/20260521033305_init_user/`
+  - `npx prisma generate` 跑通,生成 `src/generated/prisma/`(已加入 .gitignore)
+  - Prisma Studio 验证可用
+- ✅ CLAUDE.md 文档增补:开发常用命令段补充 Prisma 7 的 migrate / generate 解耦说明
 
 ### 待办(按顺序)
 
-1. **安装 Prisma + 初始化 SQLite**:
-    - `npm install prisma --save-dev`
-    - `npm install @prisma/client`
-    - `npx prisma init --datasource-provider sqlite`
-2. **编写第一版 `prisma/schema.prisma`**:把 CLAUDE.md 里所有表的字段定义翻译成 Prisma DSL(可能要分批,因为表多)
-3. **跑 `npx prisma migrate dev --name init`**:生成 SQLite 数据库 + Prisma Client
-4. **用 `npx prisma studio` 手动塞测试数据**:1-2 个供应商 + 若干标签和联系人,验证关联关系
-5. **写第一个最简页面**:`/suppliers` 路由,从数据库读供应商列表显示为文字列表
+1. **写 `src/lib/prisma.ts`**:用 `@prisma/adapter-better-sqlite3` 包装 PrismaClient,导出全局单例(Prisma 7 driver adapter 模式的标准做法)
+2. **批量翻译剩余 10 张表的 schema**(分批进行,建议顺序:Tag → Supplier → SupplierTag → Contact → Quote → QuoteTag → Note → Transaction → TransactionItem → Payment → File)
+3. **每加一组表跑一次 migrate**(`--name add_tag_supplier` 等),保持迁移历史清晰
+4. **塞测试数据**:Prisma Studio 里手动加 1-2 个供应商 + 标签 + 联系人,验证关联关系
+5. **第一个最简页面**:`/suppliers` 路由,从数据库读供应商列表显示
 6. Git 提交节点:阶段 1 完整收尾
 
 ### 下一轮对话开始时的入口
 
-打开下一轮对话,把整个 CLAUDE.md 粘给 Claude,直接说:**"开始装 Prisma"**。Claude 会:
+直接说:**"继续阶段 1,写 src/lib/prisma.ts"**。Claude 会:
+1. 解释 driver adapter 模式的工作机制
+2. 引导你自己写出 `src/lib/prisma.ts`(继续教学模式,不直接给成品)
+3. 写完后写一个最简验证脚本,跑通从代码到数据库的链路
+4. 进入批量写剩余 10 张表的环节
 
-1. 检查当前 `package.json` 和目录结构是否符合预期
-2. 给出 Prisma 安装 + 初始化的具体命令(逐条解释每条命令做什么)
-3. 协助把 CLAUDE.md 的表定义翻译成 `schema.prisma`(可能要分批,先核心表后中间表)
-4. 跑通第一次 migrate,在 Prisma Studio 里手塞测试数据
-
-预计 Prisma 落地阶段需要 1-2 轮对话。
+预计阶段 1 还需 2-3 轮对话收尾。
 

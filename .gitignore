@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Prisma 自动生成的客户端代码(每次 generate 重写,不进 Git)
+/src/generated/prisma

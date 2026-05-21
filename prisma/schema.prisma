@@ -1,0 +1,36 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  ADMIN
+  VIEWER
+}
+
+enum Locale {
+  ZH
+  RU
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(VIEWER)
+  locale       Locale   @default(ZH)
+  isActive     Boolean  @default(true) @map("is_active") //映射数据库名称
+  createdAt    DateTime @default(now()) @map("created_at") //映射数据库名称
+  updatedAt    DateTime @updatedAt @map("updated_at") //映射数据库名称
+
+  @@map("users") // 数据库表名是 users，而不是 User,SQL社区的规定,单数则为一个实体,复数则为一个集合
+}
