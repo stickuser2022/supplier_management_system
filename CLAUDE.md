@@ -49,6 +49,18 @@
 - **每个小里程碑做 Git 提交**:养成习惯,便于回滚和追溯
 - **CLAUDE.md 是项目大脑**:每次结束前更新"项目进度日志"段;阶段性里程碑同步更新本章节及其他相关章节
 
+### 用人话沟通,慎用术语
+
+AI 给用户解释时,**优先用日常类比和具体场景**,而不是堆专业术语。用户是业务负责人 + 编程学习者,术语密度过高会直接造成认知过载、影响判断质量。
+
+- 遇到一个技术词不可避免,**首次出现时用一句话解释它的本意**(比如"adapter 就是把不同品牌插头转成统一接口的转接头"),然后再继续用这个词
+- 解释机制先给比喻或具体场景(水管、配电箱、快递分拣),再上术语 —— **不要反过来**
+- 一次回应里如果出现 3 个以上新术语,大概率用户会过载 —— **拆成多轮**,或聚焦到 1 个核心概念
+- 用户表达"懵 / 一知半解 / 信息过载"时,**不要追加更多术语**,而是降一层抽象(用比喻、画图、举具体例子)
+- 决策类问题(为什么这样设计),用**"如果不这样做会怎样"的反例**来讲,比直接灌定义易懂
+
+这一条与"决策优先于动手"是同等优先级的协作准则。AI 写代码再准,如果用户读不懂决策依据,就不可能在长期项目中保留架构感,等同失败。
+
 ### Markdown 输出规范(重要)
 
 当 AI 输出**供用户粘贴到 CLAUDE.md 的内容**时,必须遵守以下格式约定,否则用户在 md 预览里看到的内容会渲染错乱:
@@ -166,6 +178,84 @@ npx prisma format                                # 自动格式化 schema.prisma
 
 > **Prisma 7 关键变化**:`migrate dev` 不再自动跑 `generate`(v6 旧版会自动跑)。改完 schema 后,**两条都要手动跑**:先 `migrate dev` 让数据库结构跟上,再 `generate` 让 TypeScript Client 代码跟上。如果只跑 migrate 不跑 generate,业务代码里的 `prisma.xxx.findMany(...)` 类型会过时报错。
 ```
+## Prisma 7 + driver adapter 实操要点
+
+本系统用的是 Prisma 7 + `@prisma/adapter-better-sqlite3` driver adapter 模式,与 Prisma 5/6 旧版差异较大。下面 5 个坑都是 2026.5.21 跑通 `src/lib/prisma.ts` 时实地踩过的,写在前头供未来对话避坑。
+
+### 1. Generator 用新的 `prisma-client` provider
+
+`prisma/schema.prisma` 顶部的 generator 块:
+
+```
+generator client {
+  provider = "prisma-client"            // 新版,旧版叫 "prisma-client-js"
+  output   = "../src/generated/prisma"  // 自定义输出路径
+}
+```
+
+带来的具体影响:Client 的入口文件叫 **`client.ts`**(旧版叫 `index.ts`),所以 import 路径必须带 `/client` 后缀:
+
+```typescript
+import { PrismaClient } from '../generated/prisma/client';
+//                                                ↑ 这段不能漏
+```
+
+漏 `/client` 会以 `Cannot find module` 报错。
+
+### 2. Adapter 包的导出名是 `PrismaBetterSqlite3`
+
+注意大小写:**小写 `Sqlite3`**,不是 `SQLite3`:
+
+```typescript
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+const adapter = new PrismaBetterSqlite3({ url: '<abs-path>' });
+```
+
+写错会以 `is not a constructor` 报错(undefined 不能 new)。
+
+**查任何 npm 包真实导出的金标方法是看 `.d.ts`**:
+
+```powershell
+type node_modules\@prisma\adapter-better-sqlite3\dist\index.d.ts
+```
+
+这是该包对外的"说明书",一切以它为准,比凭记忆或搜过时博客可靠得多。
+
+### 3. 裸 Node 脚本必须手动加载 .env
+
+`tsx` / `node` 直接跑 `.ts` / `.js` 脚本时,**不自动加载 .env**。Prisma CLI 和 Next.js 运行时自带 dotenv,所以业务代码无感;但 `scripts/` 下的工具脚本必须显式加载:
+
+```typescript
+import 'dotenv/config';                       // 必须在所有 import 之前
+import { prisma } from '../src/lib/prisma';
+```
+
+否则 `process.env.DATABASE_URL` 是 `undefined`,而 `!` 非空断言只骗 TS、不影响运行时,后续会以 `Cannot read properties of undefined (reading 'replace')` 之类的间接错出现,**症状离根因很远,排查很费时**。
+
+### 4. 路径锚点:CLI 和 adapter 都以 cwd 为基准
+
+旧文档(Prisma 5/6 时代)常说 SQLite 相对路径相对于 `schema.prisma` 目录解析。**Prisma 7 + `prisma.config.ts` 模式下,实测两端都以 `process.cwd()` 为基准**(即从哪个目录跑命令,就从那里算)。
+
+所以 `.env`:
+
+```
+DATABASE_URL="file:./dev.db"
+```
+
+从项目根目录跑命令时,真实路径是项目根目录的 `dev.db`,**不在 prisma/ 子目录**。`prisma.ts` 里转绝对路径也不需要补 `prisma/` 段:
+
+```typescript
+const raw = process.env.DATABASE_URL!.replace(/^file:/, '');
+const dbPath = path.isAbsolute(raw)
+  ? raw
+  : path.resolve(process.cwd(), raw);   // 直接 cwd + raw,不加任何子目录
+```
+
+排错小窍门:任何"数据库文件位置 / 路径锚点"类困惑,先在 prisma.ts 里 `console.log` 出 `process.env.DATABASE_URL`、`raw`、`dbPath`、`process.cwd()` 这四个值,5 分钟定位,不要靠猜。
+
+### 5. `prisma.config.ts` 是 Prisma 7 新引入的配置文件
+
+项目根目录有 `prisma.config.ts`(Prisma 7 引入,部分配置从 schema.prisma 迁移到这里)。CLI 启动时会自动加载,日志里会看到 `Loaded Prisma config from prisma.config.ts.`。具体内容当前未深究,**只要知道它存在,且会影响 CLI 行为**即可,需要调整时再翻文档。
 
 ---
 
@@ -871,41 +961,39 @@ RU    俄文
 
 ---
 
-## 2026.5.20 项目进度日志
+## 2026.5.21 项目进度日志
 
 > 此区域是"项目接力棒",每次结束工作前更新。下次开新对话,把整个 CLAUDE.md 粘给 Claude,即可无缝续接上下文。
 
-### 当前阶段:阶段 1 — Prisma 基础设施已落地,User 表已迁移
+### 当前阶段:阶段 1 — Prisma 基础设施完整跑通,准备写剩余 10 张表
 
 ### 已完成
 
 - ✅ 数据模型设计阶段全部收尾(11 张表 schema 定稿 + 历史字段双语审计)
-- ✅ Prisma 7 + SQLite 安装与配置完成:
-  - 装包:`prisma`、`@prisma/client`、`@prisma/adapter-better-sqlite3`、`better-sqlite3`、`@types/better-sqlite3`、`dotenv`
-  - 项目命名约定拍板:**方案 A**(代码 camelCase + 数据库 snake_case,`@map` 映射)
-- ✅ 首张表 User 落地:
-  - `prisma/schema.prisma`:Role + Locale 枚举 + User model 写完
-  - `npx prisma migrate dev --name init_user` 跑通,生成 `prisma/dev.db` + `prisma/migrations/20260521033305_init_user/`
-  - `npx prisma generate` 跑通,生成 `src/generated/prisma/`(已加入 .gitignore)
-  - Prisma Studio 验证可用
-- ✅ CLAUDE.md 文档增补:开发常用命令段补充 Prisma 7 的 migrate / generate 解耦说明
+- ✅ Prisma 7 + SQLite 安装与配置完成(2026.5.20)
+- ✅ User 表 schema 落地 + migrate(2026.5.20)
+- ✅ `src/lib/prisma.ts` 完成(2026.5.21):driver adapter + 全局单例 + 绝对路径 normalize
+- ✅ `scripts/verify-prisma.ts` 集成验证脚本通过:Created + Count = 1,整条链路 tsx → prisma.ts → adapter → better-sqlite3 → dev.db 跑通
+- ✅ CLAUDE.md 增补"Prisma 7 + driver adapter 实操要点"章节(2026.5.21),记录跑通过程踩过的 5 个坑
 
 ### 待办(按顺序)
 
-1. **写 `src/lib/prisma.ts`**:用 `@prisma/adapter-better-sqlite3` 包装 PrismaClient,导出全局单例(Prisma 7 driver adapter 模式的标准做法)
-2. **批量翻译剩余 10 张表的 schema**(分批进行,建议顺序:Tag → Supplier → SupplierTag → Contact → Quote → QuoteTag → Note → Transaction → TransactionItem → Payment → File)
-3. **每加一组表跑一次 migrate**(`--name add_tag_supplier` 等),保持迁移历史清晰
-4. **塞测试数据**:Prisma Studio 里手动加 1-2 个供应商 + 标签 + 联系人,验证关联关系
-5. **第一个最简页面**:`/suppliers` 路由,从数据库读供应商列表显示
-6. Git 提交节点:阶段 1 完整收尾
+1. **批量写剩余 10 张表的 Prisma schema**,建议分 3 组提交:
+   - 第一组(阶段 1 核心):Tag + Supplier + SupplierTag + Contact
+   - 第二组(阶段 4):Quote + QuoteTag + Note
+   - 第三组(阶段 5):Transaction + TransactionItem + Payment + File
+2. **每组跑一次 migrate**(`--name add_tag_supplier_contact` 等命名),保持迁移历史清晰
+3. **塞测试数据**:Prisma Studio 里手动加 1-2 个供应商 + 标签 + 联系人,验证关联关系
+4. **第一个最简页面**:`/suppliers` 路由,从数据库读供应商列表显示
+5. Git 提交节点:阶段 1 完整收尾
 
 ### 下一轮对话开始时的入口
 
-直接说:**"继续阶段 1,写 src/lib/prisma.ts"**。Claude 会:
-1. 解释 driver adapter 模式的工作机制
-2. 引导你自己写出 `src/lib/prisma.ts`(继续教学模式,不直接给成品)
-3. 写完后写一个最简验证脚本,跑通从代码到数据库的链路
-4. 进入批量写剩余 10 张表的环节
+直接说:**"继续阶段 1,写第一组 schema:Tag + Supplier + SupplierTag + Contact"**。Claude 会:
 
-预计阶段 1 还需 2-3 轮对话收尾。
+1. 按 CLAUDE.md 数据模型设计章节里 4 张表的字段定义,转写成 Prisma schema 块
+2. 走教学模式,关键决策点(如 `@map` 命名映射、`@@unique`、关系字段的 `onDelete` 行为)分别交代取舍
+3. 写完跑 `npx prisma migrate dev --name add_tag_supplier_contact` + `npx prisma generate`
+4. 更新 `verify-prisma.ts` 增加新表的小烟雾测试,确认关联关系可用
 
+预计第一组 1-2 轮对话,剩余两组各 1 轮,阶段 1 共需 3-4 轮收尾。
