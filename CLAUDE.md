@@ -993,11 +993,9 @@ RU    俄文
 
 ---
 
-## 2026.5.21 项目进度日志
+## 2026.5.22 项目进度日志
 
-> 此区域是"项目接力棒",每次结束工作前更新。下次开新对话,把整个 CLAUDE.md 粘给 Claude,即可无缝续接上下文。
-
-### 当前阶段:阶段 1 — Prisma 基础设施完整跑通,准备写剩余 10 张表
+### 当前阶段:阶段 1 — 第一组 4 张表落地完成,准备写第二组
 
 ### 已完成
 
@@ -1005,27 +1003,33 @@ RU    俄文
 - ✅ Prisma 7 + SQLite 安装与配置完成(2026.5.20)
 - ✅ User 表 schema 落地 + migrate(2026.5.20)
 - ✅ `src/lib/prisma.ts` 完成(2026.5.21):driver adapter + 全局单例 + 绝对路径 normalize
-- ✅ `scripts/verify-prisma.ts` 集成验证脚本通过:Created + Count = 1,整条链路 tsx → prisma.ts → adapter → better-sqlite3 → dev.db 跑通
-- ✅ CLAUDE.md 增补"Prisma 7 + driver adapter 实操要点"章节(2026.5.21),记录跑通过程踩过的 5 个坑
+- ✅ `scripts/verify-prisma.ts` 集成验证脚本通过(2026.5.21)
+- ✅ CLAUDE.md 增补「Prisma 7 + driver adapter 实操要点」章节(2026.5.21)
+- ✅ CLAUDE.md 增补「Prisma schema 命名约定」小节(2026.5.22):camelCase + `@map` 双层命名落档
+- ✅ CLAUDE.md 增补「关系删除策略(onDelete 三段式规则)」小节(2026.5.22):附属实体 Cascade、审计痕迹 Restrict、共享资源 Restrict
+- ✅ 第一组 4 张表 schema 落地 + migrate 通过(2026.5.22):Tag + Supplier + SupplierTag + Contact,迁移名 `add_tag_supplier_contact`
+- ✅ `src/lib/prisma.ts` 增加 `log: ['query', 'warn', 'error']` 配置,业务代码层 SQL / 警告 / 错误可见
+- ✅ `scripts/test-constraints.ts` 完成 3 个 invariant 验证(2026.5.22):
+    - FK 违反(Contact.supplierId 指向不存在的 supplier)→ P2003 ✅
+    - SupplierTag 复合主键冲突 → P2002 ✅
+    - Tag `(category, nameZh)` 唯一约束冲突 → P2002 ✅
+- ⚠️ Prisma Studio v7 的错误对话框正文区目前显示为空(不展开、不滚出内容),约束错误只能通过 DevTools Network 或测试脚本看到。已用 `test-constraints.ts` 路线绕过,后续约束验证一律走脚本,不依赖 Studio UI
 
 ### 待办(按顺序)
 
-1. **批量写剩余 10 张表的 Prisma schema**,建议分 3 组提交:
-   - 第一组(阶段 1 核心):Tag + Supplier + SupplierTag + Contact
-   - 第二组(阶段 4):Quote + QuoteTag + Note
-   - 第三组(阶段 5):Transaction + TransactionItem + Payment + File
-2. **每组跑一次 migrate**(`--name add_tag_supplier_contact` 等命名),保持迁移历史清晰
-3. **塞测试数据**:Prisma Studio 里手动加 1-2 个供应商 + 标签 + 联系人,验证关联关系
-4. **第一个最简页面**:`/suppliers` 路由,从数据库读供应商列表显示
-5. Git 提交节点:阶段 1 完整收尾
+1. ~~第一组 schema(Tag + Supplier + SupplierTag + Contact)~~ ✅
+2. **第二组 schema(Quote + QuoteTag + Note)** ← 下次对话起点
+3. 第三组 schema(Transaction + TransactionItem + Payment + File)
+4. 阶段 1 收尾:第一个最简页面 `/suppliers`(从 DB 读供应商列表显示)
+5. 进入阶段 2:Auth.js 接入 + 角色路由
 
 ### 下一轮对话开始时的入口
 
-直接说:**"继续阶段 1,写第一组 schema:Tag + Supplier + SupplierTag + Contact"**。Claude 会:
+直接说:**「继续阶段 1,写第二组 schema:Quote + QuoteTag + Note」**。Claude 会:
 
-1. 按 CLAUDE.md 数据模型设计章节里 4 张表的字段定义,转写成 Prisma schema 块
-2. 走教学模式,关键决策点(如 `@map` 命名映射、`@@unique`、关系字段的 `onDelete` 行为)分别交代取舍
-3. 写完跑 `npx prisma migrate dev --name add_tag_supplier_contact` + `npx prisma generate`
-4. 更新 `verify-prisma.ts` 增加新表的小烟雾测试,确认关联关系可用
+1. 按 CLAUDE.md 数据模型设计章节里 3 张表的字段定义,转写成 Prisma schema 块
+2. 重点关注本组新东西:`Decimal` 类型(报价金额、订单金额)、QuoteTag 限定 `category=PRODUCT` 的应用层校验、`@@index` 取舍
+3. 写完跑 `npx prisma migrate dev --name add_quote_quotetag_note` + `npx prisma generate`
+4. 扩展 `scripts/test-constraints.ts` 加入新表的 invariant 测试
 
-预计第一组 1-2 轮对话,剩余两组各 1 轮,阶段 1 共需 3-4 轮收尾。
+预计第二组 2-3 轮对话收尾。

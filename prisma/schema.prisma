@@ -32,5 +32,132 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") //映射数据库名称
   updatedAt    DateTime @updatedAt @map("updated_at") //映射数据库名称
 
+  // 反向关系字段
+  tags      Tag[]
+  suppliers Supplier[]
+  contacts  Contact[]
+
   @@map("users") // 数据库表名是 users，而不是 User,SQL社区的规定,单数则为一个实体,复数则为一个集合
+}
+
+enum TagCategory {
+  PRODUCT
+  EXPORT
+  CERT
+  CAPACITY
+  CUSTOM
+}
+
+model Tag {
+  id          Int         @id @default(autoincrement())
+  category    TagCategory
+  nameZh      String      @map("name_zh") //映射数据库名称
+  nameRu      String      @map("name_ru") //映射数据库名称
+  color       String?     @map("color") //颜色
+  icon        String?     @map("icon") //图标
+  isSystem    Boolean     @default(false) @map("is_system") //是否系统标签
+  needsReview Boolean     @default(false) @map("needs_review") //是否需要审核
+  isActive    Boolean     @default(true) @map("is_active") //是否启用
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  createdById Int         @map("created_by_id")
+
+  createdBy    User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  supplierTags SupplierTag[]
+
+  @@unique([category, nameZh])
+  @@unique([category, nameRu])
+  @@map("tags")
+}
+
+model Supplier {
+  id                          Int              @id @default(autoincrement())
+  code                        String           @unique
+  nameZh                      String           @map("name_zh")
+  nameRu                      String?          @map("name_ru")
+  shortNameZh                 String?          @map("short_name_zh")
+  shortNameRu                 String?          @map("short_name_ru")
+  provinceZh                  String           @map("province_zh")
+  provinceRu                  String?          @map("province_ru")
+  cityZh                      String           @map("city_zh")
+  cityRu                      String?          @map("city_ru")
+  districtZh                  String?          @map("district_zh")
+  districtRu                  String?          @map("district_ru")
+  addressZh                   String?          @map("address_zh")
+  addressRu                   String?          @map("address_ru")
+  latitude                    Float            @map("latitude")
+  longitude                   Float            @map("longitude")
+  cooperationLevel            CooperationLevel @default(INITIAL_CONTACT) @map("cooperation_level")
+  descriptionZh               String?          @map("description_zh")
+  descriptionRu               String?          @map("description_ru")
+  discoveredVia               String           @map("discovered_via") //发现途径
+  website                     String?          @map("website") //官网
+  nameRuAutoTranslated        Boolean          @default(true) @map("name_ru_auto_translated") //名称是否自动翻译成俄语
+  shortNameRuAutoTranslated   Boolean          @default(true) @map("short_name_ru_auto_translated") //简称是否自动翻译成俄语
+  provinceRuAutoTranslated    Boolean          @default(true) @map("province_ru_auto_translated") //省份是否自动翻译成俄语
+  cityRuAutoTranslated        Boolean          @default(true) @map("city_ru_auto_translated") //城市是否自动翻译成俄语
+  districtRuAutoTranslated    Boolean          @default(true) @map("district_ru_auto_translated") //区域是否自动翻译成俄语
+  addressRuAutoTranslated     Boolean          @default(true) @map("address_ru_auto_translated") //地址是否自动翻译成俄语
+  descriptionRuAutoTranslated Boolean          @default(true) @map("description_ru_auto_translated") //描述是否自动翻译成俄语
+  createdAt                   DateTime         @default(now()) @map("created_at")
+  updatedAt                   DateTime         @updatedAt @map("updated_at")
+  createdById                 Int              @map("created_by_id")
+  isActive                    Boolean          @default(true) @map("is_active") //是否启用
+
+  contacts     Contact[]
+  supplierTags SupplierTag[]
+  createdBy    User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@map("suppliers")
+}
+
+enum CooperationLevel {
+  INITIAL_CONTACT
+  TRIAL_ORDER
+  REGULAR
+  STRATEGIC
+  INACTIVE
+}
+
+model SupplierTag {
+  supplierId Int      @map("supplier_id")
+  tagId      Int      @map("tag_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Restrict)
+
+  @@id([supplierId, tagId]) // 复合主键
+  @@map("supplier_tags")
+}
+
+model Contact {
+  id                   Int           @id @default(autoincrement())
+  supplierId           Int           @map("supplier_id")
+  nameZh               String        @map("name_zh")
+  nameRu               String?       @map("name_ru")
+  roleZh               String?       @map("role_zh")
+  roleRu               String?       @map("role_ru")
+  phone                String?       @map("phone")
+  wechat               String?       @map("wechat")
+  email                String?       @map("email")
+  whatsapp             String?       @map("whatsapp")
+  telegram             String?       @map("telegram")
+  qq                   String?       @map("qq")
+  isPrimary            Boolean       @default(false) @map("is_primary") //是否主要联系人
+  status               ContactStatus @default(ACTIVE) //联系人状态
+  nameRuAutoTranslated Boolean       @default(true) @map("name_ru_auto_translated") //名称是否自动翻译成俄语
+  roleRuAutoTranslated Boolean       @default(true) @map("role_ru_auto_translated") //职位是否自动翻译成俄语
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  createdById          Int           @map("created_by_id")
+
+  supplier  Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdBy User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@map("contacts")
+}
+
+enum ContactStatus {
+  ACTIVE
+  ARCHIVED
 }

@@ -14,7 +14,10 @@ function createPrismaClient() {
   console.log('[prisma.ts] cwd          =', process.cwd());
 
   const adapter = new PrismaBetterSqlite3({ url: dbPath });
-  return new PrismaClient({ adapter });
+  return new PrismaClient({
+  adapter,
+  log: ['query', 'warn', 'error'],
+});
 }
 
 // ② 全局单例
