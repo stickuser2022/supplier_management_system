@@ -321,6 +321,38 @@ const dbPath = path.isAbsolute(raw)
 
 加新双语字段时按此模板套用,无需每次单独设计。
 
+### Prisma schema 命名约定
+
+数据库层与代码层命名风格分离,统一通过 `@map` / `@@map` 桥接:
+
+- **数据库层(实际列名 / 表名):** snake_case,例如 `name_zh`、`created_at`、`supplier_tag`
+- **代码层(Prisma 模型字段 / 模型名):** camelCase / PascalCase,例如 `nameZh`、`createdAt`、`SupplierTag`
+- **桥接方式:**
+    - 字段:`nameZh String @map("name_zh")`
+    - 表:`@@map("supplier_tag")`
+- **本 CLAUDE.md 文档里所有"字段定义"段落给出的是数据库视角(snake_case),写 schema 时按 camelCase 转写,加 `@map`**
+
+理由:Prisma 官方推荐 + 与 JS/TS 生态主流命名一致,业务代码里 `supplier.nameZh` 比 `supplier.name_zh` 自然;同时数据库层保持 snake_case 是 SQL 生态主流,迁移到 PostgreSQL 时也无需改列名。代价是 schema 文件里每个双语字段都要写一次 `@map`,但这是一次性成本,可接受。
+
+### 关系删除策略(onDelete 三段式规则)
+
+外键关系的 `onDelete` 行为按"关系性质"分三类决策,不要逐个表临时拍:
+
+| 关系性质 | `onDelete` | 含义 | 本项目例子 |
+|---------|-----------|------|----------|
+| **附属实体**(脱离主表无业务意义) | `Cascade` | 主表行物理删除时,附属行一并清掉 | Contact 对 Supplier;将来 Quote / Note / Transaction / File 对 Supplier |
+| **审计 / 所有权痕迹**(记录"谁创建了") | `Restrict` | 引用方还在时,禁止物理删除被引用方 | 所有业务表的 `createdBy` 对 User |
+| **共享资源引用**(被引用方是项目级共享池) | `Restrict` | 还有引用时,禁止删除共享资源,防止误删影响一大片 | SupplierTag 对 Tag |
+
+**为什么不全用 Cascade 简单粗暴?** 三类的业务含义不同:
+
+- `createdBy` 的 Restrict 保护审计链,防止"删用户连带删走他所有数据"
+- 共享 Tag 的 Restrict 防止"删一个 Tag 影响 30 家挂着它的供应商"
+- 这种"严格 vs 宽松"的分层是有意为之,所以**同一张中间表(SupplierTag)两个外键方向不对称是合理的**
+
+**与软删除的协同:** 所有业务表都有 `isActive: Boolean` 软删除字段,正常工作流走软删除,物理删除仅用于"误录想撤销"的极端场景。三段式 `onDelete` 规则只在物理删除路径上生效,平时不打扰正常流程。
+
+新增任何外键关系时,先对照上表分类,再决定 `onDelete`。出现不属于上表三种的关系性质,再单独讨论。
 ---
 
 ### Supplier 表(供应商)
