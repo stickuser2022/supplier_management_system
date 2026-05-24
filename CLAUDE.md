@@ -334,25 +334,36 @@ const dbPath = path.isAbsolute(raw)
 
 理由:Prisma 官方推荐 + 与 JS/TS 生态主流命名一致,业务代码里 `supplier.nameZh` 比 `supplier.name_zh` 自然;同时数据库层保持 snake_case 是 SQL 生态主流,迁移到 PostgreSQL 时也无需改列名。代价是 schema 文件里每个双语字段都要写一次 `@map`,但这是一次性成本,可接受。
 
-### 关系删除策略(onDelete 三段式规则)
+### 关系删除策略(onDelete 决策规则)
 
-外键关系的 `onDelete` 行为按"关系性质"分三类决策,不要逐个表临时拍:
+外键关系的 `onDelete` 行为按"关系性质 + 字段可空性"两个维度分四类决策,不要逐个表临时拍:
 
 | 关系性质 | `onDelete` | 含义 | 本项目例子 |
 |---------|-----------|------|----------|
-| **附属实体**(脱离主表无业务意义) | `Cascade` | 主表行物理删除时,附属行一并清掉 | Contact 对 Supplier;将来 Quote / Note / Transaction / File 对 Supplier |
-| **审计 / 所有权痕迹**(记录"谁创建了") | `Restrict` | 引用方还在时,禁止物理删除被引用方 | 所有业务表的 `createdBy` 对 User |
-| **共享资源引用**(被引用方是项目级共享池) | `Restrict` | 还有引用时,禁止删除共享资源,防止误删影响一大片 | SupplierTag 对 Tag |
+| **附属实体**(必填外键,脱离主表无业务意义) | `Cascade` | 主表行物理删除时,附属行一并清掉 | Contact / Quote / Note 对 Supplier;SupplierTag / QuoteTag 对各自主表 |
+| **审计 / 所有权痕迹**(必填外键,记录"谁创建了") | `Restrict` | 引用方还在时,禁止物理删除被引用方 | 所有业务表的 `createdBy` 对 User |
+| **共享资源引用**(必填外键,被引用方是项目级共享池) | `Restrict` | 还有引用时,禁止删除共享资源,防止误删影响一大片 | SupplierTag / QuoteTag 对 Tag |
+| **弱关联**(**可空外键**,被引用方可有可无,不影响事件本身) | `SetNull` | 主表行被删时,子表对应外键自动置空,事件记录保留 | Quote 对 Contact;Note 对 Contact / Quote |
 
-**为什么不全用 Cascade 简单粗暴?** 三类的业务含义不同:
+**为什么不全用 Cascade 简单粗暴?** 四类的业务含义不同:
 
 - `createdBy` 的 Restrict 保护审计链,防止"删用户连带删走他所有数据"
 - 共享 Tag 的 Restrict 防止"删一个 Tag 影响 30 家挂着它的供应商"
-- 这种"严格 vs 宽松"的分层是有意为之,所以**同一张中间表(SupplierTag)两个外键方向不对称是合理的**
+- **弱关联用 SetNull 的语义**:事件流(Quote / Note)是独立有价值的,即使原本关联的辅助对象(Contact / Quote)消失,事件本身仍要保留——置空外键意味着"原挂着的对象不在了,但这条记录本身的内容仍有意义"
+- 这种"严格 vs 宽松"的分层是有意为之,所以**同一张中间表两个外键方向不对称是合理的**
 
-**与软删除的协同:** 所有业务表都有 `isActive: Boolean` 软删除字段,正常工作流走软删除,物理删除仅用于"误录想撤销"的极端场景。三段式 `onDelete` 规则只在物理删除路径上生效,平时不打扰正常流程。
+**SetNull 与可空性的硬性绑定:** `SetNull` 只能用于可空外键(`Int?`)。必填外键(`Int`)用了 SetNull,Prisma 校验直接拒绝迁移——因为删除时往非空字段写 NULL 自相矛盾。这条铁律帮你在 schema 阶段就拍死一类设计错误。
 
-新增任何外键关系时,先对照上表分类,再决定 `onDelete`。出现不属于上表三种的关系性质,再单独讨论。
+**与软删除的协同:** 所有业务表都有 `isActive: Boolean` 软删除字段,正常工作流走软删除,物理删除仅用于"误录想撤销"的极端场景。四类 `onDelete` 规则只在物理删除路径上生效,平时不打扰正常流程。
+
+**新增外键时的快速决策路径:**
+
+| 外键可空? | 默认走哪一类 |
+|---------|-----------|
+| 必填(`Int`) | 在前三类(附属 Cascade / 审计 Restrict / 共享 Restrict)中按"性质"选 |
+| 可空(`Int?`) | 默认走第 4 类 SetNull,除非业务上明确希望事件本身也一并消失 |
+
+出现不属于上表的关系性质,再单独讨论扩展第 5 类。
 ---
 
 ### Supplier 表(供应商)
@@ -388,7 +399,7 @@ Supplier(供应商)
 ├── cooperation_level                   Enum       合作深度,默认 INITIAL_CONTACT
 ├── description_zh                      Text?      中文描述/备注
 ├── description_ru                      Text?      俄文描述(可自动翻译)
-├── discovered_via                      String?    认识渠道(自由文本)
+├── discovered_via                      String    认识渠道(自由文本)
 ├── website                             String?    主官网链接
 │
 ├── # 自动翻译标记(7 个)
@@ -993,11 +1004,11 @@ RU    俄文
 
 ---
 
-## 2026.5.22 项目进度日志
+## 2026.5.24 项目进度日志
 
-### 当前阶段:阶段 1 — 第一组 4 张表落地完成,准备写第二组
+### 当前阶段:阶段 1 — 第二组 3 张表落地完成,准备写第三组
 
-### 已完成
+### 已完成(本轮新增标 ★)
 
 - ✅ 数据模型设计阶段全部收尾(11 张表 schema 定稿 + 历史字段双语审计)
 - ✅ Prisma 7 + SQLite 安装与配置完成(2026.5.20)
@@ -1005,31 +1016,39 @@ RU    俄文
 - ✅ `src/lib/prisma.ts` 完成(2026.5.21):driver adapter + 全局单例 + 绝对路径 normalize
 - ✅ `scripts/verify-prisma.ts` 集成验证脚本通过(2026.5.21)
 - ✅ CLAUDE.md 增补「Prisma 7 + driver adapter 实操要点」章节(2026.5.21)
-- ✅ CLAUDE.md 增补「Prisma schema 命名约定」小节(2026.5.22):camelCase + `@map` 双层命名落档
-- ✅ CLAUDE.md 增补「关系删除策略(onDelete 三段式规则)」小节(2026.5.22):附属实体 Cascade、审计痕迹 Restrict、共享资源 Restrict
-- ✅ 第一组 4 张表 schema 落地 + migrate 通过(2026.5.22):Tag + Supplier + SupplierTag + Contact,迁移名 `add_tag_supplier_contact`
-- ✅ `src/lib/prisma.ts` 增加 `log: ['query', 'warn', 'error']` 配置,业务代码层 SQL / 警告 / 错误可见
-- ✅ `scripts/test-constraints.ts` 完成 3 个 invariant 验证(2026.5.22):
-    - FK 违反(Contact.supplierId 指向不存在的 supplier)→ P2003 ✅
-    - SupplierTag 复合主键冲突 → P2002 ✅
-    - Tag `(category, nameZh)` 唯一约束冲突 → P2002 ✅
-- ⚠️ Prisma Studio v7 的错误对话框正文区目前显示为空(不展开、不滚出内容),约束错误只能通过 DevTools Network 或测试脚本看到。已用 `test-constraints.ts` 路线绕过,后续约束验证一律走脚本,不依赖 Studio UI
+- ✅ CLAUDE.md 增补「Prisma schema 命名约定」小节(2026.5.22)
+- ✅ CLAUDE.md 增补「关系删除策略」小节(2026.5.22):附属 / 审计 / 共享 三段
+- ✅ 第一组 4 张表 schema 落地 + migrate(2026.5.22):Tag + Supplier + SupplierTag + Contact,迁移名 `add_tag_supplier_contact`
+- ✅ `src/lib/prisma.ts` 增加 `log: ['query', 'warn', 'error']` 配置
+- ✅ `scripts/test-constraints.ts` 完成 3 个 invariant 验证(2026.5.22)
+- ⚠️ Prisma Studio v7 错误对话框正文区显示为空,约束错误统一走测试脚本验证
+- ★ ✅ CLAUDE.md「关系删除策略」小节扩展为四类(2026.5.24):新增「弱关联」第 4 类(可空外键 SetNull),覆盖 Quote.contact / Note.contact / Note.quote 等场景
+- ★ ✅ 第二组 3 张表 schema 落地 + migrate(2026.5.24):Quote + QuoteTag + Note,迁移名 `add_quote_quotetag_note`
+- ★ ✅ `scripts/test-constraints.ts` 改造覆盖第二组(2026.5.24):Test 1 改用 Quote 触发 FK 违反、Test 2 改用 QuoteTag 触发复合主键冲突、Test 3 保留 Tag 唯一约束;3 个 invariant 全部通过
+
+### 本轮收获的关键经验(给未来对话的避坑笔记)
+
+- **`@@index` ≠ `@@unique`**:前者是查询加速带(不保证唯一性,upsert 的 `where` 用不上),后者是唯一约束(可作 upsert 的复合 where key)。误用普通索引名(如 `status_validUntil`)做 upsert 定位会 TypeScript 编译报错
+- **`SetNull` 与可空性硬绑定**:必填外键(`Int`)用 SetNull,Prisma 校验直接拒绝迁移。这条已写入「关系删除策略」第 4 类
+- **关系字段与外键字段的可空性必须一致**:`xxxId Int` 配 `xxx XXX`(无 `?`),`xxxId Int?` 配 `xxx XXX?`(有 `?`)。两边不一致 Prisma 拒绝迁移
+- **每个 1对多 关系必须两边都写**:主动方(子表持有外键)+ 反向方(父表用 `xxxs Xxx[]` 收口),缺一不可。新加一张表时,**所有引用了它的父表都得加反向字段**
+- **Prisma 7 的 migrate + generate 必须分开跑**:`migrate dev` 不再自动调 `generate`,只跑前者会让 TypeScript Client 类型滞后
 
 ### 待办(按顺序)
 
 1. ~~第一组 schema(Tag + Supplier + SupplierTag + Contact)~~ ✅
-2. **第二组 schema(Quote + QuoteTag + Note)** ← 下次对话起点
-3. 第三组 schema(Transaction + TransactionItem + Payment + File)
+2. ~~第二组 schema(Quote + QuoteTag + Note)~~ ✅
+3. **第三组 schema(Transaction + TransactionItem + Payment + File)** ← 下次对话起点
 4. 阶段 1 收尾:第一个最简页面 `/suppliers`(从 DB 读供应商列表显示)
 5. 进入阶段 2:Auth.js 接入 + 角色路由
 
 ### 下一轮对话开始时的入口
 
-直接说:**「继续阶段 1,写第二组 schema:Quote + QuoteTag + Note」**。Claude 会:
+直接说:**「继续阶段 1,写第三组 schema:Transaction + TransactionItem + Payment + File」**。Claude 会:
 
-1. 按 CLAUDE.md 数据模型设计章节里 3 张表的字段定义,转写成 Prisma schema 块
-2. 重点关注本组新东西:`Decimal` 类型(报价金额、订单金额)、QuoteTag 限定 `category=PRODUCT` 的应用层校验、`@@index` 取舍
-3. 写完跑 `npx prisma migrate dev --name add_quote_quotetag_note` + `npx prisma generate`
-4. 扩展 `scripts/test-constraints.ts` 加入新表的 invariant 测试
+1. 按 CLAUDE.md 数据模型设计章节里 4 张表的字段定义,转写成 Prisma schema 块
+2. 重点关注本组新东西:**Transaction 主从模型**(与 Quote 扁平模型有意不对称)、TransactionItem 关联 Quote 的"业务链条上下文"语义、Payment 多次付款的子表设计、File 表的多 nullable FK 挂载点方案
+3. 写完跑 `npx prisma migrate dev --name add_transaction_payment_file` + `npx prisma generate`
+4. 扩展 `scripts/test-constraints.ts` 加入新表关键 invariant(至少 FK 违反 / 唯一约束 / 复合主键冲突 三种同模式覆盖)
 
-预计第二组 2-3 轮对话收尾。
+预计第三组 3-4 轮对话收尾(比第二组略长,因为 4 张表 + 主从模型新概念)。
