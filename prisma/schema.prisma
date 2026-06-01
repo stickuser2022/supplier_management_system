@@ -38,6 +38,9 @@ model User {
   contacts  Contact[]
   quotes    Quote[]
   notes     Note[]
+  transactions Transaction[]
+  payments Payment[]
+  files File[]
 
   @@map("users") // 数据库表名是 users，而不是 User,SQL社区的规定,单数则为一个实体,复数则为一个集合
 }
@@ -112,6 +115,8 @@ model Supplier {
   supplierTags SupplierTag[]
   quotes       Quote[]
   notes        Note[]
+  transactions Transaction[]
+  files       File[]
   createdBy    User  @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
   @@map("suppliers")
@@ -161,6 +166,7 @@ model Contact {
   createdBy User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
   quotes    Quote[]
   notes     Note[]
+  transactions Transaction[]
   @@map("contacts")
 }
 
@@ -202,6 +208,8 @@ model Quote{
 
   quoteTags  QuoteTag[] 
   notes      Note[]
+  transactionItems TransactionItem[]
+  files File[]
   @@index([supplierId])
   @@index([status, validUntil])
   @@map("quotes")
@@ -246,7 +254,135 @@ model Note{
   quote Quote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  
+  files File[]
   @@index([supplierId, happenedAt])
   @@map("notes")
+}
+
+model Transaction {
+  id Int @id @default(autoincrement())
+  supplierId Int @map("supplier_id")
+  contactId Int? @map("contact_id")
+  orderedAt DateTime @map("ordered_at") //下单时间
+  totalAmount Decimal @map("total_amount")
+  currency Currency @default(CNY)
+  notesZh String? @map("note_zh")
+  notesRu String? @map("note_ru")
+  notesRuAutoTranslated Boolean @default(true) @map("note_ru_auto_translated") //备注是否自动翻译成俄语
+  status TransactionStatus @default(IN_PROGRESS)//交易状态
+  isActive Boolean @default(true) @map("is_active") //是否启用
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdById Int @map("created_by_id")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  transactionItems TransactionItem[]
+  payments Payment[]
+  files File[]
+  @@index([supplierId, orderedAt])
+  @@map("transactions")
+}
+
+enum TransactionStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model TransactionItem{
+  id Int @id @default(autoincrement())
+  transactionId Int @map("transaction_id")
+  quoteId Int? @map("quote_id")
+  productNameZh String @map("product_name_zh")
+  productNameRu String? @map("product_name_ru")
+  productSpecZh String? @map("product_spec_zh")
+  productSpecRu String? @map("product_spec_ru")
+  quantity Int @map("quantity")
+  unitZh String? @map("unit_zh")
+  unitRu String? @map("unit_ru")
+  unitPrice Decimal @map("unit_price")
+  subtotal Decimal @map("subtotal")
+  sortOrder Int @map("sort_order")@default(0)
+  productNameRuAutoTranslated Boolean @default(true) @map("product_name_ru_auto_translated") //产品名称是否自动翻译成俄语
+  productSpecRuAutoTranslated Boolean @default(true) @map("product_spec_ru_auto_translated") //产品规格是否自动翻译成俄语
+  createdAt DateTime @default(now()) @map("created_at")
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  quote Quote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  @@index([transactionId])
+  @@map("transaction_items")
+
+}
+
+model Payment{
+  id Int @id @default(autoincrement())
+  transactionId Int @map("transaction_id")
+  paidAt DateTime @map("paid_at") //付款时间
+  amount Decimal @map("amount")
+  currency Currency
+  method String? @map("method") //付款方式
+  purposeZh String? @map("purpose_zh") //付款用途
+  purposeRu String? @map("purpose_ru") //付款用途俄语
+  purposeRuAutoTranslated Boolean @default(true) @map("purpose_ru_auto_translated") //付款用途是否自动翻译成俄语
+  createdById Int @map("created_by_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  files File[]
+  @@index([transactionId, paidAt])
+  @@map("payments")
+}
+
+model File{
+  id Int @id @default(autoincrement())
+  supplierId Int? @map("supplier_id")
+  quoteId Int? @map("quote_id")
+  paymentId Int? @map("payment_id")
+  noteId Int? @map("note_id")
+  transactionId Int? @map("transaction_id")
+  type FileType @map("type")
+  fileName String @map("file_name")
+  storageKey String @map("storage_key") //文件在对象存储中的key
+  mimeType String @map("mime_type") //文件类型
+  sizeBytes Int @map("size_bytes") //文件大小
+  thumbnailKey String? @map("thumbnail_key") //缩略图在对象存储中的key
+  titleZh String? @map("title_zh")
+  titleRu String? @map("title_ru")
+  titleRuAutoTranslated Boolean @default(true) @map("title_ru_auto_translated")
+  sortOrder Int @map("sort_order")@default(0)
+  isCover Boolean @default(false) @map("is_cover") //是否封面图片
+  isActive Boolean @default(true) @map("is_active") //是否启用
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdById Int @map("created_by_id")
+
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  quote Quote? @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  note Note? @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([supplierId])
+  @@index([quoteId])
+  @@index([paymentId])
+  @@index([noteId])
+  @@index([transactionId])
+  @@map("files")
+
+}
+enum FileType {
+  SUPPLIER_LOGO
+  SUPPLIER_BROCHURE
+  SUPPLIER_VIDEO
+  SUPPLIER_DOC
+  QUOTE_IMAGE
+  PAYMENT_SCREENSHOT
+  NOTE_ATTACHMENT
+  TRANSACTION_DOC
+  OTHER 
 }
