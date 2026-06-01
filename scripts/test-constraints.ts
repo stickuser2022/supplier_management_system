@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { Prisma } from '../src/generated/prisma/client'; // 调用我们的数据模型,P 大写
-import { prisma } from '../src/lib/prisma';              // 这里的 p 是小写
+import { Prisma } from '../src/generated/prisma/client';
+import { prisma } from '../src/lib/prisma';
 
 // async function main() {...} 只是"画图纸",真正执行的是下面的
 // main().catch().finally() 这一段。把测试逻辑写在 main() 里,让它成为
@@ -12,8 +12,6 @@ async function main() {
   console.log('--- 准备前置数据 ---');
 
   // upsert:有就用,没有就新建
-  // await = "停在这,等 Prisma 干完事返回结果,再继续往下"
-  // async/await 是语法糖,让我们用同步的方式写异步代码
   const user = await prisma.user.upsert({
     where: { username: 'test_admin' },
     update: {},
@@ -41,8 +39,7 @@ async function main() {
   });
   console.log(`✓ Supplier id=${supplier.id}`);
 
-  // category_nameZh 是 schema 里 @@unique([category, nameZh]) 自动生成的
-  // 复合唯一 key,upsert 的 where 要同时提供这两个字段才能联合定位唯一记录
+  // category_nameZh 是 schema 里 @@unique([category, nameZh]) 自动生成的复合唯一 key
   const tag = await prisma.tag.upsert({
     where: { category_nameZh: { category: 'PRODUCT', nameZh: '测试品类' } },
     update: {},
@@ -53,10 +50,9 @@ async function main() {
       createdById: user.id,
     },
   });
-  console.log(`✓ Tag id=${tag.id}\n`);
+  console.log(`✓ Tag id=${tag.id}`);
 
-  // Quote 表没有合适的 @@unique 约束做幂等定位,所以只能用 create,
-  // 每次跑都新插一条。测试本身不需要幂等,所以 OK。
+  // Quote 没合适的 @@unique 做幂等定位,只能 create,每次跑都新插一条
   const quote = await prisma.quote.create({
     data: {
       supplierId: supplier.id,
@@ -73,9 +69,6 @@ async function main() {
 
   // ---------- Test 1: Quote.supplierId 指向不存在的 Supplier → P2003 ----------
   console.log('--- Test 1: quote.supplierId=99999 (不存在) → 期望 P2003 ---');
-  // try 是 JS 的异常捕获机制:执行可能抛错的代码,抛错就跳到 catch 处理。
-  // 这里尝试插入一条 quote,supplierId=99999,该 ID 在前置数据里没创建过,
-  // 违反外键约束,应该抛出 P2003。
   try {
     await prisma.quote.create({
       data: {
@@ -89,11 +82,9 @@ async function main() {
       },
     });
     console.error('❌ 失败:本应报 P2003,却插入成功\n');
-    process.exit(1); // 立即结束 Node 进程,用退出码 1 退出
-  } catch (e) { // try 块出错了,把错对象给我处理
-    // instanceof 是 JS 语法,问 "e 是不是 PrismaClientKnownRequestError 这个类的实例?"
+    process.exit(1);
+  } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError) {
-      // e.code 是错对象上的字符串属性,Prisma 抛错都带 code 字段,用来精准定位错误类型
       if (e.code === 'P2003') {
         console.log(`✅ 捕到 P2003 (外键违反)\n`);
       } else {
@@ -144,8 +135,8 @@ async function main() {
     await prisma.tag.create({
       data: {
         category: 'PRODUCT',
-        nameZh: '测试品类',       // 跟前置 tag 重名
-        nameRu: 'Тест-другой',   // 故意换 ru,排除 (category, nameRu) 干扰
+        nameZh: '测试品类',        // 跟前置 tag 重名
+        nameRu: 'Тест-другой',    // 故意换 ru,排除 (category, nameRu) 干扰
         createdById: user.id,
       },
     });
@@ -164,17 +155,182 @@ async function main() {
     }
   }
 
-  console.log('━━━━━━━━ ✅ 三个 invariant 全部验证通过 ━━━━━━━━');
+
+  // ============================================================
+  // Test 4-6:第三组新增的 invariant。
+  // 验证模式从"负向(期望抛 P 错误码)"切换为"正向断言":
+  //   1) 准备临时数据 → 2) 物理删除主表 → 3) findUnique / count 验证状态
+  //   → 4) 自清理(若 Cascade 主表已带走附属物,通常不需要额外清理)
+  // ============================================================
+
+
+  // ---------- Test 4: Transaction 主从模型 Cascade 链 ----------
+  console.log('--- Test 4: 删 Transaction → Item / Payment / File 应被级联清空 ---');
+
+  // 准备:1 Transaction + 2 Item + 2 Payment + 1 File 全挂在它下面
+  const tx = await prisma.transaction.create({
+    data: {
+      supplierId: supplier.id,
+      orderedAt: new Date(),
+      totalAmount: 1000,
+      currency: 'CNY',
+      createdById: user.id,
+    },
+  });
+
+  // createMany:批量插入,SQLite 在 Prisma 5+ 已原生支持
+  await prisma.transactionItem.createMany({
+    data: [
+      { transactionId: tx.id, productNameZh: '产品A', quantity: 10, unitPrice: 50,  subtotal: 500 },
+      { transactionId: tx.id, productNameZh: '产品B', quantity: 5,  unitPrice: 100, subtotal: 500 },
+    ],
+  });
+
+  await prisma.payment.createMany({
+    data: [
+      { transactionId: tx.id, paidAt: new Date(), amount: 300, currency: 'CNY', createdById: user.id },
+      { transactionId: tx.id, paidAt: new Date(), amount: 700, currency: 'CNY', createdById: user.id },
+    ],
+  });
+
+  const file = await prisma.file.create({
+    data: {
+      transactionId: tx.id,
+      type: 'TRANSACTION_DOC',
+      fileName: 'test.pdf',
+      storageKey: `test/transactions/${tx.id}/test.pdf`,
+      mimeType: 'application/pdf',
+      sizeBytes: 1024,
+      createdById: user.id,
+    },
+  });
+  console.log(`✓ 准备:tx=${tx.id}, 2 items, 2 payments, file=${file.id}`);
+
+  // 触发:物理删除主表
+  await prisma.transaction.delete({ where: { id: tx.id } });
+
+  // 断言:三类附属物应全被级联清掉
+  // count 返回符合条件的行数;findUnique 按主键找,找不到返回 null
+  const remainingItems    = await prisma.transactionItem.count({ where: { transactionId: tx.id } });
+  const remainingPayments = await prisma.payment.count({ where: { transactionId: tx.id } });
+  const remainingFile     = await prisma.file.findUnique({ where: { id: file.id } });
+
+  if (remainingItems === 0 && remainingPayments === 0 && remainingFile === null) {
+    console.log(`✅ Cascade 链生效:items / payments / file 全被清空\n`);
+  } else {
+    console.error(`❌ 期望全为 0,实际 items=${remainingItems}, payments=${remainingPayments}, file=${remainingFile ? '残留' : 'null'}\n`);
+    process.exit(1);
+  }
+
+
+  // ---------- Test 5: File 表多挂载点(可空 FK + Cascade) ----------
+  console.log('--- Test 5: File 仅 quoteId 非空,删 Quote → File 应被级联清掉 ---');
+
+  // 临时 Quote(独立于前置 quote,避免影响 Test 2 的 QuoteTag 关联)
+  const quoteForFile = await prisma.quote.create({
+    data: {
+      supplierId: supplier.id,
+      productNameZh: '临时报价(Test 5)',
+      unitPrice: 200,
+      currency: 'CNY',
+      quotedAt: new Date(),
+      createdById: user.id,
+    },
+  });
+
+  // 关键:5 个 FK 中只 quoteId 非空,模拟"报价图挂在 Quote 下"场景
+  const quoteImage = await prisma.file.create({
+    data: {
+      supplierId: null,
+      quoteId: quoteForFile.id,
+      paymentId: null,
+      noteId: null,
+      transactionId: null,
+      type: 'QUOTE_IMAGE',
+      fileName: 'product.jpg',
+      storageKey: `test/quotes/${quoteForFile.id}/product.jpg`,
+      mimeType: 'image/jpeg',
+      sizeBytes: 2048,
+      createdById: user.id,
+    },
+  });
+  console.log(`✓ 准备:quote=${quoteForFile.id}, file=${quoteImage.id} (仅 quoteId 非空)`);
+
+  await prisma.quote.delete({ where: { id: quoteForFile.id } });
+
+  const orphanFile = await prisma.file.findUnique({ where: { id: quoteImage.id } });
+  if (orphanFile === null) {
+    console.log(`✅ Cascade 生效:可空 FK 组合中,删唯一挂载点 (Quote) 仍能级联清掉 File\n`);
+  } else {
+    console.error(`❌ 期望 File 被清掉,但仍能查到 (id=${orphanFile.id})\n`);
+    process.exit(1);
+  }
+
+
+  // ---------- Test 6: TransactionItem.quoteId 业务链条上下文(SetNull) ----------
+  console.log('--- Test 6: 删 Quote → 关联的 TransactionItem 应保留,quoteId 置 null ---');
+
+  // 临时 quote + 临时 transaction + 一个挂在两者之间的 item
+  const quoteForItem = await prisma.quote.create({
+    data: {
+      supplierId: supplier.id,
+      productNameZh: '临时报价(Test 6)',
+      unitPrice: 300,
+      currency: 'CNY',
+      quotedAt: new Date(),
+      createdById: user.id,
+    },
+  });
+
+  const tx2 = await prisma.transaction.create({
+    data: {
+      supplierId: supplier.id,
+      orderedAt: new Date(),
+      totalAmount: 600,
+      currency: 'CNY',
+      createdById: user.id,
+    },
+  });
+
+  // 关键:item.unitPrice=290 ≠ quote.unitPrice=300,
+  // 模拟"谈判后的实际成交价",验证设计意图——价格以 item 自身为准,不读 quote
+  const item = await prisma.transactionItem.create({
+    data: {
+      transactionId: tx2.id,
+      quoteId: quoteForItem.id,
+      productNameZh: '成交产品',
+      quantity: 2,
+      unitPrice: 290,
+      subtotal: 580,
+    },
+  });
+  console.log(`✓ 准备:quote=${quoteForItem.id}, tx=${tx2.id}, item=${item.id}`);
+
+  await prisma.quote.delete({ where: { id: quoteForItem.id } });
+
+  const itemAfter = await prisma.transactionItem.findUnique({ where: { id: item.id } });
+  if (itemAfter === null) {
+    console.error(`❌ TransactionItem 不该被级联删除,但已消失\n`);
+    process.exit(1);
+  } else if (itemAfter.quoteId !== null) {
+    console.error(`❌ 期望 quoteId=null,实际=${itemAfter.quoteId}\n`);
+    process.exit(1);
+  } else {
+    console.log(`✅ SetNull 生效:item 保留(成交事件不消失),quoteId 已置空\n`);
+  }
+
+  // 清理:Test 6 的临时 transaction 不会被 Cascade 自动清,手动删(顺便带走 item)
+  await prisma.transaction.delete({ where: { id: tx2.id } });
+
+
+  console.log('━━━━━━━━ ✅ 六个 invariant 全部验证通过 ━━━━━━━━');
 }
 
-// 真正的入口:调用 main() 执行测试逻辑
 main()
-  // 接住 main 里没用 try 包住的任何错(包括内层 throw e 抛上来的),最后一道防线
   .catch((e) => {
     console.error('Unexpected error:', e);
     process.exit(1);
   })
-  // 无论成功失败都要执行的收尾,断开数据库连接保证进程能干净结束
   .finally(async () => {
     await prisma.$disconnect();
   });
