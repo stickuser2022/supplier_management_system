@@ -1004,9 +1004,9 @@ RU    俄文
 
 ---
 
-## 2026.5.24 项目进度日志
+## 2026.6.1 项目进度日志
 
-### 当前阶段:阶段 1 — 第二组 3 张表落地完成,准备写第三组
+### 当前阶段:阶段 1 — 第三组 4 张表落地 + 6 个 invariant 验证全部通过
 
 ### 已完成(本轮新增标 ★)
 
@@ -1018,37 +1018,45 @@ RU    俄文
 - ✅ CLAUDE.md 增补「Prisma 7 + driver adapter 实操要点」章节(2026.5.21)
 - ✅ CLAUDE.md 增补「Prisma schema 命名约定」小节(2026.5.22)
 - ✅ CLAUDE.md 增补「关系删除策略」小节(2026.5.22):附属 / 审计 / 共享 三段
-- ✅ 第一组 4 张表 schema 落地 + migrate(2026.5.22):Tag + Supplier + SupplierTag + Contact,迁移名 `add_tag_supplier_contact`
+- ✅ 第一组 4 张表 schema 落地 + migrate(2026.5.22):Tag + Supplier + SupplierTag + Contact
 - ✅ `src/lib/prisma.ts` 增加 `log: ['query', 'warn', 'error']` 配置
 - ✅ `scripts/test-constraints.ts` 完成 3 个 invariant 验证(2026.5.22)
 - ⚠️ Prisma Studio v7 错误对话框正文区显示为空,约束错误统一走测试脚本验证
-- ★ ✅ CLAUDE.md「关系删除策略」小节扩展为四类(2026.5.24):新增「弱关联」第 4 类(可空外键 SetNull),覆盖 Quote.contact / Note.contact / Note.quote 等场景
-- ★ ✅ 第二组 3 张表 schema 落地 + migrate(2026.5.24):Quote + QuoteTag + Note,迁移名 `add_quote_quotetag_note`
-- ★ ✅ `scripts/test-constraints.ts` 改造覆盖第二组(2026.5.24):Test 1 改用 Quote 触发 FK 违反、Test 2 改用 QuoteTag 触发复合主键冲突、Test 3 保留 Tag 唯一约束;3 个 invariant 全部通过
+- ✅ CLAUDE.md「关系删除策略」小节扩展为四类(2026.5.24):新增「弱关联」第 4 类(可空外键 SetNull)
+- ✅ 第二组 3 张表 schema 落地 + migrate(2026.5.24):Quote + QuoteTag + Note
+- ✅ `scripts/test-constraints.ts` 改造覆盖第二组(2026.5.24)
+- ★ ✅ 第三组 4 张表 schema 落地 + migrate(2026.6.1):Transaction + TransactionItem + Payment + File,迁移名 `add_transaction_payment_file`
+- ★ ✅ schema review 修复 4 严重 + 9 中等问题(2026.6.1):Transaction 误增 quoteId 删除、TransactionItem.unitPrice 类型 String→Decimal、File.supplierId 改可空、File 5 个 FK 统一 Cascade
+- ★ ✅ 清理 dev.db 历史遗留(2026.6.1):`.gitignore` 增补 `dev.db*`,`git rm --cached dev.db` 切断跟踪
+- ★ ✅ `scripts/test-constraints.ts` 扩展到 6 个 invariant 全覆盖(2026.6.1):
+    - Test 1-3 延续:FK 违反 / 复合主键 / 唯一约束(用第二组 Quote / QuoteTag / Tag)
+    - Test 4 新增:Transaction 主从模型 Cascade 链(删 Transaction → Item/Payment/File 全清)
+    - Test 5 新增:File 表「5 个可空 FK + 全 Cascade」组合验证(仅 quoteId 非空时删 Quote 仍能级联清 File)
+    - Test 6 新增:TransactionItem.quoteId 业务链条 SetNull(删 Quote → item 保留,quoteId 置空)
 
 ### 本轮收获的关键经验(给未来对话的避坑笔记)
 
-- **`@@index` ≠ `@@unique`**:前者是查询加速带(不保证唯一性,upsert 的 `where` 用不上),后者是唯一约束(可作 upsert 的复合 where key)。误用普通索引名(如 `status_validUntil`)做 upsert 定位会 TypeScript 编译报错
-- **`SetNull` 与可空性硬绑定**:必填外键(`Int`)用 SetNull,Prisma 校验直接拒绝迁移。这条已写入「关系删除策略」第 4 类
-- **关系字段与外键字段的可空性必须一致**:`xxxId Int` 配 `xxx XXX`(无 `?`),`xxxId Int?` 配 `xxx XXX?`(有 `?`)。两边不一致 Prisma 拒绝迁移
-- **每个 1对多 关系必须两边都写**:主动方(子表持有外键)+ 反向方(父表用 `xxxs Xxx[]` 收口),缺一不可。新加一张表时,**所有引用了它的父表都得加反向字段**
-- **Prisma 7 的 migrate + generate 必须分开跑**:`migrate dev` 不再自动调 `generate`,只跑前者会让 TypeScript Client 类型滞后
+- **Decimal 字段在 Prisma 上既接受 number 也接受 string**,但 String 字段只接受 string —— 测试脚本里给金额字段传数字,反过来能体检 schema 类型设计是否合理(数字字段写成 String 会被 TS 挡住)
+- **Prisma 7 上 SQLite 的 `createMany` 已原生支持**,批量准备测试数据不必降级写循环 create
+- **dev.db 必须 `.gitignore` + `git rm --cached` 两步同时做**:`.gitignore` 只对未 tracked 文件有效,已 tracked 的 SQLite 文件需要 `git rm --cached <file>`(**绝对不能漏 `--cached`**,漏了会真删本地文件)
+- **`git rm --cached` 后 VS Code 文件树显示红色 D**:这是 git index 删除状态,本地文件仍在
+- **可空 FK + Cascade 的组合在 SQLite 上正常工作**:File 表 5 个 nullable FK 即使只有 1 个非空,删除该挂载主体仍能级联清掉 File(SetNull 行为只发生在 onDelete 设为 SetNull 时,与 FK 可空性无关)
 
 ### 待办(按顺序)
 
 1. ~~第一组 schema(Tag + Supplier + SupplierTag + Contact)~~ ✅
 2. ~~第二组 schema(Quote + QuoteTag + Note)~~ ✅
-3. **第三组 schema(Transaction + TransactionItem + Payment + File)** ← 下次对话起点
-4. 阶段 1 收尾:第一个最简页面 `/suppliers`(从 DB 读供应商列表显示)
-5. 进入阶段 2:Auth.js 接入 + 角色路由
+3. ~~第三组 schema(Transaction + TransactionItem + Payment + File)~~ ✅
+4. **阶段 1 收尾:第一个最简页面 `/suppliers`(从 DB 读供应商列表显示)** ← 下次对话起点
+5. 进入阶段 2:Auth.js 接入 + 角色路由 + Leaflet 地图
 
 ### 下一轮对话开始时的入口
 
-直接说:**「继续阶段 1,写第三组 schema:Transaction + TransactionItem + Payment + File」**。Claude 会:
+直接说:**「继续阶段 1,做 `/suppliers` 列表页」**。Claude 会:
 
-1. 按 CLAUDE.md 数据模型设计章节里 4 张表的字段定义,转写成 Prisma schema 块
-2. 重点关注本组新东西:**Transaction 主从模型**(与 Quote 扁平模型有意不对称)、TransactionItem 关联 Quote 的"业务链条上下文"语义、Payment 多次付款的子表设计、File 表的多 nullable FK 挂载点方案
-3. 写完跑 `npx prisma migrate dev --name add_transaction_payment_file` + `npx prisma generate`
-4. 扩展 `scripts/test-constraints.ts` 加入新表关键 invariant(至少 FK 违反 / 唯一约束 / 复合主键冲突 三种同模式覆盖)
+1. 在 `src/app/suppliers/page.tsx` 起一个 Server Component(Next.js App Router 默认形态)
+2. 用 `prisma.supplier.findMany({ where: { isActive: true } })` 从数据库读所有活跃供应商
+3. 用最简单的 JSX 把 `nameZh / cityZh / provinceZh / cooperationLevel` 列出来(Tailwind 极简样式,不上 ShadCN 等组件库)
+4. 通过 `npm run dev` 启动 → 浏览器打开 `http://localhost:3000/suppliers` 验证
 
-预计第三组 3-4 轮对话收尾(比第二组略长,因为 4 张表 + 主从模型新概念)。
+预计 2-3 轮对话收尾。是阶段 1 最后一步,完成后就进入阶段 2 的认证 + 地图。
