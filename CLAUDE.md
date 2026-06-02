@@ -1006,57 +1006,63 @@ RU    俄文
 
 ## 2026.6.1 项目进度日志
 
-### 当前阶段:阶段 1 — 第三组 4 张表落地 + 6 个 invariant 验证全部通过
+### 当前阶段:阶段 1 全部完成,准备进入阶段 2(seed 数据 + Auth.js + 地图)
 
 ### 已完成(本轮新增标 ★)
 
 - ✅ 数据模型设计阶段全部收尾(11 张表 schema 定稿 + 历史字段双语审计)
-- ✅ Prisma 7 + SQLite 安装与配置完成(2026.5.20)
+- ✅ Prisma 7 + SQLite 安装与配置(2026.5.20)
 - ✅ User 表 schema 落地 + migrate(2026.5.20)
-- ✅ `src/lib/prisma.ts` 完成(2026.5.21):driver adapter + 全局单例 + 绝对路径 normalize
-- ✅ `scripts/verify-prisma.ts` 集成验证脚本通过(2026.5.21)
-- ✅ CLAUDE.md 增补「Prisma 7 + driver adapter 实操要点」章节(2026.5.21)
-- ✅ CLAUDE.md 增补「Prisma schema 命名约定」小节(2026.5.22)
-- ✅ CLAUDE.md 增补「关系删除策略」小节(2026.5.22):附属 / 审计 / 共享 三段
-- ✅ 第一组 4 张表 schema 落地 + migrate(2026.5.22):Tag + Supplier + SupplierTag + Contact
+- ✅ `src/lib/prisma.ts` driver adapter + 全局单例 + 绝对路径 normalize(2026.5.21)
+- ✅ `scripts/verify-prisma.ts` 集成验证脚本(2026.5.21)
+- ✅ CLAUDE.md 增补「Prisma 7 + driver adapter 实操要点」(2026.5.21)
+- ✅ CLAUDE.md 增补「Prisma schema 命名约定」(2026.5.22)
+- ✅ CLAUDE.md 增补「关系删除策略」四类(2026.5.22 + 2026.5.24 扩展)
+- ✅ 第一组 schema:Tag + Supplier + SupplierTag + Contact(2026.5.22)
 - ✅ `src/lib/prisma.ts` 增加 `log: ['query', 'warn', 'error']` 配置
 - ✅ `scripts/test-constraints.ts` 完成 3 个 invariant 验证(2026.5.22)
 - ⚠️ Prisma Studio v7 错误对话框正文区显示为空,约束错误统一走测试脚本验证
-- ✅ CLAUDE.md「关系删除策略」小节扩展为四类(2026.5.24):新增「弱关联」第 4 类(可空外键 SetNull)
-- ✅ 第二组 3 张表 schema 落地 + migrate(2026.5.24):Quote + QuoteTag + Note
-- ✅ `scripts/test-constraints.ts` 改造覆盖第二组(2026.5.24)
-- ★ ✅ 第三组 4 张表 schema 落地 + migrate(2026.6.1):Transaction + TransactionItem + Payment + File,迁移名 `add_transaction_payment_file`
+- ✅ 第二组 schema:Quote + QuoteTag + Note(2026.5.24)
+- ★ ✅ 第三组 schema:Transaction + TransactionItem + Payment + File(2026.6.1),迁移名 `add_transaction_payment_file`
 - ★ ✅ schema review 修复 4 严重 + 9 中等问题(2026.6.1):Transaction 误增 quoteId 删除、TransactionItem.unitPrice 类型 String→Decimal、File.supplierId 改可空、File 5 个 FK 统一 Cascade
 - ★ ✅ 清理 dev.db 历史遗留(2026.6.1):`.gitignore` 增补 `dev.db*`,`git rm --cached dev.db` 切断跟踪
 - ★ ✅ `scripts/test-constraints.ts` 扩展到 6 个 invariant 全覆盖(2026.6.1):
-    - Test 1-3 延续:FK 违反 / 复合主键 / 唯一约束(用第二组 Quote / QuoteTag / Tag)
-    - Test 4 新增:Transaction 主从模型 Cascade 链(删 Transaction → Item/Payment/File 全清)
-    - Test 5 新增:File 表「5 个可空 FK + 全 Cascade」组合验证(仅 quoteId 非空时删 Quote 仍能级联清 File)
-    - Test 6 新增:TransactionItem.quoteId 业务链条 SetNull(删 Quote → item 保留,quoteId 置空)
+    - Test 1-3 延续:FK 违反 / 复合主键 / 唯一约束
+    - Test 4 新增:Transaction 主从模型 Cascade 链
+    - Test 5 新增:File 表「5 个可空 FK + 全 Cascade」组合验证
+    - Test 6 新增:TransactionItem.quoteId 业务链条 SetNull
+- ★ ✅ `/suppliers` 列表页 3 步落地(2026.6.1):
+    - 第 1 步:`src/app/suppliers/page.tsx` 极简静态版,验证路由打通
+    - 第 2 步:接 Prisma,Server Component + `await prisma.supplier.findMany()`,显示数据库总条数
+    - 第 3 步:渲染成 5 列表格(编号/名称/省市/合作深度/创建时间),包含 `.map` 循环、`key` 属性、cooperationLevel 中文映射、`toLocaleDateString` 日期格式化
 
 ### 本轮收获的关键经验(给未来对话的避坑笔记)
 
-- **Decimal 字段在 Prisma 上既接受 number 也接受 string**,但 String 字段只接受 string —— 测试脚本里给金额字段传数字,反过来能体检 schema 类型设计是否合理(数字字段写成 String 会被 TS 挡住)
+- **Decimal 字段在 Prisma 上既接受 number 也接受 string**,但 String 字段只接受 string —— 测试脚本里给金额字段传数字,反过来能体检 schema 类型设计是否合理
 - **Prisma 7 上 SQLite 的 `createMany` 已原生支持**,批量准备测试数据不必降级写循环 create
-- **dev.db 必须 `.gitignore` + `git rm --cached` 两步同时做**:`.gitignore` 只对未 tracked 文件有效,已 tracked 的 SQLite 文件需要 `git rm --cached <file>`(**绝对不能漏 `--cached`**,漏了会真删本地文件)
+- **dev.db 必须 `.gitignore` + `git rm --cached` 两步同时做**:`.gitignore` 只对未 tracked 文件有效;已 tracked 的需要 `git rm --cached <file>` 切断(**绝对不能漏 `--cached`**,漏了真删本地文件)
 - **`git rm --cached` 后 VS Code 文件树显示红色 D**:这是 git index 删除状态,本地文件仍在
-- **可空 FK + Cascade 的组合在 SQLite 上正常工作**:File 表 5 个 nullable FK 即使只有 1 个非空,删除该挂载主体仍能级联清掉 File(SetNull 行为只发生在 onDelete 设为 SetNull 时,与 FK 可空性无关)
+- **可空 FK + Cascade 的组合在 SQLite 上正常工作**:File 表 5 个 nullable FK 即使只有 1 个非空,删除该挂载主体仍能级联清掉 File(SetNull 行为只发生在 onDelete 显式设为 SetNull 时,与 FK 可空性无关)
+- **Next.js 16 App Router 的页面规则**:`src/app/<路径>/page.tsx` 自动变成对应 URL,page.tsx 默认是 Server Component,函数体里可以直接 `await prisma.xxx.findMany()`,不用建 `/api` 路由
+- **教学密度过载是真实风险**:用户首次接触 React/Next.js 时,一次性抛 Server Component + path alias + orderBy + 中文映射会直接懵。后续涉及新阶段时,先把任务拆成 3 步,每次只引入 1-2 个新概念,跑通了再继续
 
 ### 待办(按顺序)
 
 1. ~~第一组 schema(Tag + Supplier + SupplierTag + Contact)~~ ✅
 2. ~~第二组 schema(Quote + QuoteTag + Note)~~ ✅
 3. ~~第三组 schema(Transaction + TransactionItem + Payment + File)~~ ✅
-4. **阶段 1 收尾:第一个最简页面 `/suppliers`(从 DB 读供应商列表显示)** ← 下次对话起点
-5. 进入阶段 2:Auth.js 接入 + 角色路由 + Leaflet 地图
+4. ~~阶段 1 收尾:`/suppliers` 列表页~~ ✅
+5. **下一步:写 `scripts/seed.ts` 塞 8-12 条样例供应商** ← 下次对话起点
+6. 进入阶段 2:Auth.js 接入 + 角色路由 + Leaflet 中国地图
+7. 阶段 6 或之后:UI 美化(深色模式适配、表格列宽、hover 效果等)—— 用户明确放最后
 
 ### 下一轮对话开始时的入口
 
-直接说:**「继续阶段 1,做 `/suppliers` 列表页」**。Claude 会:
+直接说:**「继续阶段 1 尾巴,写 `scripts/seed.ts` 塞样例供应商」**。Claude 会:
 
-1. 在 `src/app/suppliers/page.tsx` 起一个 Server Component(Next.js App Router 默认形态)
-2. 用 `prisma.supplier.findMany({ where: { isActive: true } })` 从数据库读所有活跃供应商
-3. 用最简单的 JSX 把 `nameZh / cityZh / provinceZh / cooperationLevel` 列出来(Tailwind 极简样式,不上 ShadCN 等组件库)
-4. 通过 `npm run dev` 启动 → 浏览器打开 `http://localhost:3000/suppliers` 验证
+1. 跟用户对齐 seed 数据的几个决策点:供应商数量(建议 8-12 个)、覆盖几个省份(建议 5-6 个)、是否顺带 seed 关联表(Contact / Tag / Quote 各几条做示范)、幂等策略(upsert vs 清空重建)
+2. 写 `scripts/seed.ts`,用 `prisma.xxx.upsert()` 保证可重复跑,供应商名字虚构(如「北京 XX 科技」),不混入真实业务数据
+3. 跑 `npx tsx scripts/seed.ts` 验证;刷新 `/suppliers` 看表格丰满起来
+4. Git commit + 更新 CLAUDE.md 进度日志,正式进入阶段 2
 
-预计 2-3 轮对话收尾。是阶段 1 最后一步,完成后就进入阶段 2 的认证 + 地图。
+阶段 2 的目标:Auth.js 登录页 + Admin/Viewer 角色路由保护 + Leaflet 显示中国地图 + 8-12 个红点。预计 5-8 轮对话。
