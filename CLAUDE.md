@@ -1004,9 +1004,9 @@ RU    俄文
 
 ---
 
-## 2026.6.1 项目进度日志
+## 2026.6.2 项目进度日志
 
-### 当前阶段:阶段 1 全部完成,准备进入阶段 2(seed 数据 + Auth.js + 地图)
+### 当前阶段:阶段 1 全部完成,准备进入阶段 2(Auth.js + Leaflet 地图)
 
 ### 已完成(本轮新增标 ★)
 
@@ -1019,32 +1019,33 @@ RU    俄文
 - ✅ CLAUDE.md 增补「Prisma schema 命名约定」(2026.5.22)
 - ✅ CLAUDE.md 增补「关系删除策略」四类(2026.5.22 + 2026.5.24 扩展)
 - ✅ 第一组 schema:Tag + Supplier + SupplierTag + Contact(2026.5.22)
-- ✅ `src/lib/prisma.ts` 增加 `log: ['query', 'warn', 'error']` 配置
 - ✅ `scripts/test-constraints.ts` 完成 3 个 invariant 验证(2026.5.22)
 - ⚠️ Prisma Studio v7 错误对话框正文区显示为空,约束错误统一走测试脚本验证
 - ✅ 第二组 schema:Quote + QuoteTag + Note(2026.5.24)
-- ★ ✅ 第三组 schema:Transaction + TransactionItem + Payment + File(2026.6.1),迁移名 `add_transaction_payment_file`
-- ★ ✅ schema review 修复 4 严重 + 9 中等问题(2026.6.1):Transaction 误增 quoteId 删除、TransactionItem.unitPrice 类型 String→Decimal、File.supplierId 改可空、File 5 个 FK 统一 Cascade
-- ★ ✅ 清理 dev.db 历史遗留(2026.6.1):`.gitignore` 增补 `dev.db*`,`git rm --cached dev.db` 切断跟踪
-- ★ ✅ `scripts/test-constraints.ts` 扩展到 6 个 invariant 全覆盖(2026.6.1):
-    - Test 1-3 延续:FK 违反 / 复合主键 / 唯一约束
-    - Test 4 新增:Transaction 主从模型 Cascade 链
-    - Test 5 新增:File 表「5 个可空 FK + 全 Cascade」组合验证
-    - Test 6 新增:TransactionItem.quoteId 业务链条 SetNull
-- ★ ✅ `/suppliers` 列表页 3 步落地(2026.6.1):
-    - 第 1 步:`src/app/suppliers/page.tsx` 极简静态版,验证路由打通
-    - 第 2 步:接 Prisma,Server Component + `await prisma.supplier.findMany()`,显示数据库总条数
-    - 第 3 步:渲染成 5 列表格(编号/名称/省市/合作深度/创建时间),包含 `.map` 循环、`key` 属性、cooperationLevel 中文映射、`toLocaleDateString` 日期格式化
+- ✅ 第三组 schema:Transaction + TransactionItem + Payment + File(2026.6.1),迁移名 `add_transaction_payment_file`
+- ✅ schema review 修复 4 严重 + 9 中等问题(2026.6.1)
+- ✅ 清理 dev.db 历史遗留(2026.6.1):`.gitignore` 增补 + `git rm --cached dev.db`
+- ✅ `scripts/test-constraints.ts` 扩展到 6 个 invariant 全覆盖(2026.6.1)
+- ✅ `/suppliers` 列表页 3 步落地(2026.6.1):静态版 → 接 DB 显示总数 → 5 列表格
+- ★ ✅ `scripts/seed.ts` 完成(2026.6.2):
+    - 8 个 PRODUCT 标签(玩具/纺织/五金/电子/食品/家居/服装/玻璃制品)
+    - 12 个虚构供应商,覆盖 8 个省份(粤/浙/苏/京/闽/鲁/沪/川)
+    - 各种 cooperationLevel 分布(2 STRATEGIC / 4 REGULAR / 2 TRIAL_ORDER / 3 INITIAL_CONTACT / 1 INACTIVE)
+    - 每个供应商带坐标 + 主联系人 + 1-2 个品类标签
+    - 部分供应商各 1-2 条 Quote(共 7 条)
+    - 幂等性验证:重跑 0 新增,数量稳定
+- ★ ✅ 阶段 1 全部收尾,`/suppliers` 页面 14 行数据(seed 12 + 手动 1 + 测试 1)
 
 ### 本轮收获的关键经验(给未来对话的避坑笔记)
 
-- **Decimal 字段在 Prisma 上既接受 number 也接受 string**,但 String 字段只接受 string —— 测试脚本里给金额字段传数字,反过来能体检 schema 类型设计是否合理
-- **Prisma 7 上 SQLite 的 `createMany` 已原生支持**,批量准备测试数据不必降级写循环 create
-- **dev.db 必须 `.gitignore` + `git rm --cached` 两步同时做**:`.gitignore` 只对未 tracked 文件有效;已 tracked 的需要 `git rm --cached <file>` 切断(**绝对不能漏 `--cached`**,漏了真删本地文件)
-- **`git rm --cached` 后 VS Code 文件树显示红色 D**:这是 git index 删除状态,本地文件仍在
-- **可空 FK + Cascade 的组合在 SQLite 上正常工作**:File 表 5 个 nullable FK 即使只有 1 个非空,删除该挂载主体仍能级联清掉 File(SetNull 行为只发生在 onDelete 显式设为 SetNull 时,与 FK 可空性无关)
-- **Next.js 16 App Router 的页面规则**:`src/app/<路径>/page.tsx` 自动变成对应 URL,page.tsx 默认是 Server Component,函数体里可以直接 `await prisma.xxx.findMany()`,不用建 `/api` 路由
-- **教学密度过载是真实风险**:用户首次接触 React/Next.js 时,一次性抛 Server Component + path alias + orderBy + 中文映射会直接懵。后续涉及新阶段时,先把任务拆成 3 步,每次只引入 1-2 个新概念,跑通了再继续
+- **Decimal 字段在 Prisma 上既接受 number 也接受 string**,但 String 字段只接受 string —— 测试脚本传数字能反向体检 schema 类型是否合理
+- **Prisma 7 上 SQLite 的 `createMany` 已原生支持**,批量准备测试数据不必降级写循环
+- **dev.db 必须 `.gitignore` + `git rm --cached` 两步同时做**:`.gitignore` 只对未 tracked 文件有效,已 tracked 的需要 `git rm --cached <file>` 切断(**漏 `--cached` 会真删本地文件**)
+- **可空 FK + Cascade 在 SQLite 上正常工作**:File 表 5 个 nullable FK 即使只有 1 个非空,删除该挂载主体仍能级联清掉 File
+- **Next.js 16 App Router 页面规则**:`src/app/<路径>/page.tsx` 自动变成对应 URL,page.tsx 默认 Server Component,函数体里可以直接 `await prisma.xxx.findMany()`
+- **教学密度过载是真实风险**:用户首次接触新框架时,先把任务拆成 3 步,每次只引入 1-2 个新概念,跑通了再继续
+- **seed 脚本的幂等策略分两种**:有自然 unique key 的(Supplier.code、Tag.category_nameZh)用 `upsert`;没有的(Contact、Quote)用 `findFirst` + 不存在才 create,where 条件作为"逻辑唯一键"
+- **SupplierTag 这种中间表的幂等**:用 `deleteMany({ where: { supplierId } })` + `createMany` 的"先清后建"策略,比 upsert 复合主键(`supplierId_tagId`)更直观,且不依赖 Prisma 自动生成的 composite key 命名约定
 
 ### 待办(按顺序)
 
@@ -1052,17 +1053,27 @@ RU    俄文
 2. ~~第二组 schema(Quote + QuoteTag + Note)~~ ✅
 3. ~~第三组 schema(Transaction + TransactionItem + Payment + File)~~ ✅
 4. ~~阶段 1 收尾:`/suppliers` 列表页~~ ✅
-5. **下一步:写 `scripts/seed.ts` 塞 8-12 条样例供应商** ← 下次对话起点
-6. 进入阶段 2:Auth.js 接入 + 角色路由 + Leaflet 中国地图
+5. ~~`scripts/seed.ts` 塞 12 条样例供应商~~ ✅
+6. **阶段 2:Auth.js 接入 + 角色路由 + Leaflet 中国地图** ← 下次对话起点
 7. 阶段 6 或之后:UI 美化(深色模式适配、表格列宽、hover 效果等)—— 用户明确放最后
 
 ### 下一轮对话开始时的入口
 
-直接说:**「继续阶段 1 尾巴,写 `scripts/seed.ts` 塞样例供应商」**。Claude 会:
+直接说:**「进入阶段 2,先做 Auth.js 登录认证」**或**「进入阶段 2,先做地图」**(两条线相对独立,你定先做哪条)。
 
-1. 跟用户对齐 seed 数据的几个决策点:供应商数量(建议 8-12 个)、覆盖几个省份(建议 5-6 个)、是否顺带 seed 关联表(Contact / Tag / Quote 各几条做示范)、幂等策略(upsert vs 清空重建)
-2. 写 `scripts/seed.ts`,用 `prisma.xxx.upsert()` 保证可重复跑,供应商名字虚构(如「北京 XX 科技」),不混入真实业务数据
-3. 跑 `npx tsx scripts/seed.ts` 验证;刷新 `/suppliers` 看表格丰满起来
-4. Git commit + 更新 CLAUDE.md 进度日志,正式进入阶段 2
+**Auth.js 路线预览**:
+1. 安装 `next-auth` 依赖
+2. 配置 `src/auth.ts`(认证逻辑) + `src/app/api/auth/[...nextauth]/route.ts`(API 路由)
+3. 给 admin user 设真实 bcrypt 密码(覆盖 seed 的 `'seed-placeholder'`)
+4. 写登录页 `/login`,提交账号密码后跳转 `/suppliers`
+5. 加中间件保护 `/suppliers` 等路由,未登录跳登录页
+6. 区分 Admin / Viewer 角色,Viewer 看不见某些操作按钮(后续 CRUD 页面会用)
 
-阶段 2 的目标:Auth.js 登录页 + Admin/Viewer 角色路由保护 + Leaflet 显示中国地图 + 8-12 个红点。预计 5-8 轮对话。
+**地图路线预览**:
+1. 安装 `leaflet` + `react-leaflet` 依赖
+2. 准备中国 GeoJSON 数据(放 `public/china.geojson`)
+3. 写 `/map` 页面,加载 GeoJSON 渲染地图轮廓
+4. 把 12 个供应商的 latitude/longitude 转成红点叠在地图上
+5. 点红点弹出 popup 显示供应商名+城市+合作深度
+
+预计阶段 2 总共 8-12 轮对话收尾。
