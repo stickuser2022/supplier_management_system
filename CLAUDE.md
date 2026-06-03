@@ -1004,76 +1004,57 @@ RU    俄文
 
 ---
 
-## 2026.6.2 项目进度日志
+## 2026.6.2 项目进度日志(阶段 2 启动:地图功能)
 
-### 当前阶段:阶段 1 全部完成,准备进入阶段 2(Auth.js + Leaflet 地图)
+### 当前阶段:阶段 2 进行中,地图主功能 + 交互筛选已落地,Auth.js 待开工
 
 ### 已完成(本轮新增标 ★)
 
-- ✅ 数据模型设计阶段全部收尾(11 张表 schema 定稿 + 历史字段双语审计)
-- ✅ Prisma 7 + SQLite 安装与配置(2026.5.20)
-- ✅ User 表 schema 落地 + migrate(2026.5.20)
-- ✅ `src/lib/prisma.ts` driver adapter + 全局单例 + 绝对路径 normalize(2026.5.21)
-- ✅ `scripts/verify-prisma.ts` 集成验证脚本(2026.5.21)
-- ✅ CLAUDE.md 增补「Prisma 7 + driver adapter 实操要点」(2026.5.21)
-- ✅ CLAUDE.md 增补「Prisma schema 命名约定」(2026.5.22)
-- ✅ CLAUDE.md 增补「关系删除策略」四类(2026.5.22 + 2026.5.24 扩展)
-- ✅ 第一组 schema:Tag + Supplier + SupplierTag + Contact(2026.5.22)
-- ✅ `scripts/test-constraints.ts` 完成 3 个 invariant 验证(2026.5.22)
-- ⚠️ Prisma Studio v7 错误对话框正文区显示为空,约束错误统一走测试脚本验证
-- ✅ 第二组 schema:Quote + QuoteTag + Note(2026.5.24)
-- ✅ 第三组 schema:Transaction + TransactionItem + Payment + File(2026.6.1),迁移名 `add_transaction_payment_file`
-- ✅ schema review 修复 4 严重 + 9 中等问题(2026.6.1)
-- ✅ 清理 dev.db 历史遗留(2026.6.1):`.gitignore` 增补 + `git rm --cached dev.db`
-- ✅ `scripts/test-constraints.ts` 扩展到 6 个 invariant 全覆盖(2026.6.1)
-- ✅ `/suppliers` 列表页 3 步落地(2026.6.1):静态版 → 接 DB 显示总数 → 5 列表格
-- ★ ✅ `scripts/seed.ts` 完成(2026.6.2):
-    - 8 个 PRODUCT 标签(玩具/纺织/五金/电子/食品/家居/服装/玻璃制品)
-    - 12 个虚构供应商,覆盖 8 个省份(粤/浙/苏/京/闽/鲁/沪/川)
-    - 各种 cooperationLevel 分布(2 STRATEGIC / 4 REGULAR / 2 TRIAL_ORDER / 3 INITIAL_CONTACT / 1 INACTIVE)
-    - 每个供应商带坐标 + 主联系人 + 1-2 个品类标签
-    - 部分供应商各 1-2 条 Quote(共 7 条)
-    - 幂等性验证:重跑 0 新增,数量稳定
-- ★ ✅ 阶段 1 全部收尾,`/suppliers` 页面 14 行数据(seed 12 + 手动 1 + 测试 1)
+- ★ ✅ 安装 `leaflet` + `react-leaflet` + `@types/leaflet`,React 19 无 peer dependency 警告
+- ★ ✅ `/map` 路由三文件结构落地:
+    - `page.tsx`:服务端组件,Prisma 查 isActive=true 的供应商,select 7 字段传给客户端
+    - `MapPageClient.tsx`:客户端"中间人",`next/dynamic` + `ssr: false` 动态加载 MapView
+    - `MapView.tsx`:Leaflet 主体,MapContainer + Google 瓦片 + CircleMarker + Popup
+- ★ ✅ 按 cooperationLevel 配色 + 右上角图例:
+    - 战略=深红 `#b91c1c`、常规=红 `#ef4444`、试单=橙 `#f97316`、初步接触=黄 `#eab308`、已暂停=灰 `#9ca3af`
+    - `LEVEL_CONFIG` 单一事实来源,popup 中文标签 + 标记颜色 + 图例颜色三处同源
+- ★ ✅ 图例可点击筛选(项目第一个 `useState` 交互):
+    - 单选高亮模式:点级别只显示该级别,再点同一级或「清除筛选」回到全部
+    - 图例每行显示该级别供应商数量,点击前就知道会过滤到几个
 
 ### 本轮收获的关键经验(给未来对话的避坑笔记)
 
-- **Decimal 字段在 Prisma 上既接受 number 也接受 string**,但 String 字段只接受 string —— 测试脚本传数字能反向体检 schema 类型是否合理
-- **Prisma 7 上 SQLite 的 `createMany` 已原生支持**,批量准备测试数据不必降级写循环
-- **dev.db 必须 `.gitignore` + `git rm --cached` 两步同时做**:`.gitignore` 只对未 tracked 文件有效,已 tracked 的需要 `git rm --cached <file>` 切断(**漏 `--cached` 会真删本地文件**)
-- **可空 FK + Cascade 在 SQLite 上正常工作**:File 表 5 个 nullable FK 即使只有 1 个非空,删除该挂载主体仍能级联清掉 File
-- **Next.js 16 App Router 页面规则**:`src/app/<路径>/page.tsx` 自动变成对应 URL,page.tsx 默认 Server Component,函数体里可以直接 `await prisma.xxx.findMany()`
-- **教学密度过载是真实风险**:用户首次接触新框架时,先把任务拆成 3 步,每次只引入 1-2 个新概念,跑通了再继续
-- **seed 脚本的幂等策略分两种**:有自然 unique key 的(Supplier.code、Tag.category_nameZh)用 `upsert`;没有的(Contact、Quote)用 `findFirst` + 不存在才 create,where 条件作为"逻辑唯一键"
-- **SupplierTag 这种中间表的幂等**:用 `deleteMany({ where: { supplierId } })` + `createMany` 的"先清后建"策略,比 upsert 复合主键(`supplierId_tagId`)更直观,且不依赖 Prisma 自动生成的 composite key 命名约定
+- **Leaflet 是浏览器端库,必须 `'use client'` + 动态导入 + `ssr: false`**:Next.js 默认 SSR,服务器没有 `window` 对象,Leaflet 直接报错。`ssr: false` 只能写在客户端组件里,所以必须套"page → MapPageClient → MapView"三层结构。其他纯浏览器库(富文本编辑器、某些图表库)以后会复用同样模式
+- **用 `<CircleMarker>` 替代 `<Marker>` 规避图标坑**:Leaflet 默认 `<Marker>` 依赖图片图标,Turbopack/Webpack 打包后路径常找不到导致空白标记。`<CircleMarker>` 是纯 SVG 圆点,无图片依赖,天然符合 CLAUDE.md "红点节点"愿景
+- **Google 瓦片 URL 是非官方接口**:`https://mt1.google.com/vt/lyrs=m&hl=zh-CN&x={x}&y={y}&z={z}` 能用但不稳定,Google 改了就得换。长期可考虑切换到高德/天地图等国内服务
+- **中国境内 Google Maps 坐标偏移**:Google 用 GCJ-02 加密坐标系,数据库存的 WGS-84 坐标显示时偏移 300-500 米。当前业务可接受(精度足够到城市级,有地址行补充),需要厘米级精度时再处理(`coord-transform` 等库)
+- **图例叠加用绝对定位 + `z-[1000]`**:Leaflet 内部 z-index 较高,自定义浮层要够大才能压在上面;`bg-white/95` 是 Tailwind 透明度语法,稍透出地图底色更协调
+- **单一事实来源原则**:同一组配置(枚举的中文名 + 颜色)用一个对象表达,popup/标记/图例三处都从同一处读,避免分散维护
+- **`useState` 是 React "组件随身便利贴"**:用于让组件记住跨渲染的状态(选中项、表单值、开关状态等)。本项目首次出现在 MapView 的 `selectedLevel`,以后所有表单、弹窗、加载状态都会用到,是 React 最核心钩子
+- **筛选逻辑放在渲染时算,而非改原数据**:`filteredSuppliers = suppliers.filter(...)` 派生数据不动 `suppliers` 本身,状态变化 React 自动重新计算并重绘,这是 React "声明式渲染"的标准范式
 
 ### 待办(按顺序)
 
-1. ~~第一组 schema(Tag + Supplier + SupplierTag + Contact)~~ ✅
-2. ~~第二组 schema(Quote + QuoteTag + Note)~~ ✅
-3. ~~第三组 schema(Transaction + TransactionItem + Payment + File)~~ ✅
-4. ~~阶段 1 收尾:`/suppliers` 列表页~~ ✅
-5. ~~`scripts/seed.ts` 塞 12 条样例供应商~~ ✅
-6. **阶段 2:Auth.js 接入 + 角色路由 + Leaflet 中国地图** ← 下次对话起点
-7. 阶段 6 或之后:UI 美化(深色模式适配、表格列宽、hover 效果等)—— 用户明确放最后
+1. ~~阶段 1 全部完成~~ ✅
+2. ~~阶段 2-地图主功能(red dots + popup + 色级图例 + 交互筛选)~~ ✅
+3. **阶段 2-Auth.js 接入**:登录认证 + 角色路由 + Admin/Viewer 权限区分 ← 下次对话起点
+4. 阶段 3 起后续:i18n 中俄双语界面、翻译 API 接入、UI 美化等
+5. 地图微调待选项(优先级低,真要做再做):
+    - 地图初始视角自适应到所有红点的边界框(不再硬编码中心)
+    - 红点 hover tooltip(无需点击就看到供应商名)
+    - 同城市红点聚合(几个供应商挤在一起会叠,缩放才能区分)
+    - 图例升级为多选模式(允许同时显示"战略+常规"两档)
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进入阶段 2,先做 Auth.js 登录认证」**或**「进入阶段 2,先做地图」**(两条线相对独立,你定先做哪条)。
+直接说:**「进入 Auth.js 接入」**。
 
 **Auth.js 路线预览**:
 1. 安装 `next-auth` 依赖
 2. 配置 `src/auth.ts`(认证逻辑) + `src/app/api/auth/[...nextauth]/route.ts`(API 路由)
 3. 给 admin user 设真实 bcrypt 密码(覆盖 seed 的 `'seed-placeholder'`)
 4. 写登录页 `/login`,提交账号密码后跳转 `/suppliers`
-5. 加中间件保护 `/suppliers` 等路由,未登录跳登录页
-6. 区分 Admin / Viewer 角色,Viewer 看不见某些操作按钮(后续 CRUD 页面会用)
+5. 加中间件保护 `/suppliers` 和 `/map` 等路由,未登录跳登录页
+6. 区分 Admin / Viewer 角色,Viewer 看不见某些操作按钮
 
-**地图路线预览**:
-1. 安装 `leaflet` + `react-leaflet` 依赖
-2. 准备中国 GeoJSON 数据(放 `public/china.geojson`)
-3. 写 `/map` 页面,加载 GeoJSON 渲染地图轮廓
-4. 把 12 个供应商的 latitude/longitude 转成红点叠在地图上
-5. 点红点弹出 popup 显示供应商名+城市+合作深度
-
-预计阶段 2 总共 8-12 轮对话收尾。
+预计阶段 2 余下 5-8 轮对话收尾。
