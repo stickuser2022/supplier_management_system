@@ -1004,57 +1004,80 @@ RU    俄文
 
 ---
 
-## 2026.6.2 项目进度日志(阶段 2 启动:地图功能)
+## 2026.6.3 项目进度日志(阶段 2 收尾:认证体系完整落地)
 
-### 当前阶段:阶段 2 进行中,地图主功能 + 交互筛选已落地,Auth.js 待开工
+### 当前阶段:阶段 2 Auth + 地图两条线全部完成,阶段 2 整体完成,准备进入阶段 3(i18n 中俄双语)
+
+### 重大架构决策变更:Auth.js v5 → Better Auth
+
+CLAUDE.md 原计划用 Auth.js v5,实际研究后改为 Better Auth。理由:
+
+- Auth.js v5 的核心优势(OAuth / 社交登录 / 企业 SSO)本项目完全用不到——单 Admin + 几个 Viewer 都是账号密码登录
+- 多份独立评测显示 Auth.js 自身维护者倾向推荐新项目用 Better Auth
+- Better Auth 更轻量、API 更直觉、Prisma 适配更清爽、自托管友好
+- 风险:Better Auth 是较新库,3-5 年生态如何待观察(权衡后接受)
 
 ### 已完成(本轮新增标 ★)
 
-- ★ ✅ 安装 `leaflet` + `react-leaflet` + `@types/leaflet`,React 19 无 peer dependency 警告
-- ★ ✅ `/map` 路由三文件结构落地:
-    - `page.tsx`:服务端组件,Prisma 查 isActive=true 的供应商,select 7 字段传给客户端
-    - `MapPageClient.tsx`:客户端"中间人",`next/dynamic` + `ssr: false` 动态加载 MapView
-    - `MapView.tsx`:Leaflet 主体,MapContainer + Google 瓦片 + CircleMarker + Popup
-- ★ ✅ 按 cooperationLevel 配色 + 右上角图例:
-    - 战略=深红 `#b91c1c`、常规=红 `#ef4444`、试单=橙 `#f97316`、初步接触=黄 `#eab308`、已暂停=灰 `#9ca3af`
-    - `LEVEL_CONFIG` 单一事实来源,popup 中文标签 + 标记颜色 + 图例颜色三处同源
-- ★ ✅ 图例可点击筛选(项目第一个 `useState` 交互):
-    - 单选高亮模式:点级别只显示该级别,再点同一级或「清除筛选」回到全部
-    - 图例每行显示该级别供应商数量,点击前就知道会过滤到几个
+- ★ ✅ **schema 大手术**(基于 0 真实数据的低成本时机):
+    - User.id 从 `Int @default(autoincrement())` 改为 `String @default(cuid())`
+    - 删除 User.passwordHash 字段(密码移交 Account 表管)
+    - User 表新增 Better Auth 必需字段:`email` / `emailVerified` / `name` / `image` / `displayUsername`
+    - 8 张业务表 `createdById` 全部 `Int → String`(供应商/标签/联系人/报价/沟通/订单/付款/文件)
+    - 新增 3 张 Better Auth 表:`Session` / `Account` / `Verification`
+    - drop dev.db + drop migrations 重建,新 migration: `init_with_better_auth`
+- ★ ✅ **seed.ts 重写**:admin 创建走 `auth.api.signUpEmail({ body: { email, password, name, username } })`,密码用 Better Auth 自动 scrypt 哈希存进 Account 表;signUp 后单独 `prisma.user.update` 把 role 从默认 VIEWER 提到 ADMIN;幂等通过 findUnique 预检
+- ★ ✅ **5 个 Auth 文件落地**:
+    - `src/lib/auth.ts` — 服务端 Better Auth 配置(Prisma adapter + emailAndPassword + username 插件)
+    - `src/lib/auth-client.ts` — 客户端工具(`createAuthClient` + `usernameClient` 插件)
+    - `src/app/api/auth/[...all]/route.ts` — HTTP 入口,`toNextJsHandler(auth)` 桥接
+    - `src/app/login/page.tsx` — 登录页(useState 表单 + signIn.username + useRouter 跳转)
+    - `src/components/Navbar.tsx` — 顶部导航 + 退出按钮 + 当前用户显示(useSession + signOut)
+- ★ ✅ **`src/app/layout.tsx` 集成 Navbar**:body 用 `min-h-full flex flex-col`,Navbar 占自然高度,`<main className="flex-1 flex flex-col">` 吃剩余空间;`lang="en"` → `lang="zh"`;metadata 改为项目实际名
+- ★ ✅ **`src/middleware.ts` 路由保护**:`getSessionCookie(request)` 检查 cookie,无则 redirect 到 /login;`matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)']` 排除 API 和静态资源
+- ★ ✅ **package.json 三处增补**:
+    - `"scripts": { "seed": "tsx scripts/seed.ts" }` 注册 seed 命令
+    - `devDependencies` 加 `tsx`
+    - 新增 `"overrides": { "kysely": "0.28.0" }` 修复 Better Auth + Kysely 0.29 不兼容
+- ★ ✅ **`.env` 增补**:`BETTER_AUTH_SECRET`(crypto 生成 32 字节 base64)+ `BETTER_AUTH_URL` + `NEXT_PUBLIC_BETTER_AUTH_URL`
+- ★ ✅ **端到端测试通过**:未登录访问 /suppliers/map 跳 /login → 用 admin 登录 → 进 /suppliers 顶部导航出现 → 切 /map 导航保留 → 退出回 /login
 
 ### 本轮收获的关键经验(给未来对话的避坑笔记)
 
-- **Leaflet 是浏览器端库,必须 `'use client'` + 动态导入 + `ssr: false`**:Next.js 默认 SSR,服务器没有 `window` 对象,Leaflet 直接报错。`ssr: false` 只能写在客户端组件里,所以必须套"page → MapPageClient → MapView"三层结构。其他纯浏览器库(富文本编辑器、某些图表库)以后会复用同样模式
-- **用 `<CircleMarker>` 替代 `<Marker>` 规避图标坑**:Leaflet 默认 `<Marker>` 依赖图片图标,Turbopack/Webpack 打包后路径常找不到导致空白标记。`<CircleMarker>` 是纯 SVG 圆点,无图片依赖,天然符合 CLAUDE.md "红点节点"愿景
-- **Google 瓦片 URL 是非官方接口**:`https://mt1.google.com/vt/lyrs=m&hl=zh-CN&x={x}&y={y}&z={z}` 能用但不稳定,Google 改了就得换。长期可考虑切换到高德/天地图等国内服务
-- **中国境内 Google Maps 坐标偏移**:Google 用 GCJ-02 加密坐标系,数据库存的 WGS-84 坐标显示时偏移 300-500 米。当前业务可接受(精度足够到城市级,有地址行补充),需要厘米级精度时再处理(`coord-transform` 等库)
-- **图例叠加用绝对定位 + `z-[1000]`**:Leaflet 内部 z-index 较高,自定义浮层要够大才能压在上面;`bg-white/95` 是 Tailwind 透明度语法,稍透出地图底色更协调
-- **单一事实来源原则**:同一组配置(枚举的中文名 + 颜色)用一个对象表达,popup/标记/图例三处都从同一处读,避免分散维护
-- **`useState` 是 React "组件随身便利贴"**:用于让组件记住跨渲染的状态(选中项、表单值、开关状态等)。本项目首次出现在 MapView 的 `selectedLevel`,以后所有表单、弹窗、加载状态都会用到,是 React 最核心钩子
-- **筛选逻辑放在渲染时算,而非改原数据**:`filteredSuppliers = suppliers.filter(...)` 派生数据不动 `suppliers` 本身,状态变化 React 自动重新计算并重绘,这是 React "声明式渲染"的标准范式
+- **Better Auth 与 Kysely 0.29 不兼容(2026.6.3)**:Better Auth 的 kysely-adapter 引用 `DEFAULT_MIGRATION_LOCK_TABLE`,Kysely 0.29 移除了这个 export。即便项目用 prisma adapter,Turbopack 仍会静态扫描所有 adapter 代码导致报错。解法:`package.json` 加 `"overrides": { "kysely": "0.28.0" }`,删除 node_modules + package-lock.json 重装。等 Better Auth 上游修复后可解除 pin
+- **Next.js 16.2.6 的 proxy.ts 加载有问题**:文件位置正确、export 形式正确、清缓存重启都没用,Next.js 就是不加载。最终降级用 middleware.ts(Next.js 16 仍支持,只是 deprecation 警告)。注意 middleware.ts 位置在 `src/middleware.ts`,**不是** `src/app/middleware.ts`。等 Next.js 修复后可平移代码,只需改文件名 + 函数名
+- **Next.js App Router catch-all 路由的坑**:`[...all]` 是**文件夹名**而非文件名,实际文件叫 `route.ts` 在该文件夹**内**。完整路径:`src/app/api/auth/[...all]/route.ts`。VS Code 文件树有时会把单子目录链合并显示成一行,容易看错
+- **Better Auth 把密码存到 Account 表,不存 User 表**:User 管"你是谁"(身份元数据),Account 管"你怎么证明你是你"(`providerId='credential'` + `password=<scrypt 哈希>`)。这是认证库的现代设计——也意味着我们 User schema 不再有 passwordHash 字段
+- **`signUpEmail` 创建的用户默认 role 是 schema 默认值(VIEWER),不能在 signUp body 里指定 role**:Better Auth 的 signUp 只管认证字段,业务字段(role 等)需 signUp 后单独 update。本项目 seed 里用此模式给 admin 提权
+- **环境变量分前后端**:Better Auth 的 secret(`BETTER_AUTH_SECRET`)只服务端用;客户端 baseURL(`NEXT_PUBLIC_BETTER_AUTH_URL`)需要 `NEXT_PUBLIC_` 前缀才能在浏览器组件读到——这是 Next.js 的硬规定,与 Better Auth 无关
+- **proxy/middleware 不能热重载**:跟普通组件不同,文件改动必须**完全停 dev server + 重启**才生效,有时还要删 `.next` 缓存目录
+- **数据库类型大改的窗口期**:0 真实数据时改 schema(尤其 PK / FK 类型)零成本——直接 drop dev.db + drop migrations + 重做 migrate。这是 CLAUDE.md 一直强调的"早期灵活窗口",本轮第一次真正用上
+- **Auth 系统的"五层"概念图**:UI 登录页 → auth-client.ts(浏览器侧)→ HTTP 路由 → auth.ts(服务端)→ schema(User+Account+Session)。每层之间靠约定(文件路径、函数名、URL)对接,出问题排查时按这个分层找一定能定位
 
 ### 待办(按顺序)
 
 1. ~~阶段 1 全部完成~~ ✅
 2. ~~阶段 2-地图主功能(red dots + popup + 色级图例 + 交互筛选)~~ ✅
-3. **阶段 2-Auth.js 接入**:登录认证 + 角色路由 + Admin/Viewer 权限区分 ← 下次对话起点
-4. 阶段 3 起后续:i18n 中俄双语界面、翻译 API 接入、UI 美化等
-5. 地图微调待选项(优先级低,真要做再做):
-    - 地图初始视角自适应到所有红点的边界框(不再硬编码中心)
-    - 红点 hover tooltip(无需点击就看到供应商名)
-    - 同城市红点聚合(几个供应商挤在一起会叠,缩放才能区分)
-    - 图例升级为多选模式(允许同时显示"战略+常规"两档)
+3. ~~阶段 2-Auth.js → Better Auth 接入~~ ✅
+4. **阶段 3-i18n 中俄双语界面**:`next-intl` 接入,所有 UI 文字外迁到 `messages/zh.json` + `messages/ru.json`,用户语言偏好持久化(用 User.locale 字段)← 下次对话起点
+5. 阶段 4-翻译 API 抽象层(DeepL → DeepSeek 热切换),自由文本按需翻译
+6. 阶段 5-文件存储抽象层 + 本地实现 + 业务表挂载文件
+7. 阶段 6-UI 美化(深色模式、表格优化、hover 效果等)
+8. **延期 / 低优先级**:
+    - 给 server components 加二层 session 验证(`auth.api.getSession()` from DB,真正抵御伪造 cookie,目前 middleware cookie 存在校验 + 内部小团队场景已足够)
+    - middleware.ts → proxy.ts 等 Next.js 修复后迁移
+    - 解除 kysely 0.28 锁定,等 Better Auth 修复 kysely 0.29 兼容性后
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进入 Auth.js 接入」**。
+直接说:**「进入阶段 3,i18n 中俄双语界面」**。
 
-**Auth.js 路线预览**:
-1. 安装 `next-auth` 依赖
-2. 配置 `src/auth.ts`(认证逻辑) + `src/app/api/auth/[...nextauth]/route.ts`(API 路由)
-3. 给 admin user 设真实 bcrypt 密码(覆盖 seed 的 `'seed-placeholder'`)
-4. 写登录页 `/login`,提交账号密码后跳转 `/suppliers`
-5. 加中间件保护 `/suppliers` 和 `/map` 等路由,未登录跳登录页
-6. 区分 Admin / Viewer 角色,Viewer 看不见某些操作按钮
+**阶段 3 路线预览**:
+1. 安装 `next-intl` 依赖
+2. 创建 `messages/zh.json` + `messages/ru.json`,把 Navbar、登录页、供应商列表、地图等所有界面文字外迁
+3. 配置 `i18n.ts`(语言检测 + 加载逻辑)
+4. 给 layout / 组件加 `useTranslations()` Hook
+5. Navbar 加语言切换按钮,选择持久化到 `User.locale` 字段,登录后从 DB 读初始语言
+6. 验证:切换后界面文字、错误提示、占位符全部跟着变;退出登录回 /login 也按 cookie 记住语言
 
-预计阶段 2 余下 5-8 轮对话收尾。
+预计阶段 3 用 4-6 轮对话收尾。

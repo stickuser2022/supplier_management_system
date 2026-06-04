@@ -23,26 +23,79 @@ enum Locale {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  passwordHash String   @map("password_hash")
-  role         Role     @default(VIEWER)
-  locale       Locale   @default(ZH)
-  isActive     Boolean  @default(true) @map("is_active") //映射数据库名称
-  createdAt    DateTime @default(now()) @map("created_at") //映射数据库名称
-  updatedAt    DateTime @updatedAt @map("updated_at") //映射数据库名称
+  id              String   @id @default(cuid())
+  username        String   @unique
+  role            Role     @default(VIEWER)
+  locale          Locale   @default(ZH)
+  isActive        Boolean  @default(true) @map("is_active") //映射数据库名称
+  createdAt       DateTime @default(now()) @map("created_at") //映射数据库名称
+  updatedAt       DateTime @updatedAt @map("updated_at") //映射数据库名称
+  email           String   @unique
+  emailVerified   Boolean  @default(false) @map("email_verified")
+  name            String?
+  image           String?
+  displayUsername String?  @map("display_username")
 
   // 反向关系字段
-  tags      Tag[]
-  suppliers Supplier[]
-  contacts  Contact[]
-  quotes    Quote[]
-  notes     Note[]
+  tags         Tag[]
+  suppliers    Supplier[]
+  contacts     Contact[]
+  quotes       Quote[]
+  notes        Note[]
   transactions Transaction[]
-  payments Payment[]
-  files File[]
+  payments     Payment[]
+  files        File[]
+  sessions     Session[]
+  accounts     Account[]
 
   @@map("users") // 数据库表名是 users，而不是 User,SQL社区的规定,单数则为一个实体,复数则为一个集合
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime @map("expires_at")
+  token     String   @unique
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  userId                String    @map("user_id")
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  password              String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  @@map("verifications")
 }
 
 enum TagCategory {
@@ -65,12 +118,11 @@ model Tag {
   isActive    Boolean     @default(true) @map("is_active") //是否启用
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
-  createdById Int         @map("created_by_id")
+  createdById String      @map("created_by_id")
 
   createdBy    User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
   supplierTags SupplierTag[]
   quoteTags    QuoteTag[]
-  
 
   @@unique([category, nameZh])
   @@unique([category, nameRu])
@@ -108,7 +160,7 @@ model Supplier {
   descriptionRuAutoTranslated Boolean          @default(true) @map("description_ru_auto_translated") //描述是否自动翻译成俄语
   createdAt                   DateTime         @default(now()) @map("created_at")
   updatedAt                   DateTime         @updatedAt @map("updated_at")
-  createdById                 Int              @map("created_by_id")
+  createdById                 String           @map("created_by_id")
   isActive                    Boolean          @default(true) @map("is_active") //是否启用
 
   contacts     Contact[]
@@ -116,8 +168,8 @@ model Supplier {
   quotes       Quote[]
   notes        Note[]
   transactions Transaction[]
-  files       File[]
-  createdBy    User  @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  files        File[]
+  createdBy    User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
   @@map("suppliers")
 }
@@ -160,13 +212,14 @@ model Contact {
   roleRuAutoTranslated Boolean       @default(true) @map("role_ru_auto_translated") //职位是否自动翻译成俄语
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
-  createdById          Int           @map("created_by_id")
+  createdById          String        @map("created_by_id")
 
-  supplier  Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  createdBy User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  quotes    Quote[]
-  notes     Note[]
+  supplier     Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdBy    User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  quotes       Quote[]
+  notes        Note[]
   transactions Transaction[]
+
   @@map("contacts")
 }
 
@@ -175,49 +228,52 @@ enum ContactStatus {
   ARCHIVED
 }
 
-model Quote{
-  id          Int      @id @default(autoincrement())
-  supplierId  Int      @map("supplier_id")
-  contactId   Int?     @map("contact_id")
-  productNameZh String   @map("product_name_zh")
-  productNameRu String?  @map("product_name_ru")
-  productSpecZh  String?  @map("product_spec_zh")
-  productSpecRu  String?  @map("product_spec_ru")
-  unitPrice   Decimal    @map("unit_price")
-  currency    Currency   @map("currency")@default(CNY)
-  unitZh       String?   @map("unit_zh")
-  unitRu       String?  @map("unit_ru")
-  moq         Int?      @map("moq")
-  quotedAt    DateTime @map("quoted_at")
-  validUntil      DateTime? @map("valid_until")
-  paymentTerms    String?  @map("payment_terms")
-  leadTimeDays    Int?     @map("lead_time_days")
-  source           String?  @map("source") //报价来源
-  quoteBatchId      String?  @map("quote_batch_id") //报价批次ID,用于关联同一批次的多个报价
-  status            QuoteStatus @default(ACTIVE) //报价状态
-  productNameRuAutoTranslated Boolean @default(true) @map("product_name_ru_auto_translated") //产品名称是否自动翻译成俄语
-  productSpecRuAutoTranslated Boolean @default(true) @map("product_spec_ru_auto_translated") //产品规格是否自动翻译成俄语
+model Quote {
+  id                          Int         @id @default(autoincrement())
+  supplierId                  Int         @map("supplier_id")
+  contactId                   Int?        @map("contact_id")
+  productNameZh               String      @map("product_name_zh")
+  productNameRu               String?     @map("product_name_ru")
+  productSpecZh               String?     @map("product_spec_zh")
+  productSpecRu               String?     @map("product_spec_ru")
+  unitPrice                   Decimal     @map("unit_price")
+  currency                    Currency    @default(CNY) @map("currency")
+  unitZh                      String?     @map("unit_zh")
+  unitRu                      String?     @map("unit_ru")
+  moq                         Int?        @map("moq")
+  quotedAt                    DateTime    @map("quoted_at")
+  validUntil                  DateTime?   @map("valid_until")
+  paymentTerms                String?     @map("payment_terms")
+  leadTimeDays                Int?        @map("lead_time_days")
+  source                      String?     @map("source") //报价来源
+  quoteBatchId                String?     @map("quote_batch_id") //报价批次ID,用于关联同一批次的多个报价
+  status                      QuoteStatus @default(ACTIVE) //报价状态
+  productNameRuAutoTranslated Boolean     @default(true) @map("product_name_ru_auto_translated") //产品名称是否自动翻译成俄语
+  productSpecRuAutoTranslated Boolean     @default(true) @map("product_spec_ru_auto_translated") //产品规格是否自动翻译成俄语
 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-  createdById Int      @map("created_by_id")
+  createdById String   @map("created_by_id")
 
   supplier  Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   createdBy User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
-  quoteTags  QuoteTag[] 
-  notes      Note[]
+  quoteTags        QuoteTag[]
+  notes            Note[]
   transactionItems TransactionItem[]
-  files File[]
+  files            File[]
+
   @@index([supplierId])
   @@index([status, validUntil])
   @@map("quotes")
 }
+
 enum QuoteStatus {
   ACTIVE
   ARCHIVED
 }
+
 enum Currency {
   USD
   EUR
@@ -225,62 +281,63 @@ enum Currency {
   RUB
 }
 
-model QuoteTag{
-  quoteId Int @map("quote_id")
-  tagId   Int @map("tag_id")
-  createdAt DateTime @default(now()) @map("created_at")  
-  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)//什么情况要在fields前加上关系名, @relation("QuoteTag" fields: ...) 里第一个参数是 relation name(关系名)。它的用途是:当两张表之间有多条关系时,用来区分——比如 User 表同时有 createdBy User 和 updatedBy User 两个字段都指向 User,Prisma 不知道哪个是哪个,这时才需要起名字区分
-  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Restrict)
+model QuoteTag {
+  quoteId   Int      @map("quote_id")
+  tagId     Int      @map("tag_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade) //什么情况要在fields前加上关系名, @relation("QuoteTag" fields: ...) 里第一个参数是 relation name(关系名)。它的用途是:当两张表之间有多条关系时,用来区分——比如 User 表同时有 createdBy User 和 updatedBy User 两个字段都指向 User,Prisma 不知道哪个是哪个,这时才需要起名字区分
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Restrict)
+
   @@id([quoteId, tagId]) // 复合主键
   @@map("quote_tags")
-  
 }
 
-model Note{
-  id Int @id @default(autoincrement())
-  supplierId Int @map("supplier_id")
-  contactId Int? @map("contact_id")
-  quoteId Int? @map("quote_id")
-  contentZh String @map("content_zh")
-  contentRu String? @map("content_ru")
-  happenedAt DateTime @map("happened_at") //事件发生时间
-  isActive Boolean @default(true) @map("is_active") //是否启用
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  createdById Int @map("created_by_id")
+model Note {
+  id          Int      @id @default(autoincrement())
+  supplierId  Int      @map("supplier_id")
+  contactId   Int?     @map("contact_id")
+  quoteId     Int?     @map("quote_id")
+  contentZh   String   @map("content_zh")
+  contentRu   String?  @map("content_ru")
+  happenedAt  DateTime @map("happened_at") //事件发生时间
+  isActive    Boolean  @default(true) @map("is_active") //是否启用
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String   @map("created_by_id")
 
+  createdBy User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  quote     Quote?   @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  supplier  Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  files     File[]
 
-  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  quote Quote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  files File[]
   @@index([supplierId, happenedAt])
   @@map("notes")
 }
 
 model Transaction {
-  id Int @id @default(autoincrement())
-  supplierId Int @map("supplier_id")
-  contactId Int? @map("contact_id")
-  orderedAt DateTime @map("ordered_at") //下单时间
-  totalAmount Decimal @map("total_amount")
-  currency Currency @default(CNY)
-  notesZh String? @map("note_zh")
-  notesRu String? @map("note_ru")
-  notesRuAutoTranslated Boolean @default(true) @map("note_ru_auto_translated") //备注是否自动翻译成俄语
-  status TransactionStatus @default(IN_PROGRESS)//交易状态
-  isActive Boolean @default(true) @map("is_active") //是否启用
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  createdById Int @map("created_by_id")
+  id                    Int               @id @default(autoincrement())
+  supplierId            Int               @map("supplier_id")
+  contactId             Int?              @map("contact_id")
+  orderedAt             DateTime          @map("ordered_at") //下单时间
+  totalAmount           Decimal           @map("total_amount")
+  currency              Currency          @default(CNY)
+  notesZh               String?           @map("note_zh")
+  notesRu               String?           @map("note_ru")
+  notesRuAutoTranslated Boolean           @default(true) @map("note_ru_auto_translated") //备注是否自动翻译成俄语
+  status                TransactionStatus @default(IN_PROGRESS) //交易状态
+  isActive              Boolean           @default(true) @map("is_active") //是否启用
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+  createdById           String            @map("created_by_id")
 
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  supplier         Supplier          @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdBy        User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  contact          Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
   transactionItems TransactionItem[]
-  payments Payment[]
-  files File[]
+  payments         Payment[]
+  files            File[]
+
   @@index([supplierId, orderedAt])
   @@map("transactions")
 }
@@ -291,81 +348,81 @@ enum TransactionStatus {
   CANCELLED
 }
 
-model TransactionItem{
-  id Int @id @default(autoincrement())
-  transactionId Int @map("transaction_id")
-  quoteId Int? @map("quote_id")
-  productNameZh String @map("product_name_zh")
-  productNameRu String? @map("product_name_ru")
-  productSpecZh String? @map("product_spec_zh")
-  productSpecRu String? @map("product_spec_ru")
-  quantity Int @map("quantity")
-  unitZh String? @map("unit_zh")
-  unitRu String? @map("unit_ru")
-  unitPrice Decimal @map("unit_price")
-  subtotal Decimal @map("subtotal")
-  sortOrder Int @map("sort_order")@default(0)
-  productNameRuAutoTranslated Boolean @default(true) @map("product_name_ru_auto_translated") //产品名称是否自动翻译成俄语
-  productSpecRuAutoTranslated Boolean @default(true) @map("product_spec_ru_auto_translated") //产品规格是否自动翻译成俄语
-  createdAt DateTime @default(now()) @map("created_at")
+model TransactionItem {
+  id                          Int      @id @default(autoincrement())
+  transactionId               Int      @map("transaction_id")
+  quoteId                     Int?     @map("quote_id")
+  productNameZh               String   @map("product_name_zh")
+  productNameRu               String?  @map("product_name_ru")
+  productSpecZh               String?  @map("product_spec_zh")
+  productSpecRu               String?  @map("product_spec_ru")
+  quantity                    Int      @map("quantity")
+  unitZh                      String?  @map("unit_zh")
+  unitRu                      String?  @map("unit_ru")
+  unitPrice                   Decimal  @map("unit_price")
+  subtotal                    Decimal  @map("subtotal")
+  sortOrder                   Int      @default(0) @map("sort_order")
+  productNameRuAutoTranslated Boolean  @default(true) @map("product_name_ru_auto_translated") //产品名称是否自动翻译成俄语
+  productSpecRuAutoTranslated Boolean  @default(true) @map("product_spec_ru_auto_translated") //产品规格是否自动翻译成俄语
+  createdAt                   DateTime @default(now()) @map("created_at")
 
   transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  quote Quote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  quote       Quote?      @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
   @@index([transactionId])
   @@map("transaction_items")
-
 }
 
-model Payment{
-  id Int @id @default(autoincrement())
-  transactionId Int @map("transaction_id")
-  paidAt DateTime @map("paid_at") //付款时间
-  amount Decimal @map("amount")
-  currency Currency
-  method String? @map("method") //付款方式
-  purposeZh String? @map("purpose_zh") //付款用途
-  purposeRu String? @map("purpose_ru") //付款用途俄语
-  purposeRuAutoTranslated Boolean @default(true) @map("purpose_ru_auto_translated") //付款用途是否自动翻译成俄语
-  createdById Int @map("created_by_id")
-  createdAt DateTime @default(now()) @map("created_at")
-
+model Payment {
+  id                      Int      @id @default(autoincrement())
+  transactionId           Int      @map("transaction_id")
+  paidAt                  DateTime @map("paid_at") //付款时间
+  amount                  Decimal  @map("amount")
+  currency                Currency
+  method                  String?  @map("method") //付款方式
+  purposeZh               String?  @map("purpose_zh") //付款用途
+  purposeRu               String?  @map("purpose_ru") //付款用途俄语
+  purposeRuAutoTranslated Boolean  @default(true) @map("purpose_ru_auto_translated") //付款用途是否自动翻译成俄语
+  createdById             String   @map("created_by_id")
+  createdAt               DateTime @default(now()) @map("created_at")
 
   transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  files File[]
+  createdBy   User        @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  files       File[]
+
   @@index([transactionId, paidAt])
   @@map("payments")
 }
 
-model File{
-  id Int @id @default(autoincrement())
-  supplierId Int? @map("supplier_id")
-  quoteId Int? @map("quote_id")
-  paymentId Int? @map("payment_id")
-  noteId Int? @map("note_id")
-  transactionId Int? @map("transaction_id")
-  type FileType @map("type")
-  fileName String @map("file_name")
-  storageKey String @map("storage_key") //文件在对象存储中的key
-  mimeType String @map("mime_type") //文件类型
-  sizeBytes Int @map("size_bytes") //文件大小
-  thumbnailKey String? @map("thumbnail_key") //缩略图在对象存储中的key
-  titleZh String? @map("title_zh")
-  titleRu String? @map("title_ru")
-  titleRuAutoTranslated Boolean @default(true) @map("title_ru_auto_translated")
-  sortOrder Int @map("sort_order")@default(0)
-  isCover Boolean @default(false) @map("is_cover") //是否封面图片
-  isActive Boolean @default(true) @map("is_active") //是否启用
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  createdById Int @map("created_by_id")
+model File {
+  id                    Int      @id @default(autoincrement())
+  supplierId            Int?     @map("supplier_id")
+  quoteId               Int?     @map("quote_id")
+  paymentId             Int?     @map("payment_id")
+  noteId                Int?     @map("note_id")
+  transactionId         Int?     @map("transaction_id")
+  type                  FileType @map("type")
+  fileName              String   @map("file_name")
+  storageKey            String   @map("storage_key") //文件在对象存储中的key
+  mimeType              String   @map("mime_type") //文件类型
+  sizeBytes             Int      @map("size_bytes") //文件大小
+  thumbnailKey          String?  @map("thumbnail_key") //缩略图在对象存储中的key
+  titleZh               String?  @map("title_zh")
+  titleRu               String?  @map("title_ru")
+  titleRuAutoTranslated Boolean  @default(true) @map("title_ru_auto_translated")
+  sortOrder             Int      @default(0) @map("sort_order")
+  isCover               Boolean  @default(false) @map("is_cover") //是否封面图片
+  isActive              Boolean  @default(true) @map("is_active") //是否启用
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  createdById           String   @map("created_by_id")
 
-  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  quote Quote? @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  note Note? @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  supplier    Supplier?    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  quote       Quote?       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  payment     Payment?     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  note        Note?        @relation(fields: [noteId], references: [id], onDelete: Cascade)
   transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy   User         @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
   @@index([supplierId])
   @@index([quoteId])
@@ -373,8 +430,8 @@ model File{
   @@index([noteId])
   @@index([transactionId])
   @@map("files")
-
 }
+
 enum FileType {
   SUPPLIER_LOGO
   SUPPLIER_BROCHURE
@@ -384,5 +441,5 @@ enum FileType {
   PAYMENT_SCREENSHOT
   NOTE_ATTACHMENT
   TRANSACTION_DOC
-  OTHER 
+  OTHER
 }

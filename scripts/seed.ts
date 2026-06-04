@@ -1,5 +1,6 @@
 import 'dotenv/config';// // 把 .env 里的数据库连接串等加载到 process.env
 import { prisma } from '../src/lib/prisma';//prisma：封装好的 Prisma Client 实例，用来操作数据库
+import { auth } from '../src/lib/auth';
 
 // ============================================================
 // Seed 数据定义(集中在顶部,方便日后调整)
@@ -122,17 +123,40 @@ const SUPPLIERS: SeedSupplier[] = [
 async function main() {//main 函数是整个 seed 脚本的入口，按照步骤执行数据导入逻辑。
   console.log('━━━━━━━━ 种子数据导入 ━━━━━━━━\n');
 
-  // --- 1. admin 用户(seed 数据统一挂在它名下作为 createdBy)---
-  const admin = await prisma.user.upsert({//创建或确认 admin 用户存在。使用 upsert 保证幂等：如果 username='admin' 的用户已存在则不修改它,否则创建一个新用户。
-    where: { username: 'admin' },
-    update: {},
-    create: {
-      username: 'admin',
-      passwordHash: 'seed-placeholder', // 阶段 2 接 Auth 时再正经处理
-      role: 'ADMIN',
+// --- 1. admin 用户(通过 Better Auth API 创建,密码哈希存进 Account 表)---
+const ADMIN_USERNAME = 'admin';
+const ADMIN_EMAIL = 'admin@example.com';
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMeAfterFirstLogin!';
+
+const existing = await prisma.user.findUnique({
+  where: { username: ADMIN_USERNAME },
+});
+
+if (!existing) {
+  console.log('  → 首次创建 admin(走 Better Auth signUp 流程)');
+  await auth.api.signUpEmail({
+    body: {
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+      name: '青格力',
+      username: ADMIN_USERNAME,
     },
   });
-  console.log(`✓ Admin user id=${admin.id}`);
+  // Better Auth 注册的新用户默认 role=VIEWER(schema 默认值),改成 ADMIN
+  await prisma.user.update({
+    where: { username: ADMIN_USERNAME },
+    data: { role: 'ADMIN' },
+  });
+}
+
+const admin = await prisma.user.findUniqueOrThrow({
+  where: { username: ADMIN_USERNAME },
+});
+console.log(`✓ Admin user id=${admin.id}`);
+if (!existing) {
+  console.log(`  ⚠️  首次创建账号: 用户名=${ADMIN_USERNAME}  密码=${ADMIN_PASSWORD}`);
+  console.log(`     登录后请立即改密码`);
+}
 
   // --- 2. PRODUCT 标签(8 个,系统预置)---
   const tagIdByName = new Map<string, number>();//创建 PRODUCT 标签
