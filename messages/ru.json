@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "title": "Система управления поставщиками",
+    "description": "Управление поставщиками для трансграничной закупки"
+  },
+  "navbar": {
+    "suppliers": "Поставщики",
+    "map": "Карта",
+    "logout": "Выйти",
+    "userFallback": "Пользователь"
+  },
+  "login": {
+    "title": "Вход",
+    "username": "Имя пользователя",
+    "password": "Пароль",
+    "submit": "Войти",
+    "submitting": "Вход...",
+    "errorDefault": "Ошибка входа. Проверьте имя и пароль."
+  },
+  "suppliers": {
+    "title": "Список поставщиков",
+    "total": "Всего: {count}",
+    "columns": {
+      "code": "Код",
+      "name": "Название",
+      "location": "Регион / Город",
+      "cooperationLevel": "Уровень сотрудничества",
+      "createdAt": "Создано"
+    }
+  },
+  "map": {
+    "legendTitle": "Уровень сотрудничества",
+    "clearFilter": "Сбросить фильтр"
+  },
+  "cooperationLevel": {
+    "STRATEGIC": "Стратегическое",
+    "REGULAR": "Регулярное",
+    "TRIAL_ORDER": "Пробный заказ",
+    "INITIAL_CONTACT": "Первичный контакт",
+    "INACTIVE": "Приостановлено"
+  }
+}

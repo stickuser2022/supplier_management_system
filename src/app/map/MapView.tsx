@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 
@@ -14,25 +15,28 @@ type Supplier = {
   cooperationLevel: string;
 };
 
-const LEVEL_CONFIG: Record<string, { label: string; color: string }> = {
-  STRATEGIC:       { label: '战略合作', color: '#b91c1c' },
-  REGULAR:         { label: '常规合作', color: '#ef4444' },
-  TRIAL_ORDER:     { label: '试单阶段', color: '#f97316' },
-  INITIAL_CONTACT: { label: '初步接触', color: '#eab308' },
-  INACTIVE:        { label: '已暂停',   color: '#9ca3af' },
+// 颜色配置——纯视觉,不需要翻译
+const LEVEL_COLORS: Record<string, string> = {
+  STRATEGIC:       '#b91c1c',
+  REGULAR:         '#ef4444',
+  TRIAL_ORDER:     '#f97316',
+  INITIAL_CONTACT: '#eab308',
+  INACTIVE:        '#9ca3af',
 };
 
-export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
-  // 当前选中的合作深度,null 表示"显示全部"
-  const [selectedLevel, setSelectedLevel] = useState<string | null>(null);//selectedLevel 是个便利贴,初始值 null(显示全部)。当用户点击图例时,更新这个值,React 就会重画组件,用新的 selectedLevel 过滤供应商列表。
+// 级别顺序——图例显示用,从主力到不活跃
+const LEVEL_ORDER = ['STRATEGIC', 'REGULAR', 'TRIAL_ORDER', 'INITIAL_CONTACT', 'INACTIVE'];
 
-  // 按当前选中级别过滤
+export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
+  const t = useTranslations('map');
+  const tLevel = useTranslations('cooperationLevel');
+  const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
+
   const filteredSuppliers =
     selectedLevel === null
       ? suppliers
       : suppliers.filter((s) => s.cooperationLevel === selectedLevel);
 
-  // 统计每个级别的供应商数量(显示在图例后面)
   const countByLevel: Record<string, number> = {};
   for (const s of suppliers) {
     countByLevel[s.cooperationLevel] = (countByLevel[s.cooperationLevel] ?? 0) + 1;
@@ -50,15 +54,15 @@ export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
           attribution="&copy; Google"
         />
         {filteredSuppliers.map((supplier) => {
-          const cfg = LEVEL_CONFIG[supplier.cooperationLevel] ?? LEVEL_CONFIG.INITIAL_CONTACT;
+          const color = LEVEL_COLORS[supplier.cooperationLevel] ?? LEVEL_COLORS.INITIAL_CONTACT;
           return (
             <CircleMarker
               key={supplier.id}
               center={[supplier.latitude, supplier.longitude]}
               radius={8}
               pathOptions={{
-                color: cfg.color,
-                fillColor: cfg.color,
+                color,
+                fillColor: color,
                 fillOpacity: 0.8,
                 weight: 2,
               }}
@@ -69,7 +73,9 @@ export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
                   <div className="text-gray-600">
                     {supplier.provinceZh} · {supplier.cityZh}
                   </div>
-                  <div className="text-gray-500 text-xs mt-1">{cfg.label}</div>
+                  <div className="text-gray-500 text-xs mt-1">
+                    {tLevel(supplier.cooperationLevel)}
+                  </div>
                 </div>
               </Popup>
             </CircleMarker>
@@ -77,20 +83,19 @@ export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
         })}
       </MapContainer>
 
-      {/* 右上角图例(可点击筛选) */}
-      <div className="absolute top-4 right-4 z-1000 bg-white/95 rounded-lg shadow-md p-3 text-sm min-w-160px">
+      <div className="absolute top-4 right-4 z-1000 bg-white/95 rounded-lg shadow-md p-3 text-sm min-w-40">
         <div className="font-semibold mb-2 text-gray-700 flex justify-between items-center">
-          <span>合作深度</span>
+          <span>{t('legendTitle')}</span>
           {selectedLevel !== null && (
             <button
               onClick={() => setSelectedLevel(null)}
               className="text-xs text-blue-600 hover:underline font-normal"
             >
-              清除筛选
+              {t('clearFilter')}
             </button>
           )}
         </div>
-        {Object.entries(LEVEL_CONFIG).map(([key, cfg]) => {
+        {LEVEL_ORDER.map((key) => {
           const isActive = selectedLevel === key;
           const count = countByLevel[key] ?? 0;
           return (
@@ -103,9 +108,9 @@ export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
             >
               <div
                 className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: cfg.color }}
+                style={{ backgroundColor: LEVEL_COLORS[key] }}
               />
-              <span className="text-gray-600 flex-1">{cfg.label}</span>
+              <span className="text-gray-600 flex-1">{tLevel(key)}</span>
               <span className="text-gray-400 text-xs">{count}</span>
             </div>
           );

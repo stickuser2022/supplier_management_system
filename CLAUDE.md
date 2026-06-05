@@ -1004,80 +1004,76 @@ RU    俄文
 
 ---
 
-## 2026.6.3 项目进度日志(阶段 2 收尾:认证体系完整落地)
+## 2026.6.5 项目进度日志(阶段 3 完成:i18n 中俄双语界面)
 
-### 当前阶段:阶段 2 Auth + 地图两条线全部完成,阶段 2 整体完成,准备进入阶段 3(i18n 中俄双语)
+### 当前阶段:阶段 3 完成,准备进入阶段 4(翻译 API 抽象层 + 数据字段双语)
 
-### 重大架构决策变更:Auth.js v5 → Better Auth
+### 关键架构决策
 
-CLAUDE.md 原计划用 Auth.js v5,实际研究后改为 Better Auth。理由:
-
-- Auth.js v5 的核心优势(OAuth / 社交登录 / 企业 SSO)本项目完全用不到——单 Admin + 几个 Viewer 都是账号密码登录
-- 多份独立评测显示 Auth.js 自身维护者倾向推荐新项目用 Better Auth
-- Better Auth 更轻量、API 更直觉、Prisma 适配更清爽、自托管友好
-- 风险:Better Auth 是较新库,3-5 年生态如何待观察(权衡后接受)
+- **库选 next-intl**(Next.js App Router 事实标准)
+- **Cookie 式而非 URL 式**:`/suppliers` 永远是 `/suppliers`,不搞 `/zh/suppliers` 这套。内部工具不需要 SEO,Cookie 式工程成本低、改动小
+- **语言优先级链(实际实现)**:
+    1. `NEXT_LOCALE` cookie(用户主动切过)
+    2. `Accept-Language` 浏览器头(自动识别)
+    3. 默认中文(兜底)
+    
+    注:`User.locale`(DB 字段)目前**不直接参与请求时识别**,而是在用户**切换语言时同步写入** + cookie 同步写入。等同效果(因为 cookie 在,且 User.locale 跨设备时可手动恢复)。如果未来要做"跨设备自动恢复",在登录成功回调里读 User.locale → 写 cookie 即可,留作低优先级 TODO
+- **`User.locale` schema 改可空**:`locale Locale?`(去掉 `@default(ZH)`),非破坏性 migration `make_locale_nullable`。allows "用户没主动设过 = null" 的语义,Accept-Language 自然兜底
 
 ### 已完成(本轮新增标 ★)
 
-- ★ ✅ **schema 大手术**(基于 0 真实数据的低成本时机):
-    - User.id 从 `Int @default(autoincrement())` 改为 `String @default(cuid())`
-    - 删除 User.passwordHash 字段(密码移交 Account 表管)
-    - User 表新增 Better Auth 必需字段:`email` / `emailVerified` / `name` / `image` / `displayUsername`
-    - 8 张业务表 `createdById` 全部 `Int → String`(供应商/标签/联系人/报价/沟通/订单/付款/文件)
-    - 新增 3 张 Better Auth 表:`Session` / `Account` / `Verification`
-    - drop dev.db + drop migrations 重建,新 migration: `init_with_better_auth`
-- ★ ✅ **seed.ts 重写**:admin 创建走 `auth.api.signUpEmail({ body: { email, password, name, username } })`,密码用 Better Auth 自动 scrypt 哈希存进 Account 表;signUp 后单独 `prisma.user.update` 把 role 从默认 VIEWER 提到 ADMIN;幂等通过 findUnique 预检
-- ★ ✅ **5 个 Auth 文件落地**:
-    - `src/lib/auth.ts` — 服务端 Better Auth 配置(Prisma adapter + emailAndPassword + username 插件)
-    - `src/lib/auth-client.ts` — 客户端工具(`createAuthClient` + `usernameClient` 插件)
-    - `src/app/api/auth/[...all]/route.ts` — HTTP 入口,`toNextJsHandler(auth)` 桥接
-    - `src/app/login/page.tsx` — 登录页(useState 表单 + signIn.username + useRouter 跳转)
-    - `src/components/Navbar.tsx` — 顶部导航 + 退出按钮 + 当前用户显示(useSession + signOut)
-- ★ ✅ **`src/app/layout.tsx` 集成 Navbar**:body 用 `min-h-full flex flex-col`,Navbar 占自然高度,`<main className="flex-1 flex flex-col">` 吃剩余空间;`lang="en"` → `lang="zh"`;metadata 改为项目实际名
-- ★ ✅ **`src/middleware.ts` 路由保护**:`getSessionCookie(request)` 检查 cookie,无则 redirect 到 /login;`matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)']` 排除 API 和静态资源
-- ★ ✅ **package.json 三处增补**:
-    - `"scripts": { "seed": "tsx scripts/seed.ts" }` 注册 seed 命令
-    - `devDependencies` 加 `tsx`
-    - 新增 `"overrides": { "kysely": "0.28.0" }` 修复 Better Auth + Kysely 0.29 不兼容
-- ★ ✅ **`.env` 增补**:`BETTER_AUTH_SECRET`(crypto 生成 32 字节 base64)+ `BETTER_AUTH_URL` + `NEXT_PUBLIC_BETTER_AUTH_URL`
-- ★ ✅ **端到端测试通过**:未登录访问 /suppliers/map 跳 /login → 用 admin 登录 → 进 /suppliers 顶部导航出现 → 切 /map 导航保留 → 退出回 /login
+- ★ ✅ schema 改动:`User.locale Locale @default(ZH)` → `Locale?`,migration `make_locale_nullable`(无数据丢失)
+- ★ ✅ 装 `next-intl`,142 个依赖无冲突
+- ★ ✅ **i18n 配置 7 个文件**:
+    - `src/i18n/request.ts` — 服务端识别 locale(cookie → Accept-Language → default 优先级链)
+    - `messages/zh.json` + `messages/ru.json` — 所有 UI 文字外迁,按 namespace 分组(navbar / login / suppliers / map / cooperationLevel)
+    - `next.config.ts` — `createNextIntlPlugin('./src/i18n/request.ts')` 插件挂载
+    - `src/app/layout.tsx` — 改 async,`<NextIntlClientProvider>` 注入翻译到 React 树,`<html lang={locale}>` 动态
+- ★ ✅ **界面组件全面 i18n 化**:
+    - `Navbar.tsx` — `useTranslations('navbar')` + 加语言切换按钮(中 / Ру 双 toggle)
+    - `login/page.tsx` — 表单标签 / 按钮 / 错误提示全部走翻译
+    - `MapView.tsx` — **关键重构**:`LEVEL_CONFIG` 拆成 `LEVEL_COLORS`(颜色配置代码侧)+ `cooperationLevel` 翻译键(标签 messages 侧)。视觉与语言分离的范式
+    - `suppliers/page.tsx` — `getTranslations`(服务端) + `t('total', { count })` 带参数翻译 + `toLocaleDateString(locale)` 日期按地区格式化
+- ★ ✅ **`src/app/actions/set-locale.ts`** — 项目第一个 Server Action,负责切语言的双写(cookie + User.locale 落库),DB 失败不影响 cookie 设置
 
-### 本轮收获的关键经验(给未来对话的避坑笔记)
+### 本轮新概念(给未来对话的避坑笔记)
 
-- **Better Auth 与 Kysely 0.29 不兼容(2026.6.3)**:Better Auth 的 kysely-adapter 引用 `DEFAULT_MIGRATION_LOCK_TABLE`,Kysely 0.29 移除了这个 export。即便项目用 prisma adapter,Turbopack 仍会静态扫描所有 adapter 代码导致报错。解法:`package.json` 加 `"overrides": { "kysely": "0.28.0" }`,删除 node_modules + package-lock.json 重装。等 Better Auth 上游修复后可解除 pin
-- **Next.js 16.2.6 的 proxy.ts 加载有问题**:文件位置正确、export 形式正确、清缓存重启都没用,Next.js 就是不加载。最终降级用 middleware.ts(Next.js 16 仍支持,只是 deprecation 警告)。注意 middleware.ts 位置在 `src/middleware.ts`,**不是** `src/app/middleware.ts`。等 Next.js 修复后可平移代码,只需改文件名 + 函数名
-- **Next.js App Router catch-all 路由的坑**:`[...all]` 是**文件夹名**而非文件名,实际文件叫 `route.ts` 在该文件夹**内**。完整路径:`src/app/api/auth/[...all]/route.ts`。VS Code 文件树有时会把单子目录链合并显示成一行,容易看错
-- **Better Auth 把密码存到 Account 表,不存 User 表**:User 管"你是谁"(身份元数据),Account 管"你怎么证明你是你"(`providerId='credential'` + `password=<scrypt 哈希>`)。这是认证库的现代设计——也意味着我们 User schema 不再有 passwordHash 字段
-- **`signUpEmail` 创建的用户默认 role 是 schema 默认值(VIEWER),不能在 signUp body 里指定 role**:Better Auth 的 signUp 只管认证字段,业务字段(role 等)需 signUp 后单独 update。本项目 seed 里用此模式给 admin 提权
-- **环境变量分前后端**:Better Auth 的 secret(`BETTER_AUTH_SECRET`)只服务端用;客户端 baseURL(`NEXT_PUBLIC_BETTER_AUTH_URL`)需要 `NEXT_PUBLIC_` 前缀才能在浏览器组件读到——这是 Next.js 的硬规定,与 Better Auth 无关
-- **proxy/middleware 不能热重载**:跟普通组件不同,文件改动必须**完全停 dev server + 重启**才生效,有时还要删 `.next` 缓存目录
-- **数据库类型大改的窗口期**:0 真实数据时改 schema(尤其 PK / FK 类型)零成本——直接 drop dev.db + drop migrations + 重做 migrate。这是 CLAUDE.md 一直强调的"早期灵活窗口",本轮第一次真正用上
-- **Auth 系统的"五层"概念图**:UI 登录页 → auth-client.ts(浏览器侧)→ HTTP 路由 → auth.ts(服务端)→ schema(User+Account+Session)。每层之间靠约定(文件路径、函数名、URL)对接,出问题排查时按这个分层找一定能定位
+- **`useTranslations` vs `getTranslations`**:前者用于客户端组件(Navbar、login、MapView),后者用于服务端组件(suppliers/page.tsx)。语义一致,API 形态不同(前者 Hook,后者异步函数)
+- **`t('total', { count: 12 })` 占位符语法**:messages 里写 `"共 {count} 条"` / `"Всего: {count}"`,中俄两版句式可完全不同,代码只管传变量
+- **`toLocaleDateString(locale)` 是 JS 原生**:语言代码进去,日期格式自动按地区(`zh` → `2026/6/2`,`ru` → `02.06.2026`),无需手写格式化逻辑
+- **Server Action 是 Next.js App Router 的"按钮触发的服务端函数"**:文件顶部 `'use server'`,客户端组件 `import { setLocale }` 直接 `await setLocale('ru')` 调用,Next.js 在底层自动生成 HTTP 请求传参 + 服务端执行。本项目首次出现在 `set-locale.ts`,以后所有"按钮触发数据库变更"的场景都会用这个模式(取代以前的 API 路由)
+- **`useLocale()` Hook** 拿当前激活的语言代码,用于"当前按钮高亮"这类逻辑
+- **`router.refresh()` 是 Next.js 的软刷新**:重新请求服务端组件,客户端状态(地图缩放、筛选选中)不丢;比 `window.location.reload()` 体验好
 
-### 待办(按顺序)
+### 本轮踩到的坑
 
-1. ~~阶段 1 全部完成~~ ✅
-2. ~~阶段 2-地图主功能(red dots + popup + 色级图例 + 交互筛选)~~ ✅
-3. ~~阶段 2-Auth.js → Better Auth 接入~~ ✅
-4. **阶段 3-i18n 中俄双语界面**:`next-intl` 接入,所有 UI 文字外迁到 `messages/zh.json` + `messages/ru.json`,用户语言偏好持久化(用 User.locale 字段)← 下次对话起点
-5. 阶段 4-翻译 API 抽象层(DeepL → DeepSeek 热切换),自由文本按需翻译
-6. 阶段 5-文件存储抽象层 + 本地实现 + 业务表挂载文件
-7. 阶段 6-UI 美化(深色模式、表格优化、hover 效果等)
-8. **延期 / 低优先级**:
-    - 给 server components 加二层 session 验证(`auth.api.getSession()` from DB,真正抵御伪造 cookie,目前 middleware cookie 存在校验 + 内部小团队场景已足够)
+- **Turbopack 对动态 import 路径不稳定**:`import('../../messages/${locale}.json')` 在某些情况会报 "Module not found"。如果命中,降级到静态 if/else 分支即可。本项目本轮命中过一次(messages 文件夹位置错放在 src/,移到根目录后正常)
+- **messages 文件夹必须在项目根目录**(跟 src/ 同级),不是 src/messages/。VS Code 文件树合并显示有时会误导
+- **改 messages JSON 不热重载**,需要重启 dev server。改 .tsx 组件能热重载
+- **本轮第一次见 middleware 的 deprecation 警告**:`⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.` 但 proxy.ts 在 Next.js 16.2.6 实测仍无法加载(已在阶段 2 笔记中记录),继续用 middleware.ts 等修复
+
+### 待办
+
+1. ~~阶段 1-3 全部完成~~ ✅
+2. **阶段 4-翻译 API 抽象层**:DeepL / DeepSeek 适配器,数据字段(供应商名、城市、地址、描述)的自动翻译 + 入库(Supplier.nameRu / cityRu / addressRu / descriptionRu 等已有字段) ← 下次起点
+3. 阶段 4.5(隐藏阶段)-CRUD UI:供应商 / 联系人 / 报价 / 沟通记录的新增 / 编辑 / 删除界面
+4. 阶段 5-文件存储抽象层 + 上传 UI
+5. 阶段 6-UI 美化
+6. 低优先级 / 延期:
+    - 登录成功后从 User.locale 读取并写入 cookie(跨设备自动恢复)
     - middleware.ts → proxy.ts 等 Next.js 修复后迁移
-    - 解除 kysely 0.28 锁定,等 Better Auth 修复 kysely 0.29 兼容性后
+    - 解除 kysely 0.28 锁定
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进入阶段 3,i18n 中俄双语界面」**。
+直接说:**「进入阶段 4,翻译 API 抽象层」**。
 
-**阶段 3 路线预览**:
-1. 安装 `next-intl` 依赖
-2. 创建 `messages/zh.json` + `messages/ru.json`,把 Navbar、登录页、供应商列表、地图等所有界面文字外迁
-3. 配置 `i18n.ts`(语言检测 + 加载逻辑)
-4. 给 layout / 组件加 `useTranslations()` Hook
-5. Navbar 加语言切换按钮,选择持久化到 `User.locale` 字段,登录后从 DB 读初始语言
-6. 验证:切换后界面文字、错误提示、占位符全部跟着变;退出登录回 /login 也按 cookie 记住语言
+**阶段 4 路线预览**:
+1. 设计 `TranslationProvider` 抽象层(`translate(text, from, to): Promise<string>`)
+2. 实现 DeepL 适配器(免费版 50 万字符/月够 admin 录入用)
+3. `.env` 配 DEEPL_API_KEY
+4. 写一个 "回填脚本" 把现有 12 个 supplier 的 nameRu / cityRu / provinceZh 等字段一次性自动翻译入库
+5. 在 Supplier 创建/编辑流程(目前没有,等阶段 4.5)预留 "auto translate on save" hook
+6. 阶段 4 收尾时,俄文界面下打开 /suppliers,看到 "Гуанчжоу Цзиньхуэй" 而非 "广州金辉玩具"
 
-预计阶段 3 用 4-6 轮对话收尾。
+预计阶段 4 用 3-4 轮对话收尾。

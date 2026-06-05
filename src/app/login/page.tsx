@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { signIn } from '@/lib/auth-client';
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -22,10 +24,9 @@ export default function LoginPage() {
     });
 
     if (result.error) {
-      setError(result.error.message ?? '登录失败,请检查用户名和密码');
+      setError(result.error.message ?? t('errorDefault'));
       setIsLoading(false);
     } else {
-      // 登录成功,跳到供应商列表页
       router.push('/suppliers');
     }
   }
@@ -33,10 +34,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-semibold mb-6 text-gray-800">登录</h1>
+        <h1 className="text-2xl font-semibold mb-6 text-gray-800">{t('title')}</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-700 mb-1">用户名</label>
+            <label className="block text-sm text-gray-700 mb-1">{t('username')}</label>
             <input
               type="text"
               value={username}
@@ -47,7 +48,7 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-700 mb-1">密码</label>
+            <label className="block text-sm text-gray-700 mb-1">{t('password')}</label>
             <input
               type="password"
               value={password}
@@ -67,7 +68,7 @@ export default function LoginPage() {
             disabled={isLoading}
             className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? '登录中...' : '登录'}
+            {isLoading ? t('submitting') : t('submit')}
           </button>
         </form>
       </div>

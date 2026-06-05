@@ -1,45 +1,44 @@
+import { getTranslations, getLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 
-// 把数据库里的枚举名翻译成中文,在 JSX 里查表用
-const COOPERATION_LEVEL_LABEL = {
-  STRATEGIC: '战略合作',
-  REGULAR: '常规合作',
-  TRIAL_ORDER: '试单阶段',
-  INITIAL_CONTACT: '初步接触',
-  INACTIVE: '已暂停',
-} as const;//as const —— TypeScript 的"严格只读"标记,写在对象后面,告诉 TS:"这个对象不会改、值都是固定字符串"。让类型推导更精准。不深究,记住"映射表后面写 as const"是好习惯就行。
-
 export default async function SuppliersPage() {
+  // 服务端组件用 getTranslations(异步),客户端组件才用 useTranslations
+  const t = await getTranslations('suppliers');
+  const tLevel = await getTranslations('cooperationLevel');
+  // 拿到当前用户的语言,用来格式化日期
+  const locale = await getLocale();
+
   const suppliers = await prisma.supplier.findMany({
     where: { isActive: true },
   });
 
   return (
     <main className="p-8">
-      <h1 className="text-2xl font-bold mb-4">供应商列表</h1>
-      <p className="mb-4 text-gray-600">共 {suppliers.length} 条</p>
+      <h1 className="text-2xl font-bold mb-4">{t('title')}</h1>
+      {/* 带参数的翻译:messages 里写 "共 {count} 条" / "Всего: {count}",
+          这里 count 占位符被 12 替换,中俄两版的句式哪怕完全不一样也无所谓 */}
+      <p className="mb-4 text-gray-600">{t('total', { count: suppliers.length })}</p>
 
       <table className="min-w-full border border-gray-300">
-        <thead className="bg-gray-50">{/* 表头固定在顶部 */}
+        <thead className="bg-gray-50">
           <tr>
-            <th className="border p-2 text-left">编号</th>
-            <th className="border p-2 text-left">名称</th>
-            <th className="border p-2 text-left">省 / 市</th>
-            <th className="border p-2 text-left">合作深度</th>
-            <th className="border p-2 text-left">创建时间</th>
+            <th className="border p-2 text-left">{t('columns.code')}</th>
+            <th className="border p-2 text-left">{t('columns.name')}</th>
+            <th className="border p-2 text-left">{t('columns.location')}</th>
+            <th className="border p-2 text-left">{t('columns.cooperationLevel')}</th>
+            <th className="border p-2 text-left">{t('columns.createdAt')}</th>
           </tr>
         </thead>
         <tbody>
-           {/* tbody数据区,tr数据行,td数据单元格,.map() —— 数组循环渲染,这里的 s 就是循环时当前这个供应商对象，相当于数组里的每一条数据 */}
           {suppliers.map((s) => (
-            <tr key={s.id}>{/* 这是 React 的硬性要求:用 .map 渲染列表时,每一项必须有一个唯一的 key */}
+            <tr key={s.id}>
               <td className="border p-2">{s.code}</td>
               <td className="border p-2">{s.nameZh}</td>
               <td className="border p-2">{s.provinceZh} / {s.cityZh}</td>
-              <td className="border p-2">{COOPERATION_LEVEL_LABEL[s.cooperationLevel]}</td>
-                                {/* JS 的用变量查对象的写法，用 [] 方括号把变量名放进去,拿数据库的英文值，当作钥匙，去字典里找对应的中文值 */}
-              <td className="border p-2">{s.createdAt.toLocaleDateString('zh-CN')}</td>
-                                {/* toLocaleDateString 格式化成中文日期，如 2026/6/2 */}
+              {/* cooperationLevel 字段存的是英文枚举值(如 "STRATEGIC"),直接当翻译 key 用 */}
+              <td className="border p-2">{tLevel(s.cooperationLevel)}</td>
+              {/* 把 locale 传给日期格式化:zh → 2026/6/2,ru → 02.06.2026 */}
+              <td className="border p-2">{s.createdAt.toLocaleDateString(locale)}</td>
             </tr>
           ))}
         </tbody>
