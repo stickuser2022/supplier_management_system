@@ -7,8 +7,11 @@ export default async function MapPage() {
     select: {
       id: true,
       nameZh: true,
+      nameRu: true,        // ← 新增
       cityZh: true,
+      cityRu: true,        // ← 新增
       provinceZh: true,
+      provinceRu: true,    // ← 新增
       latitude: true,
       longitude: true,
       cooperationLevel: true,

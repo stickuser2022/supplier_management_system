@@ -1,5 +1,6 @@
 import { getTranslations, getLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { pickLocalized } from '@/i18n/pick-localized';
 
 export default async function SuppliersPage() {
   // 服务端组件用 getTranslations(异步),客户端组件才用 useTranslations
@@ -33,8 +34,10 @@ export default async function SuppliersPage() {
           {suppliers.map((s) => (
             <tr key={s.id}>
               <td className="border p-2">{s.code}</td>
-              <td className="border p-2">{s.nameZh}</td>
-              <td className="border p-2">{s.provinceZh} / {s.cityZh}</td>
+              <td className="border p-2">{pickLocalized(s.nameZh, s.nameRu, locale)}</td>
+              <td className="border p-2">
+                {pickLocalized(s.provinceZh, s.provinceRu, locale)} / {pickLocalized(s.cityZh, s.cityRu, locale)}
+              </td>
               {/* cooperationLevel 字段存的是英文枚举值(如 "STRATEGIC"),直接当翻译 key 用 */}
               <td className="border p-2">{tLevel(s.cooperationLevel)}</td>
               {/* 把 locale 传给日期格式化:zh → 2026/6/2,ru → 02.06.2026 */}

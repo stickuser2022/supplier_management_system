@@ -30,9 +30,6 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
 # vercel
 .vercel
 
@@ -45,3 +42,8 @@ next-env.d.ts
 
 # Prisma SQLite 本地数据库(每次 migrate / 录数据都会变,可能含真实数据,不进 Git)
 dev.db*
+
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example

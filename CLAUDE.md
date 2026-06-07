@@ -1004,76 +1004,78 @@ RU    俄文
 
 ---
 
-## 2026.6.5 项目进度日志(阶段 3 完成:i18n 中俄双语界面)
+---
 
-### 当前阶段:阶段 3 完成,准备进入阶段 4(翻译 API 抽象层 + 数据字段双语)
+## 2026.6.6 项目进度日志(阶段 4 完成:翻译 API 抽象层 + 数据回填)
+
+### 当前阶段:阶段 4 完成,准备进入阶段 4.5(CRUD UI)
 
 ### 关键架构决策
 
-- **库选 next-intl**(Next.js App Router 事实标准)
-- **Cookie 式而非 URL 式**:`/suppliers` 永远是 `/suppliers`,不搞 `/zh/suppliers` 这套。内部工具不需要 SEO,Cookie 式工程成本低、改动小
-- **语言优先级链(实际实现)**:
-    1. `NEXT_LOCALE` cookie(用户主动切过)
-    2. `Accept-Language` 浏览器头(自动识别)
-    3. 默认中文(兜底)
-    
-    注:`User.locale`(DB 字段)目前**不直接参与请求时识别**,而是在用户**切换语言时同步写入** + cookie 同步写入。等同效果(因为 cookie 在,且 User.locale 跨设备时可手动恢复)。如果未来要做"跨设备自动恢复",在登录成功回调里读 User.locale → 写 cookie 即可,留作低优先级 TODO
-- **`User.locale` schema 改可空**:`locale Locale?`(去掉 `@default(ZH)`),非破坏性 migration `make_locale_nullable`。allows "用户没主动设过 = null" 的语义,Accept-Language 自然兜底
+- **翻译提供商:DeepSeek**(不是原计划的 DeepL,也不是中间选过的 Google NMT)。DeepL 国内拿不到 Key,Google API 国内访问被墙、上云后仍无法走,最终回到 CLAUDE.md 阶段 4 原路线预备的 DeepSeek
+- **抽象层模式**:`src/lib/translate/` 下 types + provider 适配器 + 统一入口,业务代码只调 `translate(text, 'zh', 'ru')`,底层换 provider 改 .env 一行即可。**抽象层的价值在 Google → DeepSeek 切换时被实测验证**——业务代码 / 回填脚本 0 改动
+- **数据回填策略**:7 张带"双语三件套"字段的表全部包括(空表自动跳过),按 `_ru_auto_translated` 字段决定是否覆盖(true 覆盖,false 即 Admin 手改过的永久保留)。脚本幂等,可任意重跑
+- **UI 适配工具**:`pickLocalized(zh, ru, locale)` 独立文件,fallback 永远是中文(俄文空时显示中文,避免空白)
 
-### 已完成(本轮新增标 ★)
+### 已完成
 
-- ★ ✅ schema 改动:`User.locale Locale @default(ZH)` → `Locale?`,migration `make_locale_nullable`(无数据丢失)
-- ★ ✅ 装 `next-intl`,142 个依赖无冲突
-- ★ ✅ **i18n 配置 7 个文件**:
-    - `src/i18n/request.ts` — 服务端识别 locale(cookie → Accept-Language → default 优先级链)
-    - `messages/zh.json` + `messages/ru.json` — 所有 UI 文字外迁,按 namespace 分组(navbar / login / suppliers / map / cooperationLevel)
-    - `next.config.ts` — `createNextIntlPlugin('./src/i18n/request.ts')` 插件挂载
-    - `src/app/layout.tsx` — 改 async,`<NextIntlClientProvider>` 注入翻译到 React 树,`<html lang={locale}>` 动态
-- ★ ✅ **界面组件全面 i18n 化**:
-    - `Navbar.tsx` — `useTranslations('navbar')` + 加语言切换按钮(中 / Ру 双 toggle)
-    - `login/page.tsx` — 表单标签 / 按钮 / 错误提示全部走翻译
-    - `MapView.tsx` — **关键重构**:`LEVEL_CONFIG` 拆成 `LEVEL_COLORS`(颜色配置代码侧)+ `cooperationLevel` 翻译键(标签 messages 侧)。视觉与语言分离的范式
-    - `suppliers/page.tsx` — `getTranslations`(服务端) + `t('total', { count })` 带参数翻译 + `toLocaleDateString(locale)` 日期按地区格式化
-- ★ ✅ **`src/app/actions/set-locale.ts`** — 项目第一个 Server Action,负责切语言的双写(cookie + User.locale 落库),DB 失败不影响 cookie 设置
+- ✅ 抽象层 4 个文件:
+    - `src/lib/translate/types.ts` — TranslationProvider interface 契约 + TranslationError 自定义错误类
+    - `src/lib/translate/google.ts` — Google Cloud Translation v2 适配器(留着备用,中国服务器跑不通,但代码不丢)
+    - `src/lib/translate/deepseek.ts` — DeepSeek V4 Flash 适配器,LLM 翻译模式
+    - `src/lib/translate/index.ts` — 业务入口,工厂 + 懒加载单例 + translateBatch 自动降级
+- ✅ `.env` + `.env.example` 配置 TRANSLATE_PROVIDER + 两家 Key 字段
+- ✅ `scripts/test-translate.ts` — 抽象层亮灯测试脚本
+- ✅ `scripts/backfill-translations.ts` — 数据驱动回填脚本,**实测 65 字段翻译成功 / 0 失败**
+- ✅ `src/i18n/pick-localized.ts` — 双语字段选择工具
+- ✅ `src/app/suppliers/page.tsx` 用 pickLocalized 改写
+- ✅ `src/app/map/MapView.tsx` 用 pickLocalized 改写 + 瓦片底图地名按 locale 切换(`hl=ru` / `hl=zh-CN`,加 `key={tileHl}` 强制 remount)
+- ✅ `src/app/map/page.tsx` 的 prisma `select` 加入 ru 字段
+- ✅ `.env.example` 补漏(阶段 1 遗留)
 
 ### 本轮新概念(给未来对话的避坑笔记)
 
-- **`useTranslations` vs `getTranslations`**:前者用于客户端组件(Navbar、login、MapView),后者用于服务端组件(suppliers/page.tsx)。语义一致,API 形态不同(前者 Hook,后者异步函数)
-- **`t('total', { count: 12 })` 占位符语法**:messages 里写 `"共 {count} 条"` / `"Всего: {count}"`,中俄两版句式可完全不同,代码只管传变量
-- **`toLocaleDateString(locale)` 是 JS 原生**:语言代码进去,日期格式自动按地区(`zh` → `2026/6/2`,`ru` → `02.06.2026`),无需手写格式化逻辑
-- **Server Action 是 Next.js App Router 的"按钮触发的服务端函数"**:文件顶部 `'use server'`,客户端组件 `import { setLocale }` 直接 `await setLocale('ru')` 调用,Next.js 在底层自动生成 HTTP 请求传参 + 服务端执行。本项目首次出现在 `set-locale.ts`,以后所有"按钮触发数据库变更"的场景都会用这个模式(取代以前的 API 路由)
-- **`useLocale()` Hook** 拿当前激活的语言代码,用于"当前按钮高亮"这类逻辑
-- **`router.refresh()` 是 Next.js 的软刷新**:重新请求服务端组件,客户端状态(地图缩放、筛选选中)不丢;比 `window.location.reload()` 体验好
+- **抽象层 / 适配器模式实战**:第一次真正动手实现"interface + 多 implements + 工厂选 provider + 单例缓存"。其价值在切换 provider 时被实测体现——Google → DeepSeek,业务代码 0 改动
+- **LLM 翻译 vs NMT 翻译两种范式**:LLM 用 `chat completions + system prompt` 表达翻译指令(自然语言指令式),NMT 用结构化字段 `{ q, target }`(参数式)。LLM 长句重组更地道(地址按俄语习惯重排顺序),但有同词不一致问题(同一个"金辉"可能翻成 `Цзиньхуэй` 也可能 `Цзиньхуй`),靠阶段 4.5 Admin 录入时人工把关 + `_ru_auto_translated=false` 锁定保护
+- **`temperature: 0` 用法**:LLM 翻译禁掉创造性,设 0 取概率最高的 token,输出确定性最高
+- **React Leaflet 的 key 强制 remount**:`<TileLayer>` url 改变不重载瓦片,加 `key={tileHl}` 强制重新挂载。**通用解法**:任何"prop 变了但子组件无响应"场景,先试 `key=`
+- **`prisma as any` 的合理 escape hatch**:数据驱动脚本(从字符串字段查 prisma 模型)用 any 是合理交易,加 `// eslint-disable-next-line @typescript-eslint/no-explicit-any` 让审查者知道"这是有意为之"
+- **next-intl 的 server vs client locale 拿法**:服务端组件 `getLocale()`(异步),客户端组件 `useLocale()`(Hook)
+- **Node.js fetch 不读 Windows 系统代理**:VPN 的"全局代理"骗的是 Windows 不是 Node,这是 Google API 在国内永远超时的根本原因。绕开需要 TUN 模式或 HTTPS_PROXY 注入,但**最佳实践直接换 provider**
 
-### 本轮踩到的坑
+### 本轮踩到的坑(每一个都吃过血)
 
-- **Turbopack 对动态 import 路径不稳定**:`import('../../messages/${locale}.json')` 在某些情况会报 "Module not found"。如果命中,降级到静态 if/else 分支即可。本项目本轮命中过一次(messages 文件夹位置错放在 src/,移到根目录后正常)
-- **messages 文件夹必须在项目根目录**(跟 src/ 同级),不是 src/messages/。VS Code 文件树合并显示有时会误导
-- **改 messages JSON 不热重载**,需要重启 dev server。改 .tsx 组件能热重载
-- **本轮第一次见 middleware 的 deprecation 警告**:`⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.` 但 proxy.ts 在 Next.js 16.2.6 实测仍无法加载(已在阶段 2 笔记中记录),继续用 middleware.ts 等修复
+- ❌ **DeepL API 国内拿不到 Key**:CLAUDE.md 阶段 4 路线原计划的 DeepL,实际已对中国大陆 IP 限制注册免费 key
+- ❌ **Google Cloud Translation 国内不通**:`translation.googleapis.com` 被墙,Node fetch ConnectTimeout。即便 VPN 全局代理,Node 也不走系统代理。**本质问题:国内云服务器永远访问不了 Google API**,等于今天就该换
+- ❌ **DeepSeek 取消了新用户 500 万 tokens 免费额度**(2026 年初政策变更)。最低 ¥10 充值起步,但 V4-Flash 极便宜,¥10 够这项目用半年以上
+- ❌ **DeepSeek `deepseek-chat` 是 legacy 别名**,2026 年 7 月 24 日下线。新项目用 `deepseek-v4-flash` 或 `deepseek-v4-pro`
+- ❌ **DeepSeek V4 默认开思考模式**:不显式 `thinking: { type: 'disabled' }` 会浪费大量 tokens 在 reasoning_content 上,翻译任务尤其浪费
+- ❌ **Prisma `select` 限定字段时新加字段不会自动出现**:阶段 2 做地图给 findMany 加了 select 缩窄(性能优化),阶段 4 新增 ru 字段必须同步加进 select,否则前端 prop 拿不到值,组件渲染时是 undefined
+- ❌ **Leaflet TileLayer 改 url 不重载瓦片**:必须 `key={tileHl}` 强制 remount
+- ❌ **`.gitignore` 的 `.env*` 通配符会顺手忽略 `.env.example`**:加 `!.env.example` 反向恢复
 
 ### 待办
 
-1. ~~阶段 1-3 全部完成~~ ✅
-2. **阶段 4-翻译 API 抽象层**:DeepL / DeepSeek 适配器,数据字段(供应商名、城市、地址、描述)的自动翻译 + 入库(Supplier.nameRu / cityRu / addressRu / descriptionRu 等已有字段) ← 下次起点
-3. 阶段 4.5(隐藏阶段)-CRUD UI:供应商 / 联系人 / 报价 / 沟通记录的新增 / 编辑 / 删除界面
-4. 阶段 5-文件存储抽象层 + 上传 UI
-5. 阶段 6-UI 美化
-6. 低优先级 / 延期:
+1. ~~阶段 1-4 全部完成~~ ✅
+2. **阶段 4.5 - CRUD UI**:供应商 / 联系人 / 报价 / 沟通记录的新增 / 编辑 / 删除界面。**关键设计**:复用阶段 4 的 `translate()` 函数,做"翻译预览"模式 ← 下次起点
+3. 阶段 5 - 文件存储抽象层 + 上传 UI
+4. 阶段 6 - UI 美化
+5. 低优先级 / 延期:
+    - DeepSeek V4 模型升级追踪(`deepseek-chat` 2026 年 7 月下线前不影响,但要记着)
+    - 阶段 4 用了 `prisma as any`,正式业务代码若有需要可以引入更严格的类型(typed 表名映射)
     - 登录成功后从 User.locale 读取并写入 cookie(跨设备自动恢复)
     - middleware.ts → proxy.ts 等 Next.js 修复后迁移
     - 解除 kysely 0.28 锁定
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进入阶段 4,翻译 API 抽象层」**。
+直接说:**「进入阶段 4.5,CRUD UI」**
 
-**阶段 4 路线预览**:
-1. 设计 `TranslationProvider` 抽象层(`translate(text, from, to): Promise<string>`)
-2. 实现 DeepL 适配器(免费版 50 万字符/月够 admin 录入用)
-3. `.env` 配 DEEPL_API_KEY
-4. 写一个 "回填脚本" 把现有 12 个 supplier 的 nameRu / cityRu / provinceZh 等字段一次性自动翻译入库
-5. 在 Supplier 创建/编辑流程(目前没有,等阶段 4.5)预留 "auto translate on save" hook
-6. 阶段 4 收尾时,俄文界面下打开 /suppliers,看到 "Гуанчжоу Цзиньхуэй" 而非 "广州金辉玩具"
+**阶段 4.5 路线预览**:
+1. 设计核心 CRUD 表单结构(Supplier 优先,Contact / Quote / Note 后续)
+2. Server Actions 处理保存(创建 + 更新 + 软删除)
+3. **翻译预览 hook**:Admin 填完中文 → 点"自动翻译俄文"按钮 → 系统调阶段 4 的 `translate()` → 把 7 个俄文字段填进表单 → Admin 肉眼检查 → 不一致的手改 + 自动设 `_ru_auto_translated = false` 锁定 → 保存
+4. 表单验证(Zod 或类似)
+5. 列表页加"新建"按钮 + 编辑入口
 
-预计阶段 4 用 3-4 轮对话收尾。
+预计阶段 4.5 用 4-6 轮对话收尾。

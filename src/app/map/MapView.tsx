@@ -1,15 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import { pickLocalized } from '@/i18n/pick-localized';
+
 
 type Supplier = {
   id: number;
   nameZh: string;
+  nameRu: string | null;
   cityZh: string;
+  cityRu: string | null;
   provinceZh: string;
+  provinceRu: string | null;
   latitude: number;
   longitude: number;
   cooperationLevel: string;
@@ -30,6 +35,8 @@ const LEVEL_ORDER = ['STRATEGIC', 'REGULAR', 'TRIAL_ORDER', 'INITIAL_CONTACT', '
 export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
   const t = useTranslations('map');
   const tLevel = useTranslations('cooperationLevel');
+  const locale = useLocale();
+  const tileHl = locale === 'ru' ? 'ru' : 'zh-CN'; // 瓦片底图的地名标签语言
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
 
   const filteredSuppliers =
@@ -50,7 +57,8 @@ export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
-          url="https://mt1.google.com/vt/lyrs=m&hl=zh-CN&x={x}&y={y}&z={z}"
+          key={tileHl}
+          url={`https://mt1.google.com/vt/lyrs=m&hl=${tileHl}&x={x}&y={y}&z={z}`}
           attribution="&copy; Google"
         />
         {filteredSuppliers.map((supplier) => {
@@ -69,9 +77,12 @@ export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
             >
               <Popup>
                 <div className="text-sm">
-                  <div className="font-semibold">{supplier.nameZh}</div>
+                  <div className="font-semibold">
+                    {pickLocalized(supplier.nameZh, supplier.nameRu, locale)}
+                  </div>
                   <div className="text-gray-600">
-                    {supplier.provinceZh} · {supplier.cityZh}
+                    {pickLocalized(supplier.provinceZh, supplier.provinceRu, locale)} ·{' '}
+                    {pickLocalized(supplier.cityZh, supplier.cityRu, locale)}
                   </div>
                   <div className="text-gray-500 text-xs mt-1">
                     {tLevel(supplier.cooperationLevel)}
@@ -119,14 +130,3 @@ export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
     </div>
   );
 }
-
-//这是本批最重要的概念,.map() 渲染列表——React 里画"一串相似东西"(供应商列表、表格行、菜单项)的标准做法。
-//读法:"对每一个 supplier,生成一个 <CircleMarker>"。
-//两个细节:
-
-//key={supplier.id} —— React 硬要求,告诉它"哪个组件对应哪条数据",删除/更新时不会乱。忘了写 key 会有警告,以后写列表条件反射加上。
-//<Popup> 写在 <CircleMarker> 里面 —— Leaflet 的约定:"弹窗是属于这个标记的",所以用嵌套表达从属关系。同理以后还会有 <Tooltip>(鼠标悬浮提示)。
-
-//pathOptions={{ color, fillColor, fillOpacity, weight }} 是 Leaflet 的画笔参数——边框色、填充色、透明度、线宽。完全不用记,改颜色时回查就行。
-//新概念:useState(React 的"记忆"机制)到目前为止,我们写的组件都是"渲染完就完事"——给什么数据画什么。但现在地图要"记住"用户点了哪个级别,下次点别处时还得知道当前状态是啥。
-//打个比方:useState 就像组件随身带的小便利贴。组件挂载时撕一张贴纸,写上初始值;用户点击后改写贴纸内容,React 看见贴纸变了,自动把组件重画一遍。
