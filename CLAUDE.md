@@ -1006,80 +1006,56 @@ RU    俄文
 
 ---
 
-## 2026.6.8 项目进度日志(阶段 4.5 里程碑 1a 完成:Supplier 新建表单中文链路)
+## 2026.6.8 项目进度日志(阶段 4.5 里程碑 1b 完成:翻译预览 + 锁定逻辑)
 
-### 当前阶段:阶段 4.5 进行中,里程碑 1a 完成,准备进入 1b
+### 当前阶段:阶段 4.5 进行中,里程碑 1b 完成,准备进入 1c
 
-### 里程碑 1a 范围
+### 里程碑 1b 范围
 
-供应商(Supplier)的新建表单,**仅中文字段 + 必填校验**走通——不含俄文字段、翻译预览、编辑、删除。这是阶段 4.5 的"模板验证轮",1a 走通后,1b/1c 在此基础上加翻译预览和编辑路径,1d 把同一模板复制到 Contact / Quote / Note。
+供应商表单加 7 个俄文字段输入框 + "自动翻译俄文"总按钮 + `_ru_auto_translated` 锁定逻辑。完整工作流:Admin 填中文 → 点翻译 → AI 自动填俄文 → Admin 肉眼核对 → 手改某字段 → 该字段自动上锁(🔒 已手改 + flag → false)→ 再次点翻译时该字段跳过 → 提交后数据库 7 zh + 7 ru + 7 flag 完整记录
 
 ### 关键架构决策
 
-- **表单技术栈选 B(Server Actions + 原生 `<form>` + Zod 校验)**,放弃 React Hook Form 路线。理由:Next.js 16 原生主路,依赖少(只多 Zod),对学习者心智模型简单,且本项目录入低频高专注,RHF 的"即时校验丝滑"优势用不上
-- **文件就近共置**:Supplier 相关的 form 组件、Server Action、Zod schema 都放在 `src/app/suppliers/_*` 下,而非全局 `components/` `actions/` `lib/`。理由:同表所有相关文件一处可找,以后复制模板到 Contact/Quote/Note 是整个文件夹复制
-- **表单语言策略 (A) 中文写死**:与 CLAUDE.md「Admin 始终用中文录入」原则一致。表单是 Admin 工作工具,Admin 用中文,表单 label 中文化(不走 next-intl)。Viewer 永远不进新建页(阶段 2 认证落地后由权限拦截)。这与"按钮、菜单"等纯 UI 文字走 messages 翻译的策略**分层**——纯 UI 走 i18n,Admin 录入界面走单语
-- **`createdById` 开发期兜底**:better-auth session 路径已写好(`auth.api.getSession({ headers: await headers() })`),但目前登录页面还没做,session 永远为空。临时用 admin user id 字符串兜底,登录页面接入后兜底自然失效
-
-### 与 CLAUDE.md 初版设计的差异(在阶段 4.5 工作时发现并对齐)
-
-本里程碑发现 prisma/schema.prisma 与 CLAUDE.md 初版描述存在若干差异,以 schema 为准,CLAUDE.md 视为设计意图文档:
-
-| 字段 / 项 | CLAUDE.md 写的 | 实际 schema |
-|---------|--------------|-----------|
-| `User.id` | `Int` 自增 | `String @id @default(cuid())` |
-| `User` 字段集 | username / passwordHash / role / locale / isActive | + email / emailVerified / name / image / displayUsername(better-auth 强加) |
-| `User.locale` | 默认 `ZH`,必填 | `Locale?` 可空、无默认 |
-| `Supplier.code` | `String?` 可选 | `String @unique` **必填且唯一** |
-| `Supplier.discoveredVia` | 文档中写法可解读为选填 | `String` **必填** |
-| 所有业务表 `createdById` | `Int` | `String`(随 User.id 变化) |
-
-**对齐结论**:better-auth 接入时确实做了 User 表改造(这是 better-auth 的硬性要求),其他差异属于 schema 演进。CLAUDE.md 的 User 表段落和 Supplier 的 `code`/`discoveredVia` 字段描述需在 1d 收尾时同步更新文档。
+- **部分受控表单**:7 个 zh + 7 个 ru + 7 个 flag 全由一个 `useState` 对象管理(为了让翻译按钮能编程式填值、锁定逻辑能跟踪手改),其他字段(code / 经纬度 / 合作深度 / 认识渠道 / 网址)仍非受控
+- **`useTransition` 包翻译异步**:替代手写 useState loading,自动给出 isPending 布尔,符合 React 19 惯例
+- **翻译走 Server Action,不开 API Route**:`translateSupplierFields` 标记 `'use server'`,客户端按钮直接 RPC 调用。API key 留服务端,与 1a Server Actions 路线一致
+- **批量调用 `translateBatch`**:7 字段打包一次 HTTP 请求,降级(provider 不支持 batch 时改并发逐条)由阶段 4 抽象层负责,业务代码无感
+- **锁定语义"保护手改"**:Admin 手改俄文字段 → flag 自动 false → 再次点翻译时该字段跳过。与阶段 4 backfill 脚本"flag=false 永不覆盖"语义一致,Admin 工作成果在表单环境得到同等保护
+- **🔒 视觉提示**:手改字段标签右侧显示 `🔒 已手改` Amber 色小标识,Admin 一眼分清哪些字段已上锁
+- **空中文字段跳过翻译**:不浪费 API 配额。**显式拒绝把"AI 生成 shortName"嵌入 translate prompt**——保留 translate 抽象层的纯翻译边界(避免绑死 LLM,Google NMT 切回时仍可用),AI 生成内容应作为未来 ✨ 按钮显式触发功能
 
 ### 已完成
 
-- ✅ `npm install zod`(zod 4.4.3,与 better-auth 间接依赖的 zod 4 兼容)
-- ✅ `src/app/suppliers/_validations/supplier-schema.ts` — Zod schema,只中文字段 + cooperationLevel 枚举
-- ✅ `src/app/suppliers/_actions/supplier-actions.ts` — `createSupplier` Server Action,含 better-auth session 路径 + admin 兜底 + P2002 唯一冲突处理
-- ✅ `src/app/suppliers/_components/SupplierForm.tsx` — 客户端表单,用 `useActionState` + `useFormStatus`,字段级错误显示 + 提交按钮 pending 态
-- ✅ `src/app/suppliers/new/page.tsx` — 新建供应商路由页(服务端组件,套 SupplierForm)
-- ✅ `src/app/suppliers/page.tsx` — 列表页右上角加"+ 新建供应商"按钮(走 next-intl,中俄双语)
-- ✅ `messages/zh.json` / `messages/ru.json` — 加 `suppliers.newSupplier` 翻译键
-- ✅ 端到端跑通:点新建 → 填表单 → 必填校验生效 → 提交成功 → 跳回列表 → 数据库有新行
+- ✅ `_validations/supplier-schema.ts` — 扩展 14 个新字段(7 ru + 7 flag),含 `stringToBool` 三段链:`z.enum(["true","false"]).default("true").transform(v => v === "true")`
+- ✅ `_actions/supplier-actions.ts` — 新增 `translateSupplierFields` Server Action 调 `translateBatch`;扩展 `createSupplier` 接受新字段,俄文空字符串转 null 入库;**删除原 `INITIAL_SUPPLIER_FORM_STATE` 常量导出**(违反 'use server' 文件规则)
+- ✅ `_components/SupplierForm.tsx` — 重写为部分受控:21 字段 `BilingualState` + 翻译按钮 + 锁定逻辑 + 🔒 提示。抽出 `BilingualFieldRow` 子组件减少 7 倍重复
+- ✅ 端到端验证:不翻译路径(ru=NULL,列表页 `pickLocalized` 回退到 zh) + 翻译路径(7 字段全填 + 手改保留 + 锁定标志正确入库)双路径通过
 
 ### 本轮新概念(给未来对话的避坑笔记)
 
-- **`'use server'` vs `'use client'` 分层**:服务端文件直接访问 Prisma / 密钥 / 外部 API,客户端文件做交互(useState、按钮点击)。两边靠"调用 Server Action 函数"通信,Next.js 自动打包成 HTTP 请求
-- **`useActionState` 配套 Server Action**:React 19 Hook,管理 Server Action 返回的 state(错误信息、状态),并把 action 包装成可挂在 `<form action={...}>` 上的函数
-- **`useFormStatus` 必须在 form 内部子组件用**,在 `<form>` 同级直接用永远拿不到 pending 状态。所以惯例把 SubmitButton 拆成子组件
-- **`name` 属性是表单数据传递的契约**:`<input name="nameZh">` 必须严格对应 Zod schema 字段名,否则 FormData → Object → Zod 链路对不上
-- **`redirect()` 必须在 try/catch 外**:Next.js redirect 通过抛 NEXT_REDIRECT 特殊错误实现,包在 try 里会被 catch 吞掉
-- **`revalidatePath(...)` 是写库后的标配**:不调用的话,列表页可能展示旧缓存,新建的供应商不显示
-- **better-auth `auth.api.getSession({ headers: await headers() })`**:Server Action 里读当前登录用户的标准用法。`headers()` 是 Next.js 服务端异步函数
-- **Prisma 唯一冲突错误码 `P2002`**:`@unique` 字段重复时 Prisma 抛此错误,Server Action 捕获后给字段级专门提示。Prisma 7 + driver adapter 模式下用鸭式辨形(`'code' in err`)规避命名空间 import
+- **受控 vs 非受控输入**:`value={state}` + `onChange={...}` 必须成对。漏一个 → React 警告 `controlled to uncontrolled` 或反之
+- **`useTransition` 包异步状态**:`[isPending, startTransition]`,`startTransition(async () => {...})` 自动管理 pending 布尔,不用手写 loading
+- **hidden input 传非用户输入数据**:布尔 flag 没可视输入框但要送服务端 → `<input type="hidden" name=".." value={bool ? 'true' : 'false'} />` + 服务端 Zod `stringToBool` 还原
+- **`type="button"` 至关重要**:`<button>` 默认在 form 内被当 submit;form 内非提交按钮必须显式标 `type="button"`,否则误触发表单提交
+- **`'use server'` 文件只允许 async 函数导出**:不能 `export const xxx = {...}` 对象/常量(类型 OK,因运行时擦除)。常量挪到业务组件文件
+- **Zod 4 自定义转换链**:`.enum().default().transform()` 把表单字符串布尔还原成真布尔
 
 ### 本轮踩到的坑
 
-- ❌ **CLAUDE.md User 表字段定义与现实不符**:导致首版 Server Action 用了 `createdById: 1`(Int),实际应为 String。靠跑 Prisma Studio 看实际表结构纠正
-- ❌ **`messages/{zh,ru}.json` 加翻译键容易漏一边**:zh.json 加了 ru.json 忘加,会以 `MISSING_MESSAGE: Could not resolve 'xxx' in messages for locale 'ru'` 报错。两边必须同步加
+- ❌ **`'use server'` 文件混导出对象常量** → 报错 `A "use server" file can only export async functions, found object`。1a 时埋雷,1b 复杂导出场景下 Next.js 才抛出。补救:常量移到组件文件
+- ❌ **`type="button"` 漏写**(本轮提前规避,未实际中招,但写文档备查)
 
 ### 待办
 
-1. **里程碑 1b - 翻译预览 + 俄文字段**:加 7 个俄文字段输入框、"自动翻译俄文"总按钮、调用阶段 4 的 `translate()`、`_ru_auto_translated` 翻转逻辑(Admin 手改俄文 → flag 自动 false)
-2. **里程碑 1c - Supplier 编辑路径 + 软删除入口**:`/suppliers/[id]/edit` 路由 + 列表页"停用"按钮
-3. **里程碑 1d - 套模板到 Contact / Quote / Note** + 顺手同步 CLAUDE.md 文档差异
-4. 阶段 5 - 文件存储抽象层 + 上传 UI
-5. 阶段 6 - UI 美化
+1. ~~阶段 4.5 里程碑 1a / 1b 完成~~ ✅
+2. **里程碑 1c — 编辑 + 软删除**:`/suppliers/[id]/edit` 路由,SupplierForm 改造支持 `initialData` prop;新 `updateSupplier` / `archiveSupplier` Server Actions;列表页加编辑链接 + 停用按钮 ← 下次起点
+3. **里程碑 1d — 套模板到 Contact / Quote / Note** + 同步 CLAUDE.md 文档差异
+4. 阶段 5 — 文件存储抽象层 + 上传 UI
+5. 阶段 6 — UI 美化
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进入里程碑 1b,加翻译预览」**
+直接说:**「进入里程碑 1c,做编辑 + 软删除」**
 
-**1b 路线预览**:
-1. 扩展 Zod schema:加 7 个俄文字段(`nameRu` / `shortNameRu` / 等)+ 7 个 `_ru_auto_translated` 布尔字段,全部可选(因为可能由 AI 填或人工填)
-2. 表单组件加俄文字段输入框:与中文字段并列显示(中俄一对一)
-3. 表单顶部加"自动翻译俄文"总按钮 → 调阶段 4 的 `translate()` → 用 `useState` 批量更新 7 个俄文字段值
-4. `_ru_auto_translated` 翻转逻辑:翻译填值时 7 个 flag 全置 true;Admin 手改某个俄文输入框 → 该字段 flag 自动翻转 false(锁定保护)
-5. Server Action 同步处理新字段
-
-预计 1b 用 2-3 轮对话收尾。
+**1c 路线预览**:
+1. 新路由 `src/ap

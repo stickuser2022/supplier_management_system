@@ -129,3 +129,86 @@ export async function translateSupplierFields(
     };
   }
 }
+
+// ===== 编辑 / 停用 / 恢复 =====
+
+// 编辑供应商:用 .bind(null, id) 把 id 预先绑进去,使签名与 createSupplier 一致
+// 注意:不接受 code 修改(D3)、不修改 createdById(原创建者保留)
+export async function updateSupplier(
+  id: number,
+  _prevState: SupplierFormState,
+  formData: FormData,
+): Promise<SupplierFormState> {
+  const raw = Object.fromEntries(formData);
+  const parsed = supplierCreateSchema.safeParse(raw);
+  if (!parsed.success) {
+    const flat = z.flattenError(parsed.error);
+    return {
+      status: 'error',
+      errors: flat.fieldErrors,
+      message: '表单校验失败,请检查标红的字段',
+    };
+  }
+
+  try {
+    await prisma.supplier.update({
+      where: { id },
+      data: {
+        // 显式列出可改字段,刻意不包括 code 和 createdById
+        nameZh: parsed.data.nameZh,
+        nameRu: parsed.data.nameRu || null,
+        nameRuAutoTranslated: parsed.data.nameRuAutoTranslated,
+        shortNameZh: parsed.data.shortNameZh || null,
+        shortNameRu: parsed.data.shortNameRu || null,
+        shortNameRuAutoTranslated: parsed.data.shortNameRuAutoTranslated,
+        provinceZh: parsed.data.provinceZh,
+        provinceRu: parsed.data.provinceRu || null,
+        provinceRuAutoTranslated: parsed.data.provinceRuAutoTranslated,
+        cityZh: parsed.data.cityZh,
+        cityRu: parsed.data.cityRu || null,
+        cityRuAutoTranslated: parsed.data.cityRuAutoTranslated,
+        districtZh: parsed.data.districtZh || null,
+        districtRu: parsed.data.districtRu || null,
+        districtRuAutoTranslated: parsed.data.districtRuAutoTranslated,
+        addressZh: parsed.data.addressZh || null,
+        addressRu: parsed.data.addressRu || null,
+        addressRuAutoTranslated: parsed.data.addressRuAutoTranslated,
+        descriptionZh: parsed.data.descriptionZh || null,
+        descriptionRu: parsed.data.descriptionRu || null,
+        descriptionRuAutoTranslated: parsed.data.descriptionRuAutoTranslated,
+        latitude: parsed.data.latitude,
+        longitude: parsed.data.longitude,
+        cooperationLevel: parsed.data.cooperationLevel,
+        discoveredVia: parsed.data.discoveredVia,
+        website: parsed.data.website || null,
+      },
+    });
+  } catch (err) {
+    return {
+      status: 'error',
+      message: '保存失败:' + (err instanceof Error ? err.message : '未知错误'),
+    };
+  }
+
+  revalidatePath('/suppliers');
+  revalidatePath(`/suppliers/${id}/edit`);
+  redirect('/suppliers');
+}
+
+// 停用供应商(软删除):isActive = false
+export async function archiveSupplier(id: number): Promise<void> {
+  await prisma.supplier.update({
+    where: { id },
+    data: { isActive: false },
+  });
+  revalidatePath('/suppliers');
+}
+
+// 恢复供应商:isActive = true
+export async function restoreSupplier(id: number): Promise<void> {
+  await prisma.supplier.update({
+    where: { id },
+    data: { isActive: true },
+  });
+  revalidatePath('/suppliers');
+}

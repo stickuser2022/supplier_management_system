@@ -17,16 +17,25 @@
     "submitting": "登录中...",
     "errorDefault": "登录失败,请检查用户名和密码"
   },
-  "suppliers": {
+"suppliers": {
     "title": "供应商列表",
     "total": "共 {count} 条",
     "newSupplier": "+ 新建供应商",
+    "activeView": "活跃中",
+    "archivedView": "已停用",
     "columns": {
       "code": "编号",
       "name": "名称",
       "location": "省 / 市",
       "cooperationLevel": "合作深度",
-      "createdAt": "创建时间"
+      "createdAt": "创建时间",
+      "actions": "操作"
+    },
+    "actions": {
+      "edit": "编辑",
+      "archive": "停用",
+      "restore": "恢复",
+      "confirmArchive": "确定停用「{name}」吗?"
     }
   },
   "map": {

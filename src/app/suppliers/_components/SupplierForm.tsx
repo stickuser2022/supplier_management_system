@@ -4,6 +4,7 @@ import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import {
   createSupplier,
+  updateSupplier,
   translateSupplierFields,
   type SupplierFormState,
   type SupplierTranslateField,
@@ -20,7 +21,38 @@ const COOPERATION_LEVEL_LABELS: Record<typeof COOPERATION_LEVELS[number], string
   INACTIVE: '已暂停',
 };
 
-// 双语状态对象,所有 21 个字段集中放一处
+// 编辑模式下传入的初始数据形状
+export type SupplierFormInitialData = {
+  id: number;
+  code: string;
+  nameZh: string;
+  nameRu: string | null;
+  nameRuAutoTranslated: boolean;
+  shortNameZh: string | null;
+  shortNameRu: string | null;
+  shortNameRuAutoTranslated: boolean;
+  provinceZh: string;
+  provinceRu: string | null;
+  provinceRuAutoTranslated: boolean;
+  cityZh: string;
+  cityRu: string | null;
+  cityRuAutoTranslated: boolean;
+  districtZh: string | null;
+  districtRu: string | null;
+  districtRuAutoTranslated: boolean;
+  addressZh: string | null;
+  addressRu: string | null;
+  addressRuAutoTranslated: boolean;
+  descriptionZh: string | null;
+  descriptionRu: string | null;
+  descriptionRuAutoTranslated: boolean;
+  latitude: number;
+  longitude: number;
+  cooperationLevel: typeof COOPERATION_LEVELS[number];
+  discoveredVia: string;
+  website: string | null;
+};
+
 type BilingualState = {
   nameZh: string; nameRu: string; nameRuAutoTranslated: boolean;
   shortNameZh: string; shortNameRu: string; shortNameRuAutoTranslated: boolean;
@@ -31,7 +63,7 @@ type BilingualState = {
   descriptionZh: string; descriptionRu: string; descriptionRuAutoTranslated: boolean;
 };
 
-const INITIAL_BILINGUAL: BilingualState = {
+const EMPTY_BILINGUAL: BilingualState = {
   nameZh: '', nameRu: '', nameRuAutoTranslated: true,
   shortNameZh: '', shortNameRu: '', shortNameRuAutoTranslated: true,
   provinceZh: '', provinceRu: '', provinceRuAutoTranslated: true,
@@ -40,8 +72,37 @@ const INITIAL_BILINGUAL: BilingualState = {
   addressZh: '', addressRu: '', addressRuAutoTranslated: true,
   descriptionZh: '', descriptionRu: '', descriptionRuAutoTranslated: true,
 };
+
+// 根据 initialData 算出 BilingualState 初值(null → '')
+function buildBilingualFromInitial(d?: SupplierFormInitialData): BilingualState {
+  if (!d) return EMPTY_BILINGUAL;
+  return {
+    nameZh: d.nameZh,
+    nameRu: d.nameRu ?? '',
+    nameRuAutoTranslated: d.nameRuAutoTranslated,
+    shortNameZh: d.shortNameZh ?? '',
+    shortNameRu: d.shortNameRu ?? '',
+    shortNameRuAutoTranslated: d.shortNameRuAutoTranslated,
+    provinceZh: d.provinceZh,
+    provinceRu: d.provinceRu ?? '',
+    provinceRuAutoTranslated: d.provinceRuAutoTranslated,
+    cityZh: d.cityZh,
+    cityRu: d.cityRu ?? '',
+    cityRuAutoTranslated: d.cityRuAutoTranslated,
+    districtZh: d.districtZh ?? '',
+    districtRu: d.districtRu ?? '',
+    districtRuAutoTranslated: d.districtRuAutoTranslated,
+    addressZh: d.addressZh ?? '',
+    addressRu: d.addressRu ?? '',
+    addressRuAutoTranslated: d.addressRuAutoTranslated,
+    descriptionZh: d.descriptionZh ?? '',
+    descriptionRu: d.descriptionRu ?? '',
+    descriptionRuAutoTranslated: d.descriptionRuAutoTranslated,
+  };
+}
+
 const INITIAL_FORM_STATE: SupplierFormState = { status: 'idle' };
-// 7 个字段对的元数据,翻译循环和渲染都靠它驱动
+
 type FieldPair = {
   key: SupplierTranslateField;
   zhFieldName: keyof BilingualState;
@@ -71,7 +132,7 @@ function FieldError({ errors }: { errors?: string[] }) {
   return <p className="text-red-600 text-sm mt-1">{errors[0]}</p>;
 }
 
-function SubmitButton() {
+function SubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button
@@ -79,18 +140,13 @@ function SubmitButton() {
       disabled={pending}
       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
     >
-      {pending ? '保存中…' : '保存'}
+      {pending ? '保存中…' : isEdit ? '更新' : '保存'}
     </button>
   );
 }
 
-// 渲染一对中俄字段的封装,7 个字段对都用它
 function BilingualFieldRow({
-  pair,
-  bi,
-  errors,
-  onZhChange,
-  onRuChange,
+  pair, bi, errors, onZhChange, onRuChange,
 }: {
   pair: FieldPair;
   bi: BilingualState;
@@ -101,70 +157,32 @@ function BilingualFieldRow({
   const zhValue = bi[pair.zhFieldName] as string;
   const ruValue = bi[pair.ruFieldName] as string;
   const flagValue = bi[pair.flagFieldName] as boolean;
-
   const baseClass = 'w-full px-3 py-2 border rounded';
 
   return (
     <div className="grid grid-cols-2 gap-4">
-      {/* 中文输入 */}
       <div>
         <label className="block text-sm mb-1">
-          {pair.zhLabel}
-          {pair.required && <span className="text-red-500"> *</span>}
+          {pair.zhLabel}{pair.required && <span className="text-red-500"> *</span>}
         </label>
         {pair.multiline ? (
-          <textarea
-            name={pair.zhFieldName}
-            value={zhValue}
-            onChange={(e) => onZhChange(pair.zhFieldName, e.target.value)}
-            rows={3}
-            className={baseClass}
-            placeholder={pair.zhPlaceholder}
-          />
+          <textarea name={pair.zhFieldName} value={zhValue} onChange={(e) => onZhChange(pair.zhFieldName, e.target.value)} rows={3} className={baseClass} placeholder={pair.zhPlaceholder} />
         ) : (
-          <input
-            type="text"
-            name={pair.zhFieldName}
-            value={zhValue}
-            onChange={(e) => onZhChange(pair.zhFieldName, e.target.value)}
-            className={baseClass}
-            placeholder={pair.zhPlaceholder}
-          />
+          <input type="text" name={pair.zhFieldName} value={zhValue} onChange={(e) => onZhChange(pair.zhFieldName, e.target.value)} className={baseClass} placeholder={pair.zhPlaceholder} />
         )}
         <FieldError errors={errors?.[pair.zhFieldName]} />
       </div>
-
-      {/* 俄文输入 + 锁定提示 */}
       <div>
         <label className="text-sm mb-1 flex items-center gap-2">
           <span>{pair.ruLabel}</span>
-          {!flagValue && (
-            <span className="text-xs text-amber-600">🔒 已手改</span>
-          )}
+          {!flagValue && <span className="text-xs text-amber-600">🔒 已手改</span>}
         </label>
         {pair.multiline ? (
-          <textarea
-            name={pair.ruFieldName}
-            value={ruValue}
-            onChange={(e) => onRuChange(pair.ruFieldName, pair.flagFieldName, e.target.value)}
-            rows={3}
-            className={baseClass}
-          />
+          <textarea name={pair.ruFieldName} value={ruValue} onChange={(e) => onRuChange(pair.ruFieldName, pair.flagFieldName, e.target.value)} rows={3} className={baseClass} />
         ) : (
-          <input
-            type="text"
-            name={pair.ruFieldName}
-            value={ruValue}
-            onChange={(e) => onRuChange(pair.ruFieldName, pair.flagFieldName, e.target.value)}
-            className={baseClass}
-          />
+          <input type="text" name={pair.ruFieldName} value={ruValue} onChange={(e) => onRuChange(pair.ruFieldName, pair.flagFieldName, e.target.value)} className={baseClass} />
         )}
-        {/* hidden input:把布尔值以 "true"/"false" 字符串形式塞进 FormData */}
-        <input
-          type="hidden"
-          name={pair.flagFieldName}
-          value={flagValue ? 'true' : 'false'}
-        />
+        <input type="hidden" name={pair.flagFieldName} value={flagValue ? 'true' : 'false'} />
       </div>
     </div>
   );
@@ -172,43 +190,38 @@ function BilingualFieldRow({
 
 // ===== 主组件 =====
 
-export function SupplierForm() {
-  const [state, formAction] = useActionState(createSupplier, INITIAL_FORM_STATE);
-  const [bi, setBi] = useState<BilingualState>(INITIAL_BILINGUAL);
+export function SupplierForm({ initialData }: { initialData?: SupplierFormInitialData }) {
+  const isEdit = Boolean(initialData);
+
+  // 提交时调的 action:新建用 createSupplier,编辑用 updateSupplier(id 通过 .bind 预绑)
+  const action = isEdit
+    ? updateSupplier.bind(null, initialData!.id)
+    : createSupplier;
+  const [state, formAction] = useActionState(action, INITIAL_FORM_STATE);
+
+  // useState lazy initializer:第一次渲染才计算,避免每次 render 重算
+  const [bi, setBi] = useState<BilingualState>(() => buildBilingualFromInitial(initialData));
   const [isTranslating, startTranslating] = useTransition();
   const [translateError, setTranslateError] = useState<string | null>(null);
 
   const errors = state.errors;
 
-  // 中文字段变化:只更新值
   const handleZhChange = (key: keyof BilingualState, value: string) => {
     setBi((s) => ({ ...s, [key]: value }));
   };
-
-  // 俄文字段变化:更新值 + 翻 false 标记(锁定)
-  const handleRuChange = (
-    ruKey: keyof BilingualState,
-    flagKey: keyof BilingualState,
-    value: string,
-  ) => {
+  const handleRuChange = (ruKey: keyof BilingualState, flagKey: keyof BilingualState, value: string) => {
     setBi((s) => ({ ...s, [ruKey]: value, [flagKey]: false }));
   };
 
-  // 翻译按钮
   const handleTranslate = () => {
     setTranslateError(null);
-
-    // 筛出"中文非空 + 未锁"的字段
     const requests = FIELD_PAIRS
       .filter((p) => {
         const zhValue = (bi[p.zhFieldName] as string).trim();
         const isLocked = !(bi[p.flagFieldName] as boolean);
         return zhValue.length > 0 && !isLocked;
       })
-      .map((p) => ({
-        field: p.key,
-        text: bi[p.zhFieldName] as string,
-      }));
+      .map((p) => ({ field: p.key, text: bi[p.zhFieldName] as string }));
 
     if (requests.length === 0) {
       setTranslateError('没有可翻译的字段(中文为空 / 已锁定)');
@@ -221,8 +234,6 @@ export function SupplierForm() {
         setTranslateError(res.error);
         return;
       }
-
-      // 把翻译结果回填进 state,同时把对应 flag 置 true(重新由 AI 翻译,未锁)
       setBi((s) => {
         const next = { ...s };
         for (const r of res.results) {
@@ -238,137 +249,84 @@ export function SupplierForm() {
 
   return (
     <form action={formAction} className="space-y-6 max-w-5xl">
-      {/* 顶部错误条 */}
       {state.status === 'error' && state.message && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700">
-          {state.message}
-        </div>
+        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700">{state.message}</div>
       )}
-
-      {/* 翻译错误条 */}
       {translateError && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-700">
-          {translateError}
-        </div>
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-700">{translateError}</div>
       )}
 
-      {/* 翻译按钮 + 说明 */}
       <div className="flex items-center gap-4 p-4 bg-gray-50 border rounded">
-        <button
-          type="button"
-          onClick={handleTranslate}
-          disabled={isTranslating}
-          className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
-        >
+        <button type="button" onClick={handleTranslate} disabled={isTranslating} className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50">
           {isTranslating ? '翻译中…' : '🌐 自动翻译俄文'}
         </button>
         <p className="text-sm text-gray-600">
-          填好中文后点这个按钮,AI 会把 7 个俄文字段一齐填好。手改俄文后该字段会上锁(再次翻译不覆盖)。
+          填好中文后点这个按钮,AI 把 7 个俄文字段一齐填好。手改俄文后该字段会上锁(再次翻译不覆盖)。
         </p>
       </div>
 
-      {/* 7 个双语字段对 */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">基本信息(中俄对照)</h2>
         {FIELD_PAIRS.map((pair) => (
-          <BilingualFieldRow
-            key={pair.key}
-            pair={pair}
-            bi={bi}
-            errors={errors}
-            onZhChange={handleZhChange}
-            onRuChange={handleRuChange}
-          />
+          <BilingualFieldRow key={pair.key} pair={pair} bi={bi} errors={errors} onZhChange={handleZhChange} onRuChange={handleRuChange} />
         ))}
       </section>
 
-      {/* 单语字段 */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">其他信息</h2>
 
         <div>
           <label className="block text-sm mb-1">
             供应商编号 <span className="text-red-500">*</span>
+            {isEdit && <span className="ml-2 text-xs text-gray-500">(编辑模式下不可修改)</span>}
           </label>
           <input
             type="text"
             name="code"
             placeholder="如 GZ-001"
-            className="w-full px-3 py-2 border rounded"
+            defaultValue={initialData?.code}
+            readOnly={isEdit}
+            className={`w-full px-3 py-2 border rounded ${isEdit ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''}`}
           />
           <FieldError errors={errors?.code} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm mb-1">
-              纬度 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              step="any"
-              name="latitude"
-              placeholder="如 23.1291"
-              className="w-full px-3 py-2 border rounded"
-            />
+            <label className="block text-sm mb-1">纬度 <span className="text-red-500">*</span></label>
+            <input type="number" step="any" name="latitude" placeholder="如 23.1291" defaultValue={initialData?.latitude} className="w-full px-3 py-2 border rounded" />
             <FieldError errors={errors?.latitude} />
           </div>
           <div>
-            <label className="block text-sm mb-1">
-              经度 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              step="any"
-              name="longitude"
-              placeholder="如 113.2644"
-              className="w-full px-3 py-2 border rounded"
-            />
+            <label className="block text-sm mb-1">经度 <span className="text-red-500">*</span></label>
+            <input type="number" step="any" name="longitude" placeholder="如 113.2644" defaultValue={initialData?.longitude} className="w-full px-3 py-2 border rounded" />
             <FieldError errors={errors?.longitude} />
           </div>
         </div>
 
         <div>
           <label className="block text-sm mb-1">合作深度</label>
-          <select
-            name="cooperationLevel"
-            defaultValue="INITIAL_CONTACT"
-            className="w-full px-3 py-2 border rounded"
-          >
+          <select name="cooperationLevel" defaultValue={initialData?.cooperationLevel ?? 'INITIAL_CONTACT'} className="w-full px-3 py-2 border rounded">
             {COOPERATION_LEVELS.map((level) => (
-              <option key={level} value={level}>
-                {COOPERATION_LEVEL_LABELS[level]}
-              </option>
+              <option key={level} value={level}>{COOPERATION_LEVEL_LABELS[level]}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm mb-1">
-            认识渠道 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            name="discoveredVia"
-            placeholder="如 广交会、朋友介绍、老李推荐"
-            className="w-full px-3 py-2 border rounded"
-          />
+          <label className="block text-sm mb-1">认识渠道 <span className="text-red-500">*</span></label>
+          <input type="text" name="discoveredVia" placeholder="如 广交会、朋友介绍、老李推荐" defaultValue={initialData?.discoveredVia} className="w-full px-3 py-2 border rounded" />
           <FieldError errors={errors?.discoveredVia} />
         </div>
 
         <div>
           <label className="block text-sm mb-1">官网</label>
-          <input
-            type="text"
-            name="website"
-            placeholder="https://..."
-            className="w-full px-3 py-2 border rounded"
-          />
+          <input type="text" name="website" placeholder="https://..." defaultValue={initialData?.website ?? ''} className="w-full px-3 py-2 border rounded" />
           <FieldError errors={errors?.website} />
         </div>
       </section>
 
-      <SubmitButton />
+      <SubmitButton isEdit={isEdit} />
     </form>
   );
 }

@@ -17,16 +17,25 @@
     "submitting": "Вход...",
     "errorDefault": "Ошибка входа. Проверьте имя и пароль."
   },
-  "suppliers": {
+"suppliers": {
     "title": "Список поставщиков",
     "total": "Всего: {count}",
     "newSupplier": "+ Новый поставщик",
+    "activeView": "Активные",
+    "archivedView": "Архив",
     "columns": {
       "code": "Код",
       "name": "Название",
       "location": "Регион / Город",
       "cooperationLevel": "Уровень сотрудничества",
-      "createdAt": "Создано"
+      "createdAt": "Создано",
+      "actions": "Действия"
+    },
+    "actions": {
+      "edit": "Изменить",
+      "archive": "Архивировать",
+      "restore": "Восстановить",
+      "confirmArchive": "Архивировать «{name}»?"
     }
   },
   "map": {
