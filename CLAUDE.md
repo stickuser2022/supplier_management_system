@@ -1006,76 +1006,80 @@ RU    俄文
 
 ---
 
-## 2026.6.6 项目进度日志(阶段 4 完成:翻译 API 抽象层 + 数据回填)
+## 2026.6.8 项目进度日志(阶段 4.5 里程碑 1a 完成:Supplier 新建表单中文链路)
 
-### 当前阶段:阶段 4 完成,准备进入阶段 4.5(CRUD UI)
+### 当前阶段:阶段 4.5 进行中,里程碑 1a 完成,准备进入 1b
+
+### 里程碑 1a 范围
+
+供应商(Supplier)的新建表单,**仅中文字段 + 必填校验**走通——不含俄文字段、翻译预览、编辑、删除。这是阶段 4.5 的"模板验证轮",1a 走通后,1b/1c 在此基础上加翻译预览和编辑路径,1d 把同一模板复制到 Contact / Quote / Note。
 
 ### 关键架构决策
 
-- **翻译提供商:DeepSeek**(不是原计划的 DeepL,也不是中间选过的 Google NMT)。DeepL 国内拿不到 Key,Google API 国内访问被墙、上云后仍无法走,最终回到 CLAUDE.md 阶段 4 原路线预备的 DeepSeek
-- **抽象层模式**:`src/lib/translate/` 下 types + provider 适配器 + 统一入口,业务代码只调 `translate(text, 'zh', 'ru')`,底层换 provider 改 .env 一行即可。**抽象层的价值在 Google → DeepSeek 切换时被实测验证**——业务代码 / 回填脚本 0 改动
-- **数据回填策略**:7 张带"双语三件套"字段的表全部包括(空表自动跳过),按 `_ru_auto_translated` 字段决定是否覆盖(true 覆盖,false 即 Admin 手改过的永久保留)。脚本幂等,可任意重跑
-- **UI 适配工具**:`pickLocalized(zh, ru, locale)` 独立文件,fallback 永远是中文(俄文空时显示中文,避免空白)
+- **表单技术栈选 B(Server Actions + 原生 `<form>` + Zod 校验)**,放弃 React Hook Form 路线。理由:Next.js 16 原生主路,依赖少(只多 Zod),对学习者心智模型简单,且本项目录入低频高专注,RHF 的"即时校验丝滑"优势用不上
+- **文件就近共置**:Supplier 相关的 form 组件、Server Action、Zod schema 都放在 `src/app/suppliers/_*` 下,而非全局 `components/` `actions/` `lib/`。理由:同表所有相关文件一处可找,以后复制模板到 Contact/Quote/Note 是整个文件夹复制
+- **表单语言策略 (A) 中文写死**:与 CLAUDE.md「Admin 始终用中文录入」原则一致。表单是 Admin 工作工具,Admin 用中文,表单 label 中文化(不走 next-intl)。Viewer 永远不进新建页(阶段 2 认证落地后由权限拦截)。这与"按钮、菜单"等纯 UI 文字走 messages 翻译的策略**分层**——纯 UI 走 i18n,Admin 录入界面走单语
+- **`createdById` 开发期兜底**:better-auth session 路径已写好(`auth.api.getSession({ headers: await headers() })`),但目前登录页面还没做,session 永远为空。临时用 admin user id 字符串兜底,登录页面接入后兜底自然失效
+
+### 与 CLAUDE.md 初版设计的差异(在阶段 4.5 工作时发现并对齐)
+
+本里程碑发现 prisma/schema.prisma 与 CLAUDE.md 初版描述存在若干差异,以 schema 为准,CLAUDE.md 视为设计意图文档:
+
+| 字段 / 项 | CLAUDE.md 写的 | 实际 schema |
+|---------|--------------|-----------|
+| `User.id` | `Int` 自增 | `String @id @default(cuid())` |
+| `User` 字段集 | username / passwordHash / role / locale / isActive | + email / emailVerified / name / image / displayUsername(better-auth 强加) |
+| `User.locale` | 默认 `ZH`,必填 | `Locale?` 可空、无默认 |
+| `Supplier.code` | `String?` 可选 | `String @unique` **必填且唯一** |
+| `Supplier.discoveredVia` | 文档中写法可解读为选填 | `String` **必填** |
+| 所有业务表 `createdById` | `Int` | `String`(随 User.id 变化) |
+
+**对齐结论**:better-auth 接入时确实做了 User 表改造(这是 better-auth 的硬性要求),其他差异属于 schema 演进。CLAUDE.md 的 User 表段落和 Supplier 的 `code`/`discoveredVia` 字段描述需在 1d 收尾时同步更新文档。
 
 ### 已完成
 
-- ✅ 抽象层 4 个文件:
-    - `src/lib/translate/types.ts` — TranslationProvider interface 契约 + TranslationError 自定义错误类
-    - `src/lib/translate/google.ts` — Google Cloud Translation v2 适配器(留着备用,中国服务器跑不通,但代码不丢)
-    - `src/lib/translate/deepseek.ts` — DeepSeek V4 Flash 适配器,LLM 翻译模式
-    - `src/lib/translate/index.ts` — 业务入口,工厂 + 懒加载单例 + translateBatch 自动降级
-- ✅ `.env` + `.env.example` 配置 TRANSLATE_PROVIDER + 两家 Key 字段
-- ✅ `scripts/test-translate.ts` — 抽象层亮灯测试脚本
-- ✅ `scripts/backfill-translations.ts` — 数据驱动回填脚本,**实测 65 字段翻译成功 / 0 失败**
-- ✅ `src/i18n/pick-localized.ts` — 双语字段选择工具
-- ✅ `src/app/suppliers/page.tsx` 用 pickLocalized 改写
-- ✅ `src/app/map/MapView.tsx` 用 pickLocalized 改写 + 瓦片底图地名按 locale 切换(`hl=ru` / `hl=zh-CN`,加 `key={tileHl}` 强制 remount)
-- ✅ `src/app/map/page.tsx` 的 prisma `select` 加入 ru 字段
-- ✅ `.env.example` 补漏(阶段 1 遗留)
+- ✅ `npm install zod`(zod 4.4.3,与 better-auth 间接依赖的 zod 4 兼容)
+- ✅ `src/app/suppliers/_validations/supplier-schema.ts` — Zod schema,只中文字段 + cooperationLevel 枚举
+- ✅ `src/app/suppliers/_actions/supplier-actions.ts` — `createSupplier` Server Action,含 better-auth session 路径 + admin 兜底 + P2002 唯一冲突处理
+- ✅ `src/app/suppliers/_components/SupplierForm.tsx` — 客户端表单,用 `useActionState` + `useFormStatus`,字段级错误显示 + 提交按钮 pending 态
+- ✅ `src/app/suppliers/new/page.tsx` — 新建供应商路由页(服务端组件,套 SupplierForm)
+- ✅ `src/app/suppliers/page.tsx` — 列表页右上角加"+ 新建供应商"按钮(走 next-intl,中俄双语)
+- ✅ `messages/zh.json` / `messages/ru.json` — 加 `suppliers.newSupplier` 翻译键
+- ✅ 端到端跑通:点新建 → 填表单 → 必填校验生效 → 提交成功 → 跳回列表 → 数据库有新行
 
 ### 本轮新概念(给未来对话的避坑笔记)
 
-- **抽象层 / 适配器模式实战**:第一次真正动手实现"interface + 多 implements + 工厂选 provider + 单例缓存"。其价值在切换 provider 时被实测体现——Google → DeepSeek,业务代码 0 改动
-- **LLM 翻译 vs NMT 翻译两种范式**:LLM 用 `chat completions + system prompt` 表达翻译指令(自然语言指令式),NMT 用结构化字段 `{ q, target }`(参数式)。LLM 长句重组更地道(地址按俄语习惯重排顺序),但有同词不一致问题(同一个"金辉"可能翻成 `Цзиньхуэй` 也可能 `Цзиньхуй`),靠阶段 4.5 Admin 录入时人工把关 + `_ru_auto_translated=false` 锁定保护
-- **`temperature: 0` 用法**:LLM 翻译禁掉创造性,设 0 取概率最高的 token,输出确定性最高
-- **React Leaflet 的 key 强制 remount**:`<TileLayer>` url 改变不重载瓦片,加 `key={tileHl}` 强制重新挂载。**通用解法**:任何"prop 变了但子组件无响应"场景,先试 `key=`
-- **`prisma as any` 的合理 escape hatch**:数据驱动脚本(从字符串字段查 prisma 模型)用 any 是合理交易,加 `// eslint-disable-next-line @typescript-eslint/no-explicit-any` 让审查者知道"这是有意为之"
-- **next-intl 的 server vs client locale 拿法**:服务端组件 `getLocale()`(异步),客户端组件 `useLocale()`(Hook)
-- **Node.js fetch 不读 Windows 系统代理**:VPN 的"全局代理"骗的是 Windows 不是 Node,这是 Google API 在国内永远超时的根本原因。绕开需要 TUN 模式或 HTTPS_PROXY 注入,但**最佳实践直接换 provider**
+- **`'use server'` vs `'use client'` 分层**:服务端文件直接访问 Prisma / 密钥 / 外部 API,客户端文件做交互(useState、按钮点击)。两边靠"调用 Server Action 函数"通信,Next.js 自动打包成 HTTP 请求
+- **`useActionState` 配套 Server Action**:React 19 Hook,管理 Server Action 返回的 state(错误信息、状态),并把 action 包装成可挂在 `<form action={...}>` 上的函数
+- **`useFormStatus` 必须在 form 内部子组件用**,在 `<form>` 同级直接用永远拿不到 pending 状态。所以惯例把 SubmitButton 拆成子组件
+- **`name` 属性是表单数据传递的契约**:`<input name="nameZh">` 必须严格对应 Zod schema 字段名,否则 FormData → Object → Zod 链路对不上
+- **`redirect()` 必须在 try/catch 外**:Next.js redirect 通过抛 NEXT_REDIRECT 特殊错误实现,包在 try 里会被 catch 吞掉
+- **`revalidatePath(...)` 是写库后的标配**:不调用的话,列表页可能展示旧缓存,新建的供应商不显示
+- **better-auth `auth.api.getSession({ headers: await headers() })`**:Server Action 里读当前登录用户的标准用法。`headers()` 是 Next.js 服务端异步函数
+- **Prisma 唯一冲突错误码 `P2002`**:`@unique` 字段重复时 Prisma 抛此错误,Server Action 捕获后给字段级专门提示。Prisma 7 + driver adapter 模式下用鸭式辨形(`'code' in err`)规避命名空间 import
 
-### 本轮踩到的坑(每一个都吃过血)
+### 本轮踩到的坑
 
-- ❌ **DeepL API 国内拿不到 Key**:CLAUDE.md 阶段 4 路线原计划的 DeepL,实际已对中国大陆 IP 限制注册免费 key
-- ❌ **Google Cloud Translation 国内不通**:`translation.googleapis.com` 被墙,Node fetch ConnectTimeout。即便 VPN 全局代理,Node 也不走系统代理。**本质问题:国内云服务器永远访问不了 Google API**,等于今天就该换
-- ❌ **DeepSeek 取消了新用户 500 万 tokens 免费额度**(2026 年初政策变更)。最低 ¥10 充值起步,但 V4-Flash 极便宜,¥10 够这项目用半年以上
-- ❌ **DeepSeek `deepseek-chat` 是 legacy 别名**,2026 年 7 月 24 日下线。新项目用 `deepseek-v4-flash` 或 `deepseek-v4-pro`
-- ❌ **DeepSeek V4 默认开思考模式**:不显式 `thinking: { type: 'disabled' }` 会浪费大量 tokens 在 reasoning_content 上,翻译任务尤其浪费
-- ❌ **Prisma `select` 限定字段时新加字段不会自动出现**:阶段 2 做地图给 findMany 加了 select 缩窄(性能优化),阶段 4 新增 ru 字段必须同步加进 select,否则前端 prop 拿不到值,组件渲染时是 undefined
-- ❌ **Leaflet TileLayer 改 url 不重载瓦片**:必须 `key={tileHl}` 强制 remount
-- ❌ **`.gitignore` 的 `.env*` 通配符会顺手忽略 `.env.example`**:加 `!.env.example` 反向恢复
+- ❌ **CLAUDE.md User 表字段定义与现实不符**:导致首版 Server Action 用了 `createdById: 1`(Int),实际应为 String。靠跑 Prisma Studio 看实际表结构纠正
+- ❌ **`messages/{zh,ru}.json` 加翻译键容易漏一边**:zh.json 加了 ru.json 忘加,会以 `MISSING_MESSAGE: Could not resolve 'xxx' in messages for locale 'ru'` 报错。两边必须同步加
 
 ### 待办
 
-1. ~~阶段 1-4 全部完成~~ ✅
-2. **阶段 4.5 - CRUD UI**:供应商 / 联系人 / 报价 / 沟通记录的新增 / 编辑 / 删除界面。**关键设计**:复用阶段 4 的 `translate()` 函数,做"翻译预览"模式 ← 下次起点
-3. 阶段 5 - 文件存储抽象层 + 上传 UI
-4. 阶段 6 - UI 美化
-5. 低优先级 / 延期:
-    - DeepSeek V4 模型升级追踪(`deepseek-chat` 2026 年 7 月下线前不影响,但要记着)
-    - 阶段 4 用了 `prisma as any`,正式业务代码若有需要可以引入更严格的类型(typed 表名映射)
-    - 登录成功后从 User.locale 读取并写入 cookie(跨设备自动恢复)
-    - middleware.ts → proxy.ts 等 Next.js 修复后迁移
-    - 解除 kysely 0.28 锁定
+1. **里程碑 1b - 翻译预览 + 俄文字段**:加 7 个俄文字段输入框、"自动翻译俄文"总按钮、调用阶段 4 的 `translate()`、`_ru_auto_translated` 翻转逻辑(Admin 手改俄文 → flag 自动 false)
+2. **里程碑 1c - Supplier 编辑路径 + 软删除入口**:`/suppliers/[id]/edit` 路由 + 列表页"停用"按钮
+3. **里程碑 1d - 套模板到 Contact / Quote / Note** + 顺手同步 CLAUDE.md 文档差异
+4. 阶段 5 - 文件存储抽象层 + 上传 UI
+5. 阶段 6 - UI 美化
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进入阶段 4.5,CRUD UI」**
+直接说:**「进入里程碑 1b,加翻译预览」**
 
-**阶段 4.5 路线预览**:
-1. 设计核心 CRUD 表单结构(Supplier 优先,Contact / Quote / Note 后续)
-2. Server Actions 处理保存(创建 + 更新 + 软删除)
-3. **翻译预览 hook**:Admin 填完中文 → 点"自动翻译俄文"按钮 → 系统调阶段 4 的 `translate()` → 把 7 个俄文字段填进表单 → Admin 肉眼检查 → 不一致的手改 + 自动设 `_ru_auto_translated = false` 锁定 → 保存
-4. 表单验证(Zod 或类似)
-5. 列表页加"新建"按钮 + 编辑入口
+**1b 路线预览**:
+1. 扩展 Zod schema:加 7 个俄文字段(`nameRu` / `shortNameRu` / 等)+ 7 个 `_ru_auto_translated` 布尔字段,全部可选(因为可能由 AI 填或人工填)
+2. 表单组件加俄文字段输入框:与中文字段并列显示(中俄一对一)
+3. 表单顶部加"自动翻译俄文"总按钮 → 调阶段 4 的 `translate()` → 用 `useState` 批量更新 7 个俄文字段值
+4. `_ru_auto_translated` 翻转逻辑:翻译填值时 7 个 flag 全置 true;Admin 手改某个俄文输入框 → 该字段 flag 自动翻转 false(锁定保护)
+5. Server Action 同步处理新字段
 
-预计阶段 4.5 用 4-6 轮对话收尾。
+预计 1b 用 2-3 轮对话收尾。
