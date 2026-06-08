@@ -20,6 +20,7 @@
   "suppliers": {
     "title": "Список поставщиков",
     "total": "Всего: {count}",
+    "newSupplier": "+ Новый поставщик",
     "columns": {
       "code": "Код",
       "name": "Название",

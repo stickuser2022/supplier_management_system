@@ -20,6 +20,7 @@
   "suppliers": {
     "title": "供应商列表",
     "total": "共 {count} 条",
+    "newSupplier": "+ 新建供应商",
     "columns": {
       "code": "编号",
       "name": "名称",
@@ -39,4 +40,5 @@
     "INITIAL_CONTACT": "初步接触",
     "INACTIVE": "已暂停"
   }
+  
 }
