@@ -76,14 +76,17 @@ function revalidateFor(type: FileType, ownerId: number) {
 
 // ─── POST /api/upload ──────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  // 1. 权限:仅 Admin 可上传
-  // ⚠️ 如果你的 supplier-actions.ts 用了"开发期兜底"模式拿 user_id,
-  //    这里照搬同样的逻辑,避免没 session 时无法测试
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden: admin only' }, { status: 403 });
+// 1. 取当前用户 id:与 supplier-actions.ts 同模式
+  //    开发期 session 拿不到时,兜底为 admin user id
+  //    阶段 2 完整接入认证后,改为强制要求 session
+  const DEV_FALLBACK_ADMIN_ID = 'P3wbHXCGnCMPy0k6LO4paUqASBYRgRQK';
+  let userId: string;
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    userId = session?.user?.id ?? DEV_FALLBACK_ADMIN_ID;
+  } catch {
+    userId = DEV_FALLBACK_ADMIN_ID;
   }
-  const userId = session.user.id;
 
   // 2. 解析 multipart formData
   let formData: FormData;
@@ -162,14 +165,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Storage write failed' }, { status: 500 });
   }
 
-  // 8. 标题翻译(仅 titleZh 非空时调一次 DeepSeek)
+// 8. 标题翻译(仅 titleZh 非空时调一次)
   const titleZh =
     typeof titleZhRaw === 'string' && titleZhRaw.trim() ? titleZhRaw.trim() : null;
   let titleRu: string | null = null;
   if (titleZh) {
     try {
-      const [translated] = await translateBatch([titleZh], 'ru');
-      titleRu = translated ?? null;
+      const translated = await translateBatch([
+        { text: titleZh, from: 'zh', to: 'ru' },
+      ]);
+      titleRu = translated[0] ?? null;
     } catch (err) {
       console.warn('[upload] title translation failed (skip):', err);
     }

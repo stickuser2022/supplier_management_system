@@ -1,4 +1,13 @@
 {
+  "files": {
+  "uploadLogo": "上传 LOGO",
+  "replaceLogo": "替换 LOGO",
+  "removeLogo": "清除 LOGO",
+  "uploading": "上传中…",
+  "errorTooLarge": "文件过大,最大 {max}",
+  "errorWrongType": "文件类型不支持(仅 PNG / JPEG / WEBP / GIF)",
+  "confirmRemoveLogo": "确定清除当前 LOGO?"
+},
   "notes": {
     "title": "沟通记录",
     "newNote": "+ 新建记录",

@@ -7,6 +7,7 @@ import { SupplierActionsCell } from '../_components/SupplierActionsCell';
 import { ContactsList } from './contacts/_components/ContactsList';
 import { QuotesList } from './quotes/_components/QuotesList';
 import { NotesList } from './notes/_components/NotesList';
+import { SupplierLogo } from './_components/supplier-logo';
 
 export default async function SupplierDetailPage({
   params,
@@ -19,7 +20,18 @@ export default async function SupplierDetailPage({
 
   const supplier = await prisma.supplier.findUnique({ where: { id } });
   if (!supplier) notFound();
-
+  const currentLogo = await prisma.file.findFirst({
+  where: {
+    supplierId: id,
+    type: 'SUPPLIER_LOGO',
+    isActive: true,
+  },
+  select: {
+    id: true,
+    fileName: true,
+  },
+  orderBy: { createdAt: 'desc' },  // 防御性,理论上只有 1 个
+  });
   const t = await getTranslations('supplierDetail');
   const tLevel = await getTranslations('cooperationLevel');
   const locale = await getLocale();
@@ -39,6 +51,7 @@ export default async function SupplierDetailPage({
           </h1>
           <p className="text-sm text-gray-500 mt-1 font-mono">{supplier.code}</p>
         </div>
+        <SupplierLogo supplierId={id} currentLogo={currentLogo} />
         <SupplierActionsCell
           supplier={{ id: supplier.id, nameZh: supplier.nameZh, isActive: supplier.isActive }}
         />

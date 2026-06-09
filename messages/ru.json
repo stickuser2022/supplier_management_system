@@ -1,4 +1,13 @@
 {
+  "files": {
+  "uploadLogo": "Загрузить логотип",
+  "replaceLogo": "Заменить логотип",
+  "removeLogo": "Удалить логотип",
+  "uploading": "Загрузка…",
+  "errorTooLarge": "Файл слишком большой, максимум {max}",
+  "errorWrongType": "Тип файла не поддерживается (только PNG / JPEG / WEBP / GIF)",
+  "confirmRemoveLogo": "Удалить текущий логотип?"
+},
   "notes": {
     "title": "Заметки",
     "newNote": "+ Новая заметка",
