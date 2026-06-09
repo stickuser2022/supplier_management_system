@@ -299,6 +299,7 @@ model Note {
   quoteId     Int?     @map("quote_id")
   contentZh   String   @map("content_zh")
   contentRu   String?  @map("content_ru")
+  contentRuAutoTranslated  Boolean  @default(true) @map("content_ru_auto_translated")
   happenedAt  DateTime @map("happened_at") //事件发生时间
   isActive    Boolean  @default(true) @map("is_active") //是否启用
   createdAt   DateTime @default(now()) @map("created_at")

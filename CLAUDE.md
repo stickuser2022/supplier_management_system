@@ -1006,71 +1006,45 @@ RU    俄文
 
 ---
 
-## 2026.6.8 项目进度日志(阶段 4.5 里程碑 1c 完成:编辑 + 软删除 + 恢复)
+## 2026.6.8 项目进度日志(阶段 4.5 里程碑 1d.0 完成:供应商详情页)
 
-### 当前阶段:阶段 4.5 进行中,里程碑 1c 完成,准备进入 1d
+### 当前阶段:阶段 4.5 进行中,1d.0 完成,准备进入 1d.1
 
-### 里程碑 1c 范围
+### 里程碑 1d.0 范围
 
-供应商完整生命周期:**新建(1a/1b 已完成)+ 编辑 + 软删除 + 恢复**。1c 新增编辑路由、初值预填、editable code 锁定、归档视图、停用确认对话框、恢复操作——同时复用了 1a/1b 大部分代码(Server Action / Form 组件 / Zod schema)。
+供应商详情页(`/suppliers/[id]`)—— 后续 1d.1 / 1d.2 / 1d.3 的容器。本步骤只搭骨架,Contact / Quote / Note / Transaction 4 个区段保留占位(灰色 "+ 添加(尚未实现)" 按钮 + "尚未实现" 提示),分别在 1d.1 / 1d.2 / 1d.3 / 后续阶段填充。
 
-### 关键架构决策
+### 关键架构决策(1d 整体 + 1d.0 具体)
 
-- **编辑与新建共用一份 SupplierForm**:通过可选 `initialData` prop 区分模式(`isEdit = Boolean(initialData)`),无 initialData 是新建,有则编辑。**单一组件、两种模式**,避免重复代码
-- **`.bind(null, id)` 把 update 签名对齐 create**:`updateSupplier(id, prevState, formData)` 经 `.bind(null, initialData.id)` 后变成 `(prevState, formData)`,与 `createSupplier` 同型,可由统一 `useActionState` 接管。这是 Next.js Server Actions 传递额外参数的标准模式
-- **`code` 字段编辑模式只读**(D3=B):一旦 Admin 输入并保存,该编号对外用于发票/合同/沟通,改了会导致纸面追溯断链。`readOnly` + 灰底 + 旁边说明;真要规范化编号走 Prisma Studio 这个逃生通道
-- **archive 操作走 `window.confirm`**(D1=A):停用是低频高风险操作,1 秒确认换永不误操作的安全感
-- **archived 视图 + 恢复按钮**(D2=B):通过 URL search param 切换(`/suppliers` vs `/suppliers?archived=1`)。已停用行在归档视图里有独立的「↩️ 恢复」按钮。URL 驱动而非 client state,可分享、可刷新保留状态
-- **编辑入口只对活跃供应商开放**:`/suppliers/[id]/edit` 在 supplier 已停用时直接 `notFound()`。设计意图:避免"我正在编辑一个已停用的东西"的状态歧义,Admin 想改归档项必须先恢复
-- **uncontrolled fields 用 `defaultValue` 预填**:code / 经纬度 / 合作深度 / 认识渠道 / 网址 这些非双语字段不进 useState,只在编辑模式下用 `defaultValue` 把初值塞进 DOM,提交时由 FormData 自动收集。少一份 state 少一份 bug
-- **DEV_FALLBACK_ADMIN_ID 兜底机制延续**:1c 三个新 Server Actions 不需要重新读 session(archive/restore 没有 createdById 概念,update 不动这字段),所以无新增 auth 处理
+- **子实体走独立路由**(D1=A):`/suppliers/[id]/contacts/new`、`/contacts/[contactId]/edit` 这类独立 URL,与 1a-1c 路由风格一致;放弃详情页内行内编辑(state 复杂、与项目其他部分风格不一致)
+- **整行名称作为详情链接**(D2=A):列表行供应商名变蓝色下划线 `<Link>`,点击跳 `/suppliers/[id]`。编辑 / 停用按钮保留在操作列
+- **单页垂直堆叠**(D3=A):详情页不分 tab,基本信息 + 4 个子区段上下排列。Phase 6 美化时可改 tabs(信息密度高时再说)
+- **详情页可访问已停用供应商**:archived 状态下详情页仍渲染,但顶部出现 ⚠️ 警示条 + 操作按钮变成"恢复"(没有编辑 / 停用)。**与 `/edit` 路由的"已停用直接 404"区分**——查看可以、修改不行。设计意图:Admin 可看归档数据决定是否恢复,但不能直接绕过软删除约束修改
+- **`<dl> <dt> <dd>` 语义标签做键值对列表**:HTML 原生定义列表标签,语义比 `<div>` 堆 label-value 更准确;配合 `grid-cols-[max-content_1fr]` Tailwind 任意值实现"标签宽度自适应,值占满剩余空间"
 
 ### 已完成
 
-- ✅ `_actions/supplier-actions.ts` — 追加 `updateSupplier`(显式列出可改字段,刻意排除 code 和 createdById)、`archiveSupplier`、`restoreSupplier`
-- ✅ `_components/SupplierForm.tsx` — 加 `SupplierFormInitialData` 类型 + `buildBilingualFromInitial` 转换函数;主组件加 `initialData?` prop,按是否传决定 action 和初值
-- ✅ `[id]/edit/page.tsx` — 新建动态路由,服务端组件,prisma findUnique + notFound 双重防御(id 非法 / 不存在 / 已停用)
-- ✅ `_components/SupplierActionsCell.tsx` — 新建客户端组件,封装编辑链接 + 停用按钮(带 confirm) + 恢复按钮,根据 isActive 渲染不同形态
-- ✅ `page.tsx` — 列表页加 `searchParams` 解析、archived 视图切换、操作列、按 createdAt desc 排序
-- ✅ `messages/{zh,ru}.json` — 加 `suppliers.activeView` / `archivedView`、`columns.actions`(字符串)、`actions.*`(对象含 edit/archive/restore/confirmArchive)
-- ✅ 端到端验证:编辑预填 + code 只读 + 更新成功;停用 confirm + 行消失;archived 视图显示 + 恢复 + 行返回活跃视图
+- ✅ `src/app/suppliers/[id]/page.tsx` — 新建动态路由,服务端组件,`parseInt + notFound` 双重防御(参数合法 + 资源存在)+ 渲染基本信息 + 4 个占位区段
+- ✅ `src/app/suppliers/page.tsx` — 列表名字单元格包成 `<Link href={\`/suppliers/${s.id}\`}>`
+- ✅ `messages/zh.json` + `messages/ru.json` — 新增 `supplierDetail` 命名空间,含 back / archivedWarning / sections.{basicInfo, contacts, quotes, notes, transactions} / fields.{code, name, shortName, address, coordinates, cooperationLevel, discoveredVia, website, description, createdAt} / placeholder.{addButton, notImplemented} 共 ~18 个 key
+- ✅ 端到端验证:列表名字 → 详情页跳转;中俄双视图渲染齐全;已停用警示条出现 + 单恢复按钮;占位按钮 disabled
 
-### 本轮新概念(给未来对话的避坑笔记)
+### 本轮新概念
 
-- **`.bind(null, ...args)` 适配 Server Action 签名**:`func.bind(null, x)` 返回一个新函数,把第一个参数提前绑死。`useActionState` 要求 action 签名固定 `(prevState, formData)`,用 bind 把额外参数消化掉
-- **`notFound()` 在服务端组件**:`import { notFound } from 'next/navigation'` 调用即跳 404 页,比 `return null` 干净。用于参数不合法或资源不存在的早退
-- **`defaultValue` vs `value`**:`defaultValue` 是非受控初值(浏览器接管,React 只设第一次),`value` + `onChange` 是受控(React 接管)。编辑模式 prefill 非双语字段用前者就够,避免无谓的 state
-- **`params: Promise<{ id: string }>` 必须 await**:Next.js 15+ 把动态路由 params 改成 Promise(支持流式)。旧文章里 `params.id` 直接访问的写法在新版会报错,**新版必须 `const { id } = await params`**
-- **URL 搜索参数驱动视图切换**:`?archived=1` 在服务端组件用 `searchParams` 拿到,根据值改 prisma `where` 条件。视图切换用 `<Link>` 而非 `<button onClick>`(后者只改 client state、刷新就丢)
-- **`window.confirm` 用于低频高风险操作**:不需要全局通知组件,2 行代码完成"取消/确定"二选一。注意必须在客户端组件里调
+- **同一 `[id]` 文件夹下可有多个 `page.tsx` 兄弟**:`[id]/page.tsx` 服务 `/suppliers/14`,`[id]/edit/page.tsx` 服务 `/suppliers/14/edit`。文件名相同但**所在文件夹不同**,Next.js 通过文件夹层级路由,不冲突
+- **`[id]` 是文件夹名约定,URL 里出现真实值**:`/suppliers/[id]` 字面 URL 不存在(`parseInt("[id]")` 是 NaN → 404)。必须从 list `<Link>` 跳或手输真实数字
+- **`<a target="_blank" rel="noopener noreferrer">`**:外链必须配套——防止新 tab 反向操作原页面 + 防 referrer header 泄露,Web 安全标配
+- **`<dl> <dt> <dd>` + Tailwind `grid-cols-[max-content_1fr]`**:语义化键值对渲染的标准方案,中俄 label 长度不同也能自适应
 
 ### 本轮踩到的坑
 
-- ❌ **AI 给的 JSON 占位符被字面粘贴**:我上一轮用 "...(保留原内容)" 作占位符,意图是"你这里原来啥就保留啥",用户照字面意思粘进去,导致 messages 文件出现实际值是 "..." 的字段 + 错位嵌套(`columns` 里又出现一个 `columns`)。**教训:AI 给 JSON 一律完整写全,不写占位符**——以后这条 AI 协作准则补到 CLAUDE.md 的协作约定章节
-- ❌ **'use server' 文件不能 export 对象**(1b 已记,1c 复用经验)
+- ❌ **复制 JSX 代码时漏粘开标签 `<a`**:多行属性的标签开头容易被漏,parser 报 "Unexpected token >" 但错误行号误导(报闭合附近)。**经验**:VS Code 光标放在闭合标签上会高亮开标签,失配则定位异常
+- ❌ **`messages/{zh,ru}.json` 同步漏一边**(1c / 1d.0 都中招):本轮 zh.json 漏 `supplierDetail` 命名空间。**养成"双语成对改"习惯,改一份立刻改另一份**,不要分两次
+- ❌ **`[id]` 文件夹混淆**:Admin 误访问 `localhost:3000/suppliers/[id]` 字面 URL → 404。**文件夹的方括号是 Next.js 动态段约定,URL 里是真实值**——首次接触 dynamic routes 容易栽
 
 ### 待办
 
-1. ~~阶段 4.5 里程碑 1a / 1b / 1c 完成~~ ✅
-2. **里程碑 1d — 套模板到 Contact / Quote / Note** + **同步 CLAUDE.md 文档差异**。每个实体都是"新建 + 编辑 + 软删除"完整循环,大部分能复用 1a/1c 的模式。**注意 1d 需要新增 supplier 详情页**(`/suppliers/[id]`)作为 Contact/Quote/Note 的管理容器,目前没有这一页 ← 下次起点
-3. 阶段 5 — 文件存储抽象层 + 上传 UI
-4. 阶段 6 — UI 美化
-
-### 下一轮对话开始时的入口
-
-直接说:**「进入里程碑 1d」**
-
-**1d 路线预览**(可能比 1a-1c 加起来都长,因为是 3 个实体):
-
-1. **先建 Supplier 详情页** `/suppliers/[id]/page.tsx` — 显示供应商基本信息 + 嵌入 Contact / Quote / Note 子列表 + 各自"+ 新建"按钮。这是 1d 所有 CRUD 的容器
-2. **决策分支:子实体 CRUD 用独立路由还是详情页内行内编辑**
-   - 独立路由:`/suppliers/[id]/contacts/new`、`/contacts/[contactId]/edit` 等(结构清晰但路由多)
-   - 行内编辑:详情页内开抽屉/卡片(无路由跳转但 state 复杂)
-   - 我倾向独立路由(与 supplier 风格一致),具体开 1d 时讨论
-3. **Contact** — `isPrimary` 唯一性应用层保证(同 supplier 至多 1 个 primary,事务里实现)
-4. **Quote** — Decimal 字段、Currency 枚举、日期字段、Many-to-Many Tag 关联(PRODUCT 类型 tag 选择器)
-5. **Note** — 按需翻译模式(content_ru 是 Admin 手填的逃生通道,无 AI 自动翻译);double time(happenedAt 可填过去日期 vs createdAt 自动)
-6. **顺手同步 CLAUDE.md User 表段落 + Supplier.code / discoveredVia 字段描述**与现实 schema 对齐
-7. **AI 协作准则补一条**:JSON 一律完整写全,不写占位符
-
-预计 1d 用 4-6 轮对话收尾(每实体 1-2 轮 + 详情页 + 文档同步)。
+1. ~~阶段 4.5 里程碑 1a / 1b / 1c / 1d.0 完成~~ ✅
+2. **里程碑 1d.1 — Contact CRUD**:`/suppliers/[id]/contacts/new`、`/contacts/[contactId]/edit`。模式与 Supplier 同源(双语字段 + 翻译按钮 + 锁定逻辑),但有几个特殊点:**`isPrimary` 同 supplier 唯一性应用层保证**(事务里先把其他 contact 的 isPrimary 改 false,再设当前为 true);**6 个联系方式字段"按需添加"UI**(默认不显示输入框,点击 "+ 添加联系方式" 才出现);**status 用 `ContactStatus` 枚举(ACTIVE / ARCHIVED)而非 `isActive: Boolean`**——这是 Contact 与 Supplier 的细微差异。详情页"联系人"占位换成真实列表 + 主要联系人星标 + "+ 添加联系人"按钮 ← 下次起点
+3. **里程碑 1d.2 — Quote CRUD**:Decimal / Currency / Date / Tag 多对多
+4. **里程碑 1d.3 — Note CRUD**:按需翻译模式(无 AI 翻译按钮,content_ru 为 Admin 手填逃生通道)

@@ -4,6 +4,9 @@ import { getTranslations, getLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { pickLocalized } from '@/i18n/pick-localized';
 import { SupplierActionsCell } from '../_components/SupplierActionsCell';
+import { ContactsList } from './contacts/_components/ContactsList';
+import { QuotesList } from './quotes/_components/QuotesList';
+import { NotesList } from './notes/_components/NotesList';
 
 export default async function SupplierDetailPage({
   params,
@@ -120,9 +123,9 @@ export default async function SupplierDetailPage({
       </section>
 
       {/* 4 个占位区段(后续里程碑填充)*/}
-      <PlaceholderSection title={t('sections.contacts')} t={t} />
-      <PlaceholderSection title={t('sections.quotes')} t={t} />
-      <PlaceholderSection title={t('sections.notes')} t={t} />
+      <ContactsList supplierId={supplier.id} />
+      <QuotesList supplierId={supplier.id} />
+      <NotesList supplierId={supplier.id} />
       <PlaceholderSection title={t('sections.transactions')} t={t} />
     </div>
   );

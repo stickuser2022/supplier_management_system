@@ -1,4 +1,52 @@
 {
+  "notes": {
+    "title": "沟通记录",
+    "newNote": "+ 新建记录",
+    "empty": "暂无沟通记录",
+    "actions": {
+      "edit": "编辑",
+      "archive": "归档",
+      "restore": "恢复",
+      "confirmArchive": "确定归档这条记录吗?\n「{preview}」"
+    }
+  },
+  "quotes": {
+    "title": "报价记录",
+    "newQuote": "+ 新建报价",
+    "empty": "暂无报价",
+    "columns": {
+      "product": "产品",
+      "price": "单价",
+      "tags": "品类",
+      "quotedAt": "报价日期",
+      "validUntil": "有效期",
+      "actions": "操作"
+    },
+    "actions": {
+      "edit": "编辑",
+      "archive": "归档",
+      "restore": "恢复",
+      "confirmArchive": "确定归档「{name}」的报价吗?"
+    }
+  },
+  "contacts": {
+    "title": "联系人",
+    "newContact": "+ 新建联系人",
+    "empty": "暂无联系人,点右上角添加",
+    "columns": {
+      "name": "姓名",
+      "role": "职位",
+      "contact": "联系方式",
+      "actions": "操作"
+    },
+    "actions": {
+      "edit": "编辑",
+      "archive": "归档",
+      "restore": "恢复",
+      "setPrimary": "设为主要",
+      "confirmArchive": "确定归档「{name}」吗?"
+    }
+  },
   "metadata": {
     "title": "供应商管理系统",
     "description": "青格力跨境采购供应商管理"
