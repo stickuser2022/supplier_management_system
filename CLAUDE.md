@@ -1006,56 +1006,71 @@ RU    俄文
 
 ---
 
-## 2026.6.8 项目进度日志(阶段 4.5 里程碑 1b 完成:翻译预览 + 锁定逻辑)
+## 2026.6.8 项目进度日志(阶段 4.5 里程碑 1c 完成:编辑 + 软删除 + 恢复)
 
-### 当前阶段:阶段 4.5 进行中,里程碑 1b 完成,准备进入 1c
+### 当前阶段:阶段 4.5 进行中,里程碑 1c 完成,准备进入 1d
 
-### 里程碑 1b 范围
+### 里程碑 1c 范围
 
-供应商表单加 7 个俄文字段输入框 + "自动翻译俄文"总按钮 + `_ru_auto_translated` 锁定逻辑。完整工作流:Admin 填中文 → 点翻译 → AI 自动填俄文 → Admin 肉眼核对 → 手改某字段 → 该字段自动上锁(🔒 已手改 + flag → false)→ 再次点翻译时该字段跳过 → 提交后数据库 7 zh + 7 ru + 7 flag 完整记录
+供应商完整生命周期:**新建(1a/1b 已完成)+ 编辑 + 软删除 + 恢复**。1c 新增编辑路由、初值预填、editable code 锁定、归档视图、停用确认对话框、恢复操作——同时复用了 1a/1b 大部分代码(Server Action / Form 组件 / Zod schema)。
 
 ### 关键架构决策
 
-- **部分受控表单**:7 个 zh + 7 个 ru + 7 个 flag 全由一个 `useState` 对象管理(为了让翻译按钮能编程式填值、锁定逻辑能跟踪手改),其他字段(code / 经纬度 / 合作深度 / 认识渠道 / 网址)仍非受控
-- **`useTransition` 包翻译异步**:替代手写 useState loading,自动给出 isPending 布尔,符合 React 19 惯例
-- **翻译走 Server Action,不开 API Route**:`translateSupplierFields` 标记 `'use server'`,客户端按钮直接 RPC 调用。API key 留服务端,与 1a Server Actions 路线一致
-- **批量调用 `translateBatch`**:7 字段打包一次 HTTP 请求,降级(provider 不支持 batch 时改并发逐条)由阶段 4 抽象层负责,业务代码无感
-- **锁定语义"保护手改"**:Admin 手改俄文字段 → flag 自动 false → 再次点翻译时该字段跳过。与阶段 4 backfill 脚本"flag=false 永不覆盖"语义一致,Admin 工作成果在表单环境得到同等保护
-- **🔒 视觉提示**:手改字段标签右侧显示 `🔒 已手改` Amber 色小标识,Admin 一眼分清哪些字段已上锁
-- **空中文字段跳过翻译**:不浪费 API 配额。**显式拒绝把"AI 生成 shortName"嵌入 translate prompt**——保留 translate 抽象层的纯翻译边界(避免绑死 LLM,Google NMT 切回时仍可用),AI 生成内容应作为未来 ✨ 按钮显式触发功能
+- **编辑与新建共用一份 SupplierForm**:通过可选 `initialData` prop 区分模式(`isEdit = Boolean(initialData)`),无 initialData 是新建,有则编辑。**单一组件、两种模式**,避免重复代码
+- **`.bind(null, id)` 把 update 签名对齐 create**:`updateSupplier(id, prevState, formData)` 经 `.bind(null, initialData.id)` 后变成 `(prevState, formData)`,与 `createSupplier` 同型,可由统一 `useActionState` 接管。这是 Next.js Server Actions 传递额外参数的标准模式
+- **`code` 字段编辑模式只读**(D3=B):一旦 Admin 输入并保存,该编号对外用于发票/合同/沟通,改了会导致纸面追溯断链。`readOnly` + 灰底 + 旁边说明;真要规范化编号走 Prisma Studio 这个逃生通道
+- **archive 操作走 `window.confirm`**(D1=A):停用是低频高风险操作,1 秒确认换永不误操作的安全感
+- **archived 视图 + 恢复按钮**(D2=B):通过 URL search param 切换(`/suppliers` vs `/suppliers?archived=1`)。已停用行在归档视图里有独立的「↩️ 恢复」按钮。URL 驱动而非 client state,可分享、可刷新保留状态
+- **编辑入口只对活跃供应商开放**:`/suppliers/[id]/edit` 在 supplier 已停用时直接 `notFound()`。设计意图:避免"我正在编辑一个已停用的东西"的状态歧义,Admin 想改归档项必须先恢复
+- **uncontrolled fields 用 `defaultValue` 预填**:code / 经纬度 / 合作深度 / 认识渠道 / 网址 这些非双语字段不进 useState,只在编辑模式下用 `defaultValue` 把初值塞进 DOM,提交时由 FormData 自动收集。少一份 state 少一份 bug
+- **DEV_FALLBACK_ADMIN_ID 兜底机制延续**:1c 三个新 Server Actions 不需要重新读 session(archive/restore 没有 createdById 概念,update 不动这字段),所以无新增 auth 处理
 
 ### 已完成
 
-- ✅ `_validations/supplier-schema.ts` — 扩展 14 个新字段(7 ru + 7 flag),含 `stringToBool` 三段链:`z.enum(["true","false"]).default("true").transform(v => v === "true")`
-- ✅ `_actions/supplier-actions.ts` — 新增 `translateSupplierFields` Server Action 调 `translateBatch`;扩展 `createSupplier` 接受新字段,俄文空字符串转 null 入库;**删除原 `INITIAL_SUPPLIER_FORM_STATE` 常量导出**(违反 'use server' 文件规则)
-- ✅ `_components/SupplierForm.tsx` — 重写为部分受控:21 字段 `BilingualState` + 翻译按钮 + 锁定逻辑 + 🔒 提示。抽出 `BilingualFieldRow` 子组件减少 7 倍重复
-- ✅ 端到端验证:不翻译路径(ru=NULL,列表页 `pickLocalized` 回退到 zh) + 翻译路径(7 字段全填 + 手改保留 + 锁定标志正确入库)双路径通过
+- ✅ `_actions/supplier-actions.ts` — 追加 `updateSupplier`(显式列出可改字段,刻意排除 code 和 createdById)、`archiveSupplier`、`restoreSupplier`
+- ✅ `_components/SupplierForm.tsx` — 加 `SupplierFormInitialData` 类型 + `buildBilingualFromInitial` 转换函数;主组件加 `initialData?` prop,按是否传决定 action 和初值
+- ✅ `[id]/edit/page.tsx` — 新建动态路由,服务端组件,prisma findUnique + notFound 双重防御(id 非法 / 不存在 / 已停用)
+- ✅ `_components/SupplierActionsCell.tsx` — 新建客户端组件,封装编辑链接 + 停用按钮(带 confirm) + 恢复按钮,根据 isActive 渲染不同形态
+- ✅ `page.tsx` — 列表页加 `searchParams` 解析、archived 视图切换、操作列、按 createdAt desc 排序
+- ✅ `messages/{zh,ru}.json` — 加 `suppliers.activeView` / `archivedView`、`columns.actions`(字符串)、`actions.*`(对象含 edit/archive/restore/confirmArchive)
+- ✅ 端到端验证:编辑预填 + code 只读 + 更新成功;停用 confirm + 行消失;archived 视图显示 + 恢复 + 行返回活跃视图
 
 ### 本轮新概念(给未来对话的避坑笔记)
 
-- **受控 vs 非受控输入**:`value={state}` + `onChange={...}` 必须成对。漏一个 → React 警告 `controlled to uncontrolled` 或反之
-- **`useTransition` 包异步状态**:`[isPending, startTransition]`,`startTransition(async () => {...})` 自动管理 pending 布尔,不用手写 loading
-- **hidden input 传非用户输入数据**:布尔 flag 没可视输入框但要送服务端 → `<input type="hidden" name=".." value={bool ? 'true' : 'false'} />` + 服务端 Zod `stringToBool` 还原
-- **`type="button"` 至关重要**:`<button>` 默认在 form 内被当 submit;form 内非提交按钮必须显式标 `type="button"`,否则误触发表单提交
-- **`'use server'` 文件只允许 async 函数导出**:不能 `export const xxx = {...}` 对象/常量(类型 OK,因运行时擦除)。常量挪到业务组件文件
-- **Zod 4 自定义转换链**:`.enum().default().transform()` 把表单字符串布尔还原成真布尔
+- **`.bind(null, ...args)` 适配 Server Action 签名**:`func.bind(null, x)` 返回一个新函数,把第一个参数提前绑死。`useActionState` 要求 action 签名固定 `(prevState, formData)`,用 bind 把额外参数消化掉
+- **`notFound()` 在服务端组件**:`import { notFound } from 'next/navigation'` 调用即跳 404 页,比 `return null` 干净。用于参数不合法或资源不存在的早退
+- **`defaultValue` vs `value`**:`defaultValue` 是非受控初值(浏览器接管,React 只设第一次),`value` + `onChange` 是受控(React 接管)。编辑模式 prefill 非双语字段用前者就够,避免无谓的 state
+- **`params: Promise<{ id: string }>` 必须 await**:Next.js 15+ 把动态路由 params 改成 Promise(支持流式)。旧文章里 `params.id` 直接访问的写法在新版会报错,**新版必须 `const { id } = await params`**
+- **URL 搜索参数驱动视图切换**:`?archived=1` 在服务端组件用 `searchParams` 拿到,根据值改 prisma `where` 条件。视图切换用 `<Link>` 而非 `<button onClick>`(后者只改 client state、刷新就丢)
+- **`window.confirm` 用于低频高风险操作**:不需要全局通知组件,2 行代码完成"取消/确定"二选一。注意必须在客户端组件里调
 
 ### 本轮踩到的坑
 
-- ❌ **`'use server'` 文件混导出对象常量** → 报错 `A "use server" file can only export async functions, found object`。1a 时埋雷,1b 复杂导出场景下 Next.js 才抛出。补救:常量移到组件文件
-- ❌ **`type="button"` 漏写**(本轮提前规避,未实际中招,但写文档备查)
+- ❌ **AI 给的 JSON 占位符被字面粘贴**:我上一轮用 "...(保留原内容)" 作占位符,意图是"你这里原来啥就保留啥",用户照字面意思粘进去,导致 messages 文件出现实际值是 "..." 的字段 + 错位嵌套(`columns` 里又出现一个 `columns`)。**教训:AI 给 JSON 一律完整写全,不写占位符**——以后这条 AI 协作准则补到 CLAUDE.md 的协作约定章节
+- ❌ **'use server' 文件不能 export 对象**(1b 已记,1c 复用经验)
 
 ### 待办
 
-1. ~~阶段 4.5 里程碑 1a / 1b 完成~~ ✅
-2. **里程碑 1c — 编辑 + 软删除**:`/suppliers/[id]/edit` 路由,SupplierForm 改造支持 `initialData` prop;新 `updateSupplier` / `archiveSupplier` Server Actions;列表页加编辑链接 + 停用按钮 ← 下次起点
-3. **里程碑 1d — 套模板到 Contact / Quote / Note** + 同步 CLAUDE.md 文档差异
-4. 阶段 5 — 文件存储抽象层 + 上传 UI
-5. 阶段 6 — UI 美化
+1. ~~阶段 4.5 里程碑 1a / 1b / 1c 完成~~ ✅
+2. **里程碑 1d — 套模板到 Contact / Quote / Note** + **同步 CLAUDE.md 文档差异**。每个实体都是"新建 + 编辑 + 软删除"完整循环,大部分能复用 1a/1c 的模式。**注意 1d 需要新增 supplier 详情页**(`/suppliers/[id]`)作为 Contact/Quote/Note 的管理容器,目前没有这一页 ← 下次起点
+3. 阶段 5 — 文件存储抽象层 + 上传 UI
+4. 阶段 6 — UI 美化
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进入里程碑 1c,做编辑 + 软删除」**
+直接说:**「进入里程碑 1d」**
 
-**1c 路线预览**:
-1. 新路由 `src/ap
+**1d 路线预览**(可能比 1a-1c 加起来都长,因为是 3 个实体):
+
+1. **先建 Supplier 详情页** `/suppliers/[id]/page.tsx` — 显示供应商基本信息 + 嵌入 Contact / Quote / Note 子列表 + 各自"+ 新建"按钮。这是 1d 所有 CRUD 的容器
+2. **决策分支:子实体 CRUD 用独立路由还是详情页内行内编辑**
+   - 独立路由:`/suppliers/[id]/contacts/new`、`/contacts/[contactId]/edit` 等(结构清晰但路由多)
+   - 行内编辑:详情页内开抽屉/卡片(无路由跳转但 state 复杂)
+   - 我倾向独立路由(与 supplier 风格一致),具体开 1d 时讨论
+3. **Contact** — `isPrimary` 唯一性应用层保证(同 supplier 至多 1 个 primary,事务里实现)
+4. **Quote** — Decimal 字段、Currency 枚举、日期字段、Many-to-Many Tag 关联(PRODUCT 类型 tag 选择器)
+5. **Note** — 按需翻译模式(content_ru 是 Admin 手填的逃生通道,无 AI 自动翻译);double time(happenedAt 可填过去日期 vs createdAt 自动)
+6. **顺手同步 CLAUDE.md User 表段落 + Supplier.code / discoveredVia 字段描述**与现实 schema 对齐
+7. **AI 协作准则补一条**:JSON 一律完整写全,不写占位符
+
+预计 1d 用 4-6 轮对话收尾(每实体 1-2 轮 + 详情页 + 文档同步)。

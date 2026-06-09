@@ -38,6 +38,33 @@
       "confirmArchive": "确定停用「{name}」吗?"
     }
   },
+  "supplierDetail": {
+    "back": "← 返回列表",
+    "archivedWarning": "⚠️ 此供应商已停用,数据仅供查看。恢复后可编辑。",
+    "sections": {
+      "basicInfo": "基本信息",
+      "contacts": "联系人",
+      "quotes": "报价记录",
+      "notes": "沟通记录",
+      "transactions": "交易记录"
+    },
+    "fields": {
+      "code": "编号",
+      "name": "全名",
+      "shortName": "简称",
+      "address": "地址",
+      "coordinates": "经纬度",
+      "cooperationLevel": "合作深度",
+      "discoveredVia": "认识渠道",
+      "website": "官网",
+      "description": "备注 / 描述",
+      "createdAt": "创建时间"
+    },
+    "placeholder": {
+      "addButton": "+ 添加(尚未实现)",
+      "notImplemented": "尚未实现"
+    }
+  },
   "map": {
     "legendTitle": "合作深度",
     "clearFilter": "清除筛选"

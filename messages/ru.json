@@ -38,6 +38,33 @@
       "confirmArchive": "Архивировать «{name}»?"
     }
   },
+  "supplierDetail": {
+    "back": "← Назад к списку",
+    "archivedWarning": "⚠️ Этот поставщик архивирован, данные доступны только для просмотра. Восстановите для редактирования.",
+    "sections": {
+      "basicInfo": "Основная информация",
+      "contacts": "Контакты",
+      "quotes": "Предложения",
+      "notes": "Заметки",
+      "transactions": "Заказы"
+    },
+    "fields": {
+      "code": "Код",
+      "name": "Полное название",
+      "shortName": "Сокращённое название",
+      "address": "Адрес",
+      "coordinates": "Координаты",
+      "cooperationLevel": "Уровень сотрудничества",
+      "discoveredVia": "Источник",
+      "website": "Веб-сайт",
+      "description": "Описание / Заметки",
+      "createdAt": "Дата создания"
+    },
+    "placeholder": {
+      "addButton": "+ Добавить (не реализовано)",
+      "notImplemented": "Скоро будет реализовано"
+    }
+  },
   "map": {
     "legendTitle": "Уровень сотрудничества",
     "clearFilter": "Сбросить фильтр"

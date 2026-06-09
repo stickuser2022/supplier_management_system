@@ -68,7 +68,14 @@ export default async function SuppliersPage({
           {suppliers.map((s) => (
             <tr key={s.id}>
               <td className="border p-2">{s.code}</td>
-              <td className="border p-2">{pickLocalized(s.nameZh, s.nameRu, locale)}</td>
+              <td className="border p-2">
+              <Link
+                href={`/suppliers/${s.id}`}
+                className="text-blue-600 hover:underline"
+              >
+                {pickLocalized(s.nameZh, s.nameRu, locale)}
+              </Link>
+            </td>
               <td className="border p-2">
                 {pickLocalized(s.provinceZh, s.provinceRu, locale)} / {pickLocalized(s.cityZh, s.cityRu, locale)}
               </td>
