@@ -42,7 +42,17 @@
   "save": "保存",
   "saving": "保存中…",
   "cancel": "取消",
-  "errorTitleZhEmpty": "请先填写中文标题"
+  "errorTitleZhEmpty": "请先填写中文标题",
+  "quoteImagesTitle": "报价图",
+  "quoteImagesEmpty": "暂无报价图",
+  "uploadQuoteImages": "上传图片",
+  "quoteImageAcceptHint": "图片,最大 10MB",
+  "cover": "封面",
+  "setAsCover": "设为封面",
+  "moveUp": "上移",
+  "moveDown": "下移",
+  "coverFixed": "封面位置固定"
+  
 },
   "notes": {
     "title": "沟通记录",

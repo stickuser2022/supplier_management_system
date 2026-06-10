@@ -41,7 +41,16 @@
   "save": "Сохранить",
   "saving": "Сохранение…",
   "cancel": "Отмена",
-  "errorTitleZhEmpty": "Сначала заполните название на китайском"
+  "errorTitleZhEmpty": "Сначала заполните название на китайском",
+  "quoteImagesTitle": "Изображения предложения",
+  "quoteImagesEmpty": "Изображения отсутствуют",
+  "uploadQuoteImages": "Загрузить изображения",
+  "quoteImageAcceptHint": "Изображение, до 10 МБ",
+  "cover": "Обложка",
+  "setAsCover": "Сделать обложкой",
+  "moveUp": "Вверх",
+  "moveDown": "Вниз",
+  "coverFixed": "Положение обложки фиксировано"
 },
   "notes": {
     "title": "Заметки",
