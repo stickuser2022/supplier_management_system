@@ -35,7 +35,13 @@
   "uploadBatchDone": "Загрузка завершена: успешно {ok}, ошибок {fail}",
 
   "errorBrochureType": "Каталог принимает только изображения и PDF",
-  "errorDocType": "Документ принимает изображения / PDF / Word / Excel"
+  "errorDocType": "Документ принимает изображения / PDF / Word / Excel",
+  "editTitleHeading": "Редактирование названия файла",
+  "backToSupplier": "Назад к поставщику",
+  "save": "Сохранить",
+  "saving": "Сохранение…",
+  "cancel": "Отмена",
+  "errorTitleZhEmpty": "Сначала заполните название на китайском"
 },
   "notes": {
     "title": "Заметки",

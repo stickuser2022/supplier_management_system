@@ -1,4 +1,5 @@
 {
+
 "files": {
   "uploadLogo": "上传 LOGO",
   "replaceLogo": "替换 LOGO",
@@ -35,7 +36,13 @@
   "uploadBatchDone": "上传完成:{ok} 成功,{fail} 失败",
 
   "errorBrochureType": "画册仅接受图片或 PDF",
-  "errorDocType": "文档接受图片 / PDF / Word / Excel"
+  "errorDocType": "文档接受图片 / PDF / Word / Excel",
+  "editTitleHeading": "编辑文件标题",
+  "backToSupplier": "返回供应商详情",
+  "save": "保存",
+  "saving": "保存中…",
+  "cancel": "取消",
+  "errorTitleZhEmpty": "请先填写中文标题"
 },
   "notes": {
     "title": "沟通记录",

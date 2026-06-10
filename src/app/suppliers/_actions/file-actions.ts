@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { translateBatch } from '@/lib/translate';
 import { fileTitleSchema } from '../_validations/file-schema';
+import { redirect } from 'next/navigation'; 
 
 // ─── 清除 LOGO(原有,保留)────────────────────────────────────
 export async function clearSupplierLogo(
@@ -96,12 +97,12 @@ export async function updateFileTitle(
     };
   }
 
-  try {
-    const supplierId = await getFileSupplierId(fileId);
-    if (!supplierId) {
-      return { status: 'error', message: '文件不存在' };
-    }
+  const supplierId = await getFileSupplierId(fileId);
+  if (!supplierId) {
+    return { status: 'error', message: '文件不存在' };
+  }
 
+  try {
     await prisma.file.update({
       where: { id: fileId },
       data: {
@@ -110,15 +111,15 @@ export async function updateFileTitle(
         titleRuAutoTranslated: parsed.data.titleRuAutoTranslated,
       },
     });
-
-    revalidatePath(`/suppliers/${supplierId}`);
-    return { status: 'success' };
   } catch (err) {
     return {
       status: 'error',
       message: '保存失败:' + (err instanceof Error ? err.message : '未知错误'),
     };
   }
+
+  revalidatePath(`/suppliers/${supplierId}`);
+  redirect(`/suppliers/${supplierId}`);
 }
 
 // ─── 触发文件标题的 AI 翻译(供编辑页"翻译"按钮调用)──────────
