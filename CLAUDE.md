@@ -1016,79 +1016,94 @@ RU    俄文
 
 ---
 
-## 2026.6.9 项目进度日志(阶段 4.5 里程碑 1d.1 + 1d.2 + 1d.3 完成:Contact / Quote / Note CRUD)
+## 2026.6.10 项目进度日志(阶段 5 里程碑 2a.0–2a.3 完成:存储抽象层 + LOGO 端到端)
 
-### 当前阶段:阶段 4.5 整体完成,准备 1d.4 文档同步或进入阶段 5
+### 当前阶段:阶段 5 第一片(SUPPLIER 资料文件)进行中,LOGO 跑通,BROCHURE / DOC 待做
 
 ### 里程碑范围
 
-1d.0 搭好详情页容器后,本轮一次性补完 3 个子实体的完整 CRUD(新建 + 编辑 + 归档 + 恢复)。供应商详情页的 4 个区段(联系人 / 报价 / 沟通记录 / 交易记录)前三个已嵌入真实组件,第四个(交易记录)保留占位等后续阶段。
+阶段 5 整体目标是"做一层存储抽象,让业务代码不知道文件是落在本地、OSS 还是 COS",路径与阶段 4 翻译抽象一致。本片(2a)聚焦供应商资料的三种文件类型——LOGO / BROCHURE / DOC,本轮把基础设施(2a.0–2a.2)+ 第一种 type 端到端(2a.3)做完。
 
 ### 关键架构决策
 
-- **3 实体共用同一翻译模式**:Contact(2 双语对)/ Quote(2 双语对)/ Note(1 双语对)全部走 Supplier 的"翻译预览 + AI 入库 + `_ru_auto_translated` 锁定"路线。**这是与 CLAUDE.md 原设计的重要偏离**——CLAUDE.md 原本规定 Note 走"按需翻译不入库"模式,1d.3 时改为入库,理由(用户决策):Note 一般是写一次少改的事件记录,不像 Supplier 备注会反复修改,AI 翻译一次入库划算;且 4 实体翻译模式统一后代码复用度高
-- **Note 表 schema 迁移**:新增 `contentRuAutoTranslated: Boolean @default(true)` 字段,使 Note 能加入"AI 翻译入库 + 锁定"语义。这是项目第一次在阶段 4.5 中做 schema 迁移(之前都在阶段 1 一次性完成)
-- **子实体路由就近共置**(D1=A):每个实体在 `[id]/<entity>/` 文件夹下自带 `_validations/` + `_actions/` + `_components/` + 路由页,与 Supplier 的就近共置风格一致
-- **删除模式不统一是有意为之**:Contact 用 `ContactStatus` 枚举(ACTIVE/ARCHIVED),Quote 用 `QuoteStatus` 枚举(ACTIVE/ARCHIVED),Supplier / Note 用 `isActive: Boolean`。**两种都对**,符合各表 CLAUDE.md 原设计:有更丰富语义需求时用枚举(留扩展口),纯二元状态用布尔
-- **Tag 走"已有多选 chip"**(Q1=A):Quote 表单从数据库已存的 PRODUCT 类型 tag 多选,种子数据由 Admin 在 Prisma Studio 提前手工录入(本轮已录 ~12 个常用品类)。**显式拒绝 Quote 表单内联建 Tag**,避免阶段 4.5 范围爆炸,留给未来"Tag 管理"阶段做
-- **Quote 编辑不锁字段**(Q3=A):与 Supplier 的 `code` 锁定不同,Quote 字段不会扩散到外部纸面(发票合同等),Admin 可自由修正录错
-- **Contact 6 联系方式全平铺**(C1=A):6 个字段(phone / wechat / email / whatsapp / telegram / qq)默认全显示,空的不填即可。放弃"+ 按需添加"UI——简洁但实现复杂,投入产出比不划算
-- **Quote-Tag 多对多用"先删后插"模式**:更新 Quote 时事务里 `deleteMany` 旧关联 + `createMany` 新关联,比 diff 增删简单可靠,数据量小时性能足够
-- **Decimal / Date 字段处理**:Prisma `Decimal` 用 `.toString()` 序列化给 form,Date 用 `.toISOString().slice(0, 10)` 转 `YYYY-MM-DD` 给 `<input type="date">`
+- **Route Handler 而非 Server Action**:大文件(画册 PDF 5-20MB、视频 50MB+)走 Next.js Server Action 默认 1MB body 限制扛不住,改走标准 `/api/upload` 多部分表单上传。Server Action 仍用于不涉及上传字节的小操作(如 clearSupplierLogo)
+- **存储抽象层四件套** (`src/lib/storage/`):types.ts 定义 `StorageProvider` 接口(put/get/delete/exists 四方法),key.ts 提供 `keyFor()` / `thumbKeyFor()` 纯函数,local.ts 实现本地文件系统,index.ts 按 `STORAGE_DRIVER` 环境变量挑 provider 并导出单例。未来加 OSS 只需新 provider 文件 + index.ts 加一个 case
+- **`keyFor(type, ownerId, filename)` 集中维护路径风格**:`{业务实体}/{ownerId}/{子分类}/{stamp}-{rand}-{safe-filename}`。改路径风格只改一个文件,业务调用方零感知
+- **`sanitizeFilename` 文件名净化**:非字母数字下划线短横线全替换为 `_`,扩展名小写,截断 60 字符,防止"../"目录穿越和中文文件名跨平台不稳
+- **`thumbKeyFor` 追加 `.thumb.webp` 而非替换扩展名**:`xxx.png` → `xxx.png.thumb.webp`,排错时一眼对得上原图,删原图也能查到孤儿缩略图
+- **写入顺序:存储先 → DB 后**:存储成功 DB 失败时清理孤儿文件,失败模式比"DB 成功存储失败"产生的幽灵记录友好。每条 catch 路径都做反向清理
+- **缩略图同步生成 + 失败容忍**:sharp 处理图片(300x300 inside resize + webp quality 80),缩略图失败只警告不阻断主流程(避免奇葩格式炸了整条链路)。视频缩略图留到 2a.5,需要系统装 ffmpeg
+- **LOGO 唯一性走 Prisma 事务**:同 Contact.isPrimary 模式,事务里 updateMany 旧 LOGO 归档 + create 新 LOGO,任何环节失败整体回滚
+- **文件访问通过专用路由**:`storage/` 不在 `public/`,浏览器不能直接访问。`/api/files/[id]` 校验登录态后流出文件;`?thumb=1` 走缩略图分支。`Content-Disposition: inline` + `filename*=UTF-8''xx` 编码非 ASCII 文件名;`Cache-Control: private, max-age=3600` 浏览器缓存 1 小时,CDN/代理不缓存
+- **临时安全债:DEV_FALLBACK_ADMIN_ID 兜底**:沿用 supplier-actions.ts 同一模式——session 拿不到时兜底为 admin user id。优点是当前阶段无需登录就能联调;**代价是 Route Handler 比 Server Action 暴露面更大**(curl 也能调)。阶段 2 完整接入认证 UI 后必须移除兜底,改强制要求 session,并真正引入 role gate
+- **`<img>` 而非 `<Image>`**:Next.js 的 Image 组件适合静态资源,不适合权限保护的动态 API URL,阶段 6 UI 美化时再视情况切
 
 ### 已完成
 
-**Contact**(1d.1):
-- ✅ `[id]/contacts/` 下 5 个文件:Zod schema / Server Actions(create/update/archive/restore/setPrimary/translate)/ ContactForm / ContactActionsCell / ContactsList
-- ✅ 2 个路由页:`new/` + `[contactId]/edit/`
-- ✅ `[id]/page.tsx` 嵌入 ContactsList(替换占位)
-- ✅ i18n `contacts` 命名空间
-- ✅ 端到端验证:翻译姓名职位 / 主要联系人唯一性事务 / 6 联系方式紧凑显示 / 归档恢复
+**2a.0 准备工作:**
+- ✅ `npm install sharp`(图片处理)
+- ✅ 项目根建 `storage/` 目录 + `.gitignore` 写 `*`(目录入 Git、内容不入)
+- ✅ `.env` / `.env.example` 补 `STORAGE_DRIVER` / `STORAGE_ROOT`
+- ✅ 验证 Prisma 客户端导出 `FileType` 枚举
 
-**Quote**(1d.2):
-- ✅ `[id]/quotes/` 下 6 个文件(多了 TagMultiSelect 组件)
-- ✅ 2 个路由页
-- ✅ `[id]/page.tsx` 嵌入 QuotesList
-- ✅ i18n `quotes` 命名空间
-- ✅ 端到端验证:翻译产品名规格 / 货币单位 / MOQ 校验 / Tag 多选 chip / 报价日期与有效期(含过期标红)
+**2a.1 存储抽象层** (`src/lib/storage/`):
+- ✅ types.ts — `StorageProvider` 接口契约
+- ✅ key.ts — `keyFor` / `thumbKeyFor` / 内部 `sanitizeFilename` 纯函数
+- ✅ local.ts — `LocalStorageProvider` 类,含 zip slip 防护
+- ✅ index.ts — 按 env 挑 provider,导出 `storage` 单例
 
-**Note**(1d.3):
-- ✅ Prisma schema 迁移:`add_note_content_ru_auto_translated` 加 `contentRuAutoTranslated` 字段
-- ✅ `[id]/notes/` 下 5 个文件
-- ✅ 2 个路由页
-- ✅ `[id]/page.tsx` 嵌入 NotesList(详情页 4 区段中 3 个已真实化)
-- ✅ i18n `notes` 命名空间
-- ✅ 端到端验证:中文必填 / 翻译入库 + 锁定 / 关联联系人 + 报价(可空)/ 卡片式展示
+**2a.2 两条 API 路由:**
+- ✅ `POST /api/upload`:multipart 解析、类型校验、所有 9 个 FileType 的 MIME / 大小白名单、缩略图、事务唯一性、孤儿清理、revalidatePath
+- ✅ `GET /api/files/[id]`:权限校验、`?thumb=1` 缩略图分支、Content-Disposition inline、Cache-Control private
+
+**2a.3 SUPPLIER_LOGO 端到端:**
+- ✅ `src/app/suppliers/_actions/file-actions.ts` — `clearSupplierLogo` server action(无 auth gate,与 archiveSupplier 同模式)
+- ✅ `src/app/suppliers/[id]/_components/supplier-logo.tsx` — 客户端组件,虚框占位 / 缩略图显示 / 替换 / 清除 / loading / 错误提示
+- ✅ `messages/zh.json` + `messages/ru.json` 新增 `files` 命名空间
+- ✅ `[id]/page.tsx` 顶部嵌入 SupplierLogo 组件
+- ✅ 端到端验证:上传一张图 → 缩略图显示 → 替换 → 清除 → DB / 磁盘双向核对(`storage/suppliers/{id}/logo/` 下有原图 + .thumb.webp 两个文件)
 
 ### 本轮新概念
 
-- **`prisma.$transaction(async (tx) => ...)`**:多操作打包成单一 SQL 事务,要么全成要么全回滚。Contact 设主要联系人时清其他人的 isPrimary、Quote 更新 tag 关联时"先删后插"都用了
-- **`formData.getAll('xxx')`**:多值同名字段(如多个 hidden input 都叫 tagIds),`Object.fromEntries` 只保留最后一个,会丢数据。`getAll` 拿数组
-- **`<datalist>` 原生自动补全**:`<input list="...">` + `<datalist id="..."><option/></datalist>`,实现"下拉建议但允许自由输入",零 JS。Quote 单位字段用这个
-- **Prisma `Decimal` 不能直接渲染**:`{q.unitPrice}` 会报错或显示对象。必须 `.toString()`(精度不丢)或 `.toNumber()`(可能丢精度)
-- **HTML `<input type="date">` 日期序列化**:接受 `YYYY-MM-DD` 字符串。Date → 字符串用 `date.toISOString().slice(0, 10)`
-- **空字符串到 undefined 的 Zod 转换链**:`z.union([z.literal('').transform(() => undefined), z.coerce.number().int().positive()]).optional()` 处理"表单空 = 字段缺失"的语义
-- **Server Action `.bind(supplierId, ...)`**:1c 已用过 `.bind(null, id)` 一参版本,1d.x 普遍用 `.bind(null, supplierId)` 把父级 id 预绑进 create/update action
+- **Route Handler vs Server Action 取舍**:大小、调用方、HTTP 标准、类型链分离的差异
+- **`multipart/form-data` + FormData API**:浏览器端 `fetch + new FormData()` 上传文件的标准姿势,与 Server Action 完全不同的传输方式
+- **`sharp` 库**:Node 上基于 libvips 的快速图片处理,`.resize().webp().toBuffer()` 链式调用
+- **`webp` 格式**:体积小、现代浏览器全支持,作为缩略图统一格式
+- **zip slip 防护**:`path.resolve(root, userKey)` 后用 `startsWith(root)` 校验,阻止恶意 key 含 `..` 穿到 root 外
+- **`Content-Disposition: inline` 与 `filename*=UTF-8''...`**:让浏览器直接展示文件(图片/PDF/视频),并按 RFC 5987 编码中文文件名
+- **`router.refresh()` 与 `revalidatePath` 配合**:服务端清缓存 + 客户端重新拉数据 + 重新渲染,两个都要,缺一个看不到刷新
+- **隐藏 `<input type="file">` + 按钮触发 `click()`**:浏览器原生 file input 没法定制样式,通用做法是隐藏它用其他元素触发
+- **TypeScript `never` 穷举检查**:`switch` 末尾 `const _: never = type` 把"漏 case"提到编译期发现
+- **客户端预校验 + 服务端校验双重保险**:前者早失败友好,后者防绕过
 
 ### 本轮踩到的坑
 
-- ❌ **"Failed to fetch"无明显错误信息**:Turbopack 热重载频繁改文件时偶现的瞬时抽风,几秒后自动恢复。如果持续不消,99% 是某个新文件服务端渲染崩了,需要看 `npm run dev` 终端的红字堆栈
-- ❌ **Prisma Studio 种 tag 时 createdById 必填**:Tag 表有外键约束,种子时必须填 admin 的 cuid 字符串。**记得把那串 `P3wbHXCGn...` 准备好**
-- ❌ **Note 翻译模式与 CLAUDE.md 原设计冲突**:本轮做 1d.3 时发现 CLAUDE.md 写的是"按需翻译不入库",与本轮决定的"AI 翻译入库"相反。**已在本进度日志记录,1d.4 文档同步时正式修订 CLAUDE.md**
+- ❌ **`session.user.role` 在 better-auth 默认 User 类型上不存在**:role 字段是 Prisma schema 上的 custom 字段,better-auth 类型层不知道。结论:**阶段 5 不做 role 检查**,与现有 supplier-actions.ts 同步,等阶段 2 完整接入认证再处理 role
+- ❌ **`translateBatch` 签名记错**:它吃**一个**数组参数 `[{text, from, to}, ...]`,不是 `(texts, locale)` 两参。调用前先翻 supplier-actions.ts 看真实姿势
+- ❌ **`npx tsx -e` 不加载 tsconfig paths**:`@/...` 别名在 inline 脚本里解析失败,这种验证不可靠。判断代码是否能跑应该看 `npm run dev` 的编译输出
+- ❌ **PowerShell `echo "*" > file` 可能写 UTF-16 BOM**:`.gitignore` 看似空文件。规避:用 VS Code 直接建文件,默认 UTF-8 无 BOM
 
 ### 待办
 
-1. ~~阶段 4.5 里程碑 1a / 1b / 1c / 1d.0 / 1d.1 / 1d.2 / 1d.3 完成~~ ✅
-2. **里程碑 1d.4 — CLAUDE.md 文档同步**(下一步,本轮一并完成,见下面"文档对齐"段)
-3. **阶段 4.5 整体完成**,阶段 5 开始:文件存储抽象层 + 上传 UI(画册、视频、图片、报价图、付款截图等)
-4. 阶段 6 - UI 美化
+1. ~~2a.0 准备 / 2a.1 抽象层 / 2a.2 API 路由 / 2a.3 LOGO~~ ✅
+2. **2a.4 BROCHURE + DOC**(下一步):多文件、有 title(走 AI 翻译入库)、列表 UI、归档/恢复/改 title 的 server actions。大部分基础设施(API 路由、存储层、缩略图)已就绪,主要是 UI 复用
+3. **2a.5 SUPPLIER_VIDEO**:系统装 ffmpeg 命令行 + `fluent-ffmpeg` npm 包 + 抽第 1 秒一帧做封面 + 视频播放器 UI
+4. **2b QUOTE_IMAGE**:多图 + sort_order + is_cover(每 Quote 唯一封面事务),与 Quote 详情联动
+5. **2c PAYMENT_SCREENSHOT / NOTE_ATTACHMENT / TRANSACTION_DOC**:挂载到对应实体,UI 复用现有上传组件
+6. 阶段 5 整体收尾后进**阶段 6 UI 美化**
+
+### 临时安全债清单(阶段 2 / 阶段 6 处理)
+
+- `/api/upload` 用 `DEV_FALLBACK_ADMIN_ID` 兜底拿 user id,无 session 也能上传——阶段 2 接入认证后改强制 session
+- 所有 server action 与 route handler 都没有 role gate(viewer 理论上也能调 admin 接口)——阶段 2 引入 role 检查
+- `<img>` 标签直接拼 API URL,无 Image 组件优化——阶段 6 UI 美化时评估
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进入阶段 5,文件存储」**
+直接说:**「继续阶段 5,进 2a.4 BROCHURE + DOC」**
 
-阶段 5 路线预览(给未来对话定调):
-1. 设计存储抽象层(类似阶段 4 的翻译抽象层):本地文件系统 / OSS / COS 切换零业务感知
-2. 上传组件(拖拽 + 选择,显示进度)
-3. 不同 type 的 UI 差异化(Logo 当头像 / Brochure 当画廊 / Video 用播放器)
-4. File 表已在阶段 1 完整设计,实现时只是给字段填值
+2a.4 路线预览:
+1. Server Actions:archiveFile / restoreFile / updateFileTitle / triggerTranslateTitle(类似 Note 的 title 翻译入库 + 锁定)
+2. 复用现有 `/api/upload`(zero 改动),前端组件需要支持多文件选择 + title 输入
+3. 详情页"画册"区段(画廊式缩略图网格 + 点击放大)和"资质文档"区段(列表式 + 文件图标 + 下载链接)
+4. 引入"画廊视图"模式与 LOGO 的单图模式做对比,巩固"数据库一致 / UI 差异化"设计哲学
