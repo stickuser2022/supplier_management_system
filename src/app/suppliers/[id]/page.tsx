@@ -8,6 +8,9 @@ import { ContactsList } from './contacts/_components/ContactsList';
 import { QuotesList } from './quotes/_components/QuotesList';
 import { NotesList } from './notes/_components/NotesList';
 import { SupplierLogo } from './_components/supplier-logo';
+import { FileUploader } from './_components/file-uploader';
+import { BrochureGallery } from './_components/brochure-gallery';
+import { DocList } from './_components/doc-list';
 
 export default async function SupplierDetailPage({
   params,
@@ -30,10 +33,48 @@ export default async function SupplierDetailPage({
     id: true,
     fileName: true,
   },
+  
   orderBy: { createdAt: 'desc' },  // 防御性,理论上只有 1 个
   });
+  const brochures = await prisma.file.findMany({
+  where: {
+    supplierId: id,
+    type: 'SUPPLIER_BROCHURE',
+    isActive: true,
+  },
+  select: {
+    id: true,
+    fileName: true,
+    mimeType: true,
+    sizeBytes: true,
+    thumbnailKey: true,
+    titleZh: true,
+    titleRu: true,
+    createdAt: true,
+  },
+  orderBy: { createdAt: 'desc' },
+});
+
+const docs = await prisma.file.findMany({
+  where: {
+    supplierId: id,
+    type: 'SUPPLIER_DOC',
+    isActive: true,
+  },
+  select: {
+    id: true,
+    fileName: true,
+    mimeType: true,
+    sizeBytes: true,
+    titleZh: true,
+    titleRu: true,
+    createdAt: true,
+  },
+  orderBy: { createdAt: 'desc' },
+});
   const t = await getTranslations('supplierDetail');
   const tLevel = await getTranslations('cooperationLevel');
+  const tFiles = await getTranslations('files');
   const locale = await getLocale();
 
   return (
@@ -139,6 +180,37 @@ export default async function SupplierDetailPage({
       <ContactsList supplierId={supplier.id} />
       <QuotesList supplierId={supplier.id} />
       <NotesList supplierId={supplier.id} />
+      {/* 画册 / 产品目录 */}
+      <section className="mb-6">
+        <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
+          {tFiles('brochuresTitle')}
+        </h2>
+        <FileUploader
+          supplierId={id}
+          type="SUPPLIER_BROCHURE"
+          accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+          maxBytes={30 * 1024 * 1024}
+          label={tFiles('uploadBrochures')}
+          acceptHint={tFiles('brochureAcceptHint')}
+        />
+        <BrochureGallery supplierId={id} items={brochures} />
+      </section>
+
+      {/* 资质 / 文档 */}
+      <section className="mb-6">
+        <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
+          {tFiles('docsTitle')}
+        </h2>
+        <FileUploader
+          supplierId={id}
+          type="SUPPLIER_DOC"
+          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          maxBytes={30 * 1024 * 1024}
+          label={tFiles('uploadDocs')}
+          acceptHint={tFiles('docAcceptHint')}
+        />
+        <DocList supplierId={id} items={docs} />
+      </section>
       <PlaceholderSection title={t('sections.transactions')} t={t} />
     </div>
   );
