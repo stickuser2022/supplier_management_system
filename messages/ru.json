@@ -1,12 +1,41 @@
 {
-  "files": {
+"files": {
   "uploadLogo": "Загрузить логотип",
   "replaceLogo": "Заменить логотип",
   "removeLogo": "Удалить логотип",
   "uploading": "Загрузка…",
   "errorTooLarge": "Файл слишком большой, максимум {max}",
   "errorWrongType": "Тип файла не поддерживается (только PNG / JPEG / WEBP / GIF)",
-  "confirmRemoveLogo": "Удалить текущий логотип?"
+  "confirmRemoveLogo": "Удалить текущий логотип?",
+
+  "brochuresTitle": "Каталоги / буклеты",
+  "brochuresEmpty": "Каталоги отсутствуют",
+  "uploadBrochures": "Загрузить каталоги",
+  "brochureAcceptHint": "Изображение или PDF, до 30 МБ",
+
+  "docsTitle": "Документы / сертификаты",
+  "docsEmpty": "Документы отсутствуют",
+  "uploadDocs": "Загрузить документы",
+  "docAcceptHint": "Изображение / PDF / Word / Excel, до 30 МБ",
+
+  "fileTitle": "Название",
+  "fileTitleZh": "Название (китайский)",
+  "fileTitleRu": "Название (русский)",
+  "fileTitlePlaceholder": "Напр.: Весенний каталог 2025, Лицензия",
+  "fileSize": "Размер",
+  "uploadedAt": "Время загрузки",
+  "openFile": "Открыть",
+  "downloadFile": "Скачать",
+  "editTitle": "Изменить название",
+  "archiveFile": "В архив",
+  "restoreFile": "Восстановить",
+  "confirmArchive": "Перенести файл в архив?",
+  "translateTitle": "Автоматически перевести",
+  "titleRuLocked": "Изменено вручную (авто-перевод не перезапишет)",
+  "uploadBatchDone": "Загрузка завершена: успешно {ok}, ошибок {fail}",
+
+  "errorBrochureType": "Каталог принимает только изображения и PDF",
+  "errorDocType": "Документ принимает изображения / PDF / Word / Excel"
 },
   "notes": {
     "title": "Заметки",

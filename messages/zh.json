@@ -1,12 +1,41 @@
 {
-  "files": {
+"files": {
   "uploadLogo": "上传 LOGO",
   "replaceLogo": "替换 LOGO",
   "removeLogo": "清除 LOGO",
   "uploading": "上传中…",
   "errorTooLarge": "文件过大,最大 {max}",
   "errorWrongType": "文件类型不支持(仅 PNG / JPEG / WEBP / GIF)",
-  "confirmRemoveLogo": "确定清除当前 LOGO?"
+  "confirmRemoveLogo": "确定清除当前 LOGO?",
+
+  "brochuresTitle": "画册 / 产品目录",
+  "brochuresEmpty": "暂无画册",
+  "uploadBrochures": "上传画册",
+  "brochureAcceptHint": "图片或 PDF,最大 30MB",
+
+  "docsTitle": "资质 / 文档",
+  "docsEmpty": "暂无文档",
+  "uploadDocs": "上传文档",
+  "docAcceptHint": "图片 / PDF / Word / Excel,最大 30MB",
+
+  "fileTitle": "标题",
+  "fileTitleZh": "标题(中文)",
+  "fileTitleRu": "标题(俄文)",
+  "fileTitlePlaceholder": "如:2025春季画册、营业执照",
+  "fileSize": "大小",
+  "uploadedAt": "上传时间",
+  "openFile": "打开",
+  "downloadFile": "下载",
+  "editTitle": "编辑标题",
+  "archiveFile": "归档",
+  "restoreFile": "恢复",
+  "confirmArchive": "确定归档此文件?",
+  "translateTitle": "自动翻译俄文",
+  "titleRuLocked": "已手工修正(自动翻译会跳过)",
+  "uploadBatchDone": "上传完成:{ok} 成功,{fail} 失败",
+
+  "errorBrochureType": "画册仅接受图片或 PDF",
+  "errorDocType": "文档接受图片 / PDF / Word / Excel"
 },
   "notes": {
     "title": "沟通记录",
