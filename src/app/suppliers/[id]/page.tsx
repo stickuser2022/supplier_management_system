@@ -186,7 +186,7 @@ const docs = await prisma.file.findMany({
           {tFiles('brochuresTitle')}
         </h2>
         <FileUploader
-          supplierId={id}
+          ownerId={id}
           type="SUPPLIER_BROCHURE"
           accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
           maxBytes={30 * 1024 * 1024}
@@ -202,7 +202,7 @@ const docs = await prisma.file.findMany({
           {tFiles('docsTitle')}
         </h2>
         <FileUploader
-          supplierId={id}
+          ownerId={id}
           type="SUPPLIER_DOC"
           accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           maxBytes={30 * 1024 * 1024}

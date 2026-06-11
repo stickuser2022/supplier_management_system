@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 type Props = {
-  supplierId: number;
-  type: 'SUPPLIER_BROCHURE' | 'SUPPLIER_DOC';
+  ownerId: number;
+  type: 'SUPPLIER_BROCHURE' | 'SUPPLIER_DOC' | 'QUOTE_IMAGE';
   accept: string;     // HTML accept 属性
   maxBytes: number;   // 客户端预校验上限
   label: string;      // 按钮文字
@@ -20,7 +20,7 @@ type UploadStatus = {
 };
 
 export function FileUploader({
-  supplierId,
+  ownerId,
   type,
   accept,
   maxBytes,
@@ -66,7 +66,7 @@ export function FileUploader({
       const fd = new FormData();
       fd.append('file', initial[i].file);
       fd.append('type', type);
-      fd.append('ownerId', String(supplierId));
+      fd.append('ownerId', String(ownerId));
 
       try {
         const res = await fetch('/api/upload', { method: 'POST', body: fd });

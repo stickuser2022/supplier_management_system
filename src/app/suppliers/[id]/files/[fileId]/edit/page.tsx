@@ -23,14 +23,28 @@ export default async function FileEditPage({
       titleRu: true,
       titleRuAutoTranslated: true,
       supplierId: true,
+      quoteId: true,
     },
   });
 
-  if (!file) notFound();
-  // 防御:URL 拼错时(fileId 对但 supplierId 不对)重定向回真的归属
-  if (file.supplierId !== supplierId) {
-    if (file.supplierId) redirect(`/suppliers/${file.supplierId}/files/${fileId}/edit`);
-    else notFound();
+if (!file) notFound();
+
+  // 算出文件的"有效 supplierId":
+  //   SUPPLIER_* 类型直接拿 file.supplierId
+  //   QUOTE_IMAGE 类型经 file.quoteId → quote.supplierId
+  let effectiveSupplierId = file.supplierId;
+  if (!effectiveSupplierId && file.quoteId) {
+    const quote = await prisma.quote.findUnique({
+      where: { id: file.quoteId },
+      select: { supplierId: true },
+    });
+    effectiveSupplierId = quote?.supplierId ?? null;
+  }
+  if (!effectiveSupplierId) notFound();
+
+  // URL 拼错时跳到真正归属的供应商
+  if (effectiveSupplierId !== supplierId) {
+    redirect(`/suppliers/${effectiveSupplierId}/files/${fileId}/edit`);
   }
 
   const tFiles = await getTranslations('files');
