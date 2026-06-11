@@ -1,4 +1,73 @@
 {
+  "transactions": {
+  "title": "Заказы",
+  "newTransaction": "Новый заказ",
+  "empty": "Заказы отсутствуют",
+  "itemsUnit": "шт",
+  "save": "Сохранить",
+  "saving": "Сохранение…",
+  "cancel": "Отмена",
+  "translate": "Автоперевод",
+  "lockedRu": "Изменено вручную",
+  "addItem": "Добавить позицию",
+  "removeItem": "Удалить",
+  "itemRow": "Позиция",
+  "addPayment": "Добавить платёж",
+  "removePayment": "Удалить",
+  "paymentRow": "Платёж",
+  "paymentsEmpty": "Платежей пока нет",
+  "sections": {
+    "main": "Информация о заказе",
+    "items": "Позиции",
+    "payments": "Платежи"
+  },
+  "fields": {
+    "orderedAt": "Дата заказа",
+    "contact": "Контактное лицо",
+    "totalAmount": "Сумма заказа",
+    "currency": "Валюта",
+    "status": "Статус",
+    "notesZh": "Примечания (китайский)",
+    "notesRu": "Примечания (русский)"
+  },
+  "statuses": {
+    "IN_PROGRESS": "В работе",
+    "COMPLETED": "Завершён",
+    "CANCELLED": "Отменён"
+  },
+  "columns": {
+    "orderedAt": "Дата",
+    "items": "Позиции",
+    "total": "Сумма",
+    "paid": "Оплачено",
+    "status": "Статус",
+    "actions": "Действия"
+  },
+  "actions": {
+    "edit": "Изменить",
+    "archive": "В архив",
+    "restore": "Восстановить",
+    "confirmArchive": "Перенести заказ в архив?"
+  },
+  "item": {
+    "linkQuote": "Связать с предложением (опц.)",
+    "productNameZh": "Название (китайский)",
+    "productSpecZh": "Характеристики (китайский)",
+    "quantity": "Кол-во",
+    "unitZh": "Ед.",
+    "unitPrice": "Цена",
+    "subtotal": "Итого"
+  },
+  "payment": {
+    "paidAt": "Дата платежа",
+    "amount": "Сумма",
+    "currency": "Валюта",
+    "method": "Метод",
+    "methodPlaceholder": "WeChat / Банк / Через Ли",
+    "purposeZh": "Назначение (китайский)",
+    "purposePlaceholder": "Задаток / Часть / Остаток"
+  }
+},
 "files": {
   "uploadLogo": "Загрузить логотип",
   "replaceLogo": "Заменить логотип",
@@ -58,7 +127,11 @@
   "videosTitle": "Видео завода / линии",
   "videosEmpty": "Видео отсутствуют",
   "uploadVideos": "Загрузить видео",
-  "videoAcceptHint": "Видео, до 200 МБ"
+  "videoAcceptHint": "Видео, до 200 МБ",
+  "transactionDocsTitle": "Документы заказа",
+  "transactionDocsEmpty": "Документы отсутствуют",
+  "uploadTransactionDocs": "Загрузить документы",
+  "transactionDocAcceptHint": "Изображение / PDF / Word / Excel, до 30 МБ"
 
 },
   "notes": {

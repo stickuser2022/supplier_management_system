@@ -1016,93 +1016,55 @@ RU    俄文
 
 ---
 
-## 2026.6.10(续) 项目进度日志(阶段 5 里程碑 2c + 2a.5 完成:笔记附件 + 视频抽帧)
+## 2026.6.10(终)项目进度日志(阶段 5 全部完成 + Transaction 管理 UI + 物理删除)
 
-### 当前阶段:阶段 5 文件子系统基本封顶
+### 当前阶段:阶段 5 完整封顶,所有数据模型 + 文件子系统在线
 
-完成 6 种 FileType 中能落地的全部:LOGO / BROCHURE / DOC / QUOTE_IMAGE / NOTE_ATTACHMENT / SUPPLIER_VIDEO。剩下 PAYMENT_SCREENSHOT 和 TRANSACTION_DOC 必须等 Transaction 管理 UI 里程碑建好父实体后才能挂。
+阶段 5 历史上最大的一天。本日累计完成:文件子系统全 6 种 type、Transaction 管理 UI(主表 + Item + Payment 子表)、TRANSACTION_DOC 文件挂载、物理删除入口。**Phase 5 完整收工。**
 
 ### 里程碑范围
 
-本批次两个独立小里程碑 + 一个"顺带 bug 修复":
-- **2c NOTE_ATTACHMENT**:Note 沟通记录加附件能力(微信截图、合同照、录音文件等)
-- **2a.5 SUPPLIER_VIDEO**:工厂 / 产线视频上传,ffmpeg 抽第 1 秒一帧做封面缩略图
-- **Range 请求支持**:视频播放器进度条可拖动的服务端基础设施
+- **Transaction 管理 UI**:主表 CRUD + 内嵌 Items 子表 + 内嵌 Payments 子表,使用 JSON 隐藏字段传递子表数据,服务端 Zod 数组校验 + Prisma 事务包裹"先删后插"刷新子表
+- **TRANSACTION_DOC**:基础设施全复用,挂在 transaction,出现在订单编辑页底部
+- **PAYMENT_SCREENSHOT 延后**:File 表 type 已预留,UI 等"付款详情管理"小里程碑做(数据库无需改动)
+- **物理删除入口**:文件标题编辑页右下角加"⚠️ 永久删除"按钮,双重 confirm,DB 行 + 磁盘文件原图 + 缩略图一并清除
 
 ### 关键架构决策
 
-- **`ffmpeg-static` 而非系统级 ffmpeg**:Windows 装系统 ffmpeg 麻烦(下二进制 + 加 PATH + 重启 shell),`ffmpeg-static` 把 ffmpeg 二进制打包进 npm 包,`npm install` 自动落地,跨平台开箱即用。代价是 node_modules 多 ~80MB,可接受
-- **视频抽帧走"临时文件中转"**:fluent-ffmpeg 要求真实文件路径,不能直接处理 Buffer。流程:`os.tmpdir()` 写临时 mp4 → 跑 ffmpeg screenshot 抽第 1 秒一帧到临时 PNG → sharp 把 PNG 转成 webp → 通过 storage 抽象层落到正式位置 → finally 删两个临时文件。**所有临时文件清理放 finally 里**,防止异常时残留
-- **`getFileSupplierId` helper 扩展到 NOTE_ATTACHMENT**:加 noteId 分支,经 `note.supplierId` 拿到 supplier。这是上次发现的"helper 必须按 type 分支"模式的第二次应用,模式稳定下来——以后每加一种"非直挂 supplier"的 FileType 必须扩这个 helper
-- **NoteAttachmentList UI:图片混文档的双模式渲染**:与 BrochureGallery 的"画廊"或 DocList 的"列表"不同——note 附件是图片(微信截图)和文档(PDF/Word)混着出现的,所以选**列表模式**(因为更适合混合内容),但**为图片单独走缩略图,非图片走彩色文件类型徽章**。同一组件内根据 mime 类型分支渲染 left 侧的视觉元素
-- **视频画廊的播放按钮覆盖层**:用 CSS `absolute inset-0 + flex center` 在缩略图上盖一个半透明圆形 `▶` 按钮,`group-hover` 时加深背景色提供反馈。比真造一个 video player 嵌进列表项简单太多,**点击则在新 tab 用浏览器原生 player 播放**——简化大于花哨
-- **HTTP Range 请求**:`Accept-Ranges: bytes` 头是关键标识——浏览器靠它判断"服务端支持 seek",才会启用 `<video>` 元素可拖动的进度条。然后 `Range: bytes=X-Y` 请求头要返回 `206 Partial Content` + `Content-Range`。**这套 HTTP 协议是浏览器视频播放体验的隐藏前提**,不实现就只能从头看到尾,看着像个 bug 但其实是缺特性
-- **Range 实现的性能取舍**:当前 `LocalStorageProvider` 读整文件再 `subarray`(每次请求 100MB 视频会读 100MB 内存),个人采购规模够用;上 OSS 时让 OSS provider 实现真正的 `getRange` 走对象存储的 byte range API,内存自然不爆
+- **Transaction 子表:JSON 序列化传值 + 先删后插**:Items 和 Payments 不走独立 CRUD action,直接在 TransactionForm 里维护 state,提交时序列化成 JSON 放进隐藏 input,server action 解析 JSON 用 Zod 数组校验。更新时事务里 deleteMany + createMany,简单可靠
+- **AVAILABLE_QUOTES 下拉显示复合识别信息**:`{产品名} · {单价} {币种} · {日期}`,Admin 一眼能选对哪条 Quote 来源
+- **物理删除 = DB delete + storage delete + 软容错**:DB 删除是事务性必须成功的;磁盘文件删除是"尽力而为",失败不阻断(因为磁盘文件可能已经被外部清理过)。两个分开看待,削除"DB 删了但磁盘没删"和"磁盘没了但 DB 留着"两种诡异中间态
+- **getFileSupplierId helper 五分支完整版**:SUPPLIER_* / QUOTE_IMAGE / NOTE_ATTACHMENT / TRANSACTION_DOC / PAYMENT_SCREENSHOT(经 payment → transaction 两跳),覆盖所有 FileType。**阶段 5 隐性扩展点正式完成**
 
 ### 已完成
 
-**2c NOTE_ATTACHMENT:**
-- ✅ `getFileSupplierId` 加 noteId 分支
-- ✅ `FileUploader` type union 加 `NOTE_ATTACHMENT`
-- ✅ 新建 `note-attachment-list.tsx`(图片走缩略图、文档走彩色徽章的混合渲染)
-- ✅ files 命名空间 i18n 加 4 条
-- ✅ Note 编辑页嵌入"附件"section
-- ✅ 端到端验证:多类型混合上传 / 缩略图 / 归档 / 编辑标题跳转
+**Transaction 管理 UI:**
+- ✅ `transactions/_validations/transaction-schema.ts`(主表 + Item + Payment 数组校验)
+- ✅ `transactions/_actions/transaction-actions.ts`(create / update / archive / restore / translate)
+- ✅ `TransactionForm`(主信息 + 动态 Items 行 + 动态 Payments 行)
+- ✅ `TransactionsList`(供应商详情页内,替换原占位)
+- ✅ `TransactionActionsCell`(编辑 / 停用 / 恢复)
+- ✅ `new/page.tsx` + `[transactionId]/edit/page.tsx`
+- ✅ `transactions` i18n 命名空间
 
-**2a.5 SUPPLIER_VIDEO:**
-- ✅ `npm install fluent-ffmpeg ffmpeg-static @types/fluent-ffmpeg`
-- ✅ `/api/upload/route.ts` 加 `generateVideoThumbnail` helper(临时文件中转 + finally 清理)
-- ✅ 缩略图分支从 image 扩展为 image / video 双分支
-- ✅ `FileUploader` type union 加 `SUPPLIER_VIDEO`
-- ✅ 新建 `supplier-video-gallery.tsx`(aspect-video + 播放按钮覆盖层)
-- ✅ files 命名空间 i18n 加 4 条
-- ✅ 供应商详情页嵌入"工厂 / 产线视频"section
-- ✅ 端到端验证:上传 mp4 → 等 5-30 秒 ffmpeg 抽帧 → 卡片显示视频第 1 秒画面 + ▶ 按钮 → 新 tab 浏览器原生播放
+**TRANSACTION_DOC:**
+- ✅ `getFileSupplierId` 加 transactionId / paymentId 分支
+- ✅ `FileUploader` type union 加 TRANSACTION_DOC + PAYMENT_SCREENSHOT
+- ✅ `transaction-doc-list.tsx`
+- ✅ 订单编辑页底部嵌入"订单单据 / 合同 / 发票"区段
 
-**Range 请求支持:**
-- ✅ `/api/files/[id]/route.ts` 新增 Range header 解析 + 206 Partial Content 响应分支
-- ✅ 所有响应统一加 `Accept-Ranges: bytes` 头
-- ✅ 越界请求返回 416 Range Not Satisfiable
-- ✅ 视频拖进度条验证通过
+**物理删除:**
+- ✅ `physicallyDeleteFile(fileId)` action(DB 删 + 磁盘删 + 容错)
+- ✅ 文件标题编辑页右下角"⚠️ 永久删除"按钮(双重 confirm)
 
-### 本轮新概念
+### 待办(阶段 5 之外)
 
-- **`ffmpeg-static` 包**:把 ffmpeg 命令行二进制打包成 npm 依赖,免去系统级安装。`import ffmpegPath from 'ffmpeg-static'` 拿到二进制绝对路径,丢给 fluent-ffmpeg 的 `setFfmpegPath()`
-- **`fluent-ffmpeg`**:Node 上的 ffmpeg 命令行包装,提供链式 API。`.screenshots({ timestamps, filename, folder, size })` 是抽帧的常用入口
-- **`os.tmpdir()`**:跨平台拿系统临时目录(Windows 是 `C:\Users\xxx\AppData\Local\Temp\`,Linux 是 `/tmp/`),临时文件中转的标准做法
-- **`try / finally` 清理临时文件**:无论中间环节怎么报错,finally 块保证 unlink 跑一遍,`.catch(() => {})` 吞 ENOENT 防"删不存在的文件"二次报错
-- **HTTP `Range` 头 + `206 Partial Content`**:`<video>` / `<audio>` 元素拖动进度条、断点续传下载的底层机制。`Range: bytes=X-Y` 请求 → `206` + `Content-Range: bytes X-Y/Total` 响应
-- **`Accept-Ranges: bytes` 响应头**:服务端"我支持 seek"的宣告。浏览器看到这个才会启用 video 进度条的可拖动状态,**没有它即使后端实现了 Range 处理,UI 也是灰的**
-- **CSS `aspect-video`(16:9 比例容器)+ `object-cover`**:Tailwind 标准做法,视频缩略图卡片用 16:9 容器,缩略图填充截取
-- **`group-hover`**:Tailwind 模式——父元素加 `group`,子元素用 `group-hover:xxx` 在父元素 hover 时变样式。视频卡片的 ▶ 按钮 hover 加深就用这个
-
-### 本轮踩到的坑
-
-- ❌ **视频进度条灰着拖不动**:第一反应"视频文件坏了 / 浏览器 bug",其实是服务端没实现 Range 请求。**症状离根因远**——MIME 对、文件能播、能听见声、能看见画面,**只有 seek 不行**——这种"功能 99% 对" 的诡异表现,90% 概率是 HTTP 协议层的特性缺失
-- ❌ **`ffmpeg-static` 不是 default export 的常见误解**:`import ffmpegPath from 'ffmpeg-static'` 拿到的是字符串路径,**有时是 null**(平台不支持时)。所以代码里要 `if (ffmpegPath) { ffmpeg.setFfmpegPath(ffmpegPath); }` 防御一下
-- ❌ **`screenshots()` 的 `timestamps: ['1']` 参数容易写错成数字 `[1]`**:fluent-ffmpeg 要字符串,代表"第 1 秒"。数字 `1` 表示"百分之 1 进度位置",语义不同
-- ❌ **临时文件名同毫秒冲突**:多人或单人并发上传时,只用 `Date.now()` 拼路径可能撞名。`Date.now() + Math.random().toString(36).slice(2, 8)` 拼合,够防同毫秒
-
-### 临时安全债清单(本轮新增)
-
-- **`LocalStorageProvider` 的 `get(key)` 读整文件到 Buffer**:Range 请求时每次 100MB 视频都会读 100MB 进内存。**OSS 阶段在 provider 内实现 `getRange(key, start, end)`,直接走对象存储的 byte range API,跳过中间 Buffer**——届时这条债自然消失
-- **`/api/files/[id]` 路由 Range 处理在内存里 subarray**:大文件 + 高并发会吃内存。**和上一条同源,OSS 阶段自动解决**
-
-### 待办
-
-1. ~~2c NOTE_ATTACHMENT~~ ✅
-2. ~~2a.5 SUPPLIER_VIDEO~~ ✅
-3. ~~Range 请求支持~~ ✅
-4. **阶段 5 文件子系统封顶**——LOGO / BROCHURE / DOC / QUOTE_IMAGE / NOTE_ATTACHMENT / SUPPLIER_VIDEO 全在线 ✅
-5. (大里程碑)**Transaction 管理 UI**:TransactionForm + TransactionItem 子表 + Payment 子表 CRUD。完了之后才能补 TRANSACTION_DOC / PAYMENT_SCREENSHOT 两种 FileType
-6. **阶段 6 UI 美化**:把全阶段搭起来的功能视觉打磨一波(headers、间距、配色、Image 组件、响应式细节)
-7. (临时小钩子)**物理删除入口**:给"误录想撤销"加一条真删除路径(DB 行 + 磁盘文件一起删)
-8. (临时小钩子)**OSS 上线时的 `getRange` 优化**:LocalStorageProvider 的整文件读法在大量 Range 请求下吃内存,届时切 OSS 实现真 byte range
+1. ~~阶段 5 全部~~ ✅
+2. **阶段 6 UI 美化**(下一阶段):整体视觉打磨,准备给海外家人正式使用
+3. **付款详情管理**(小里程碑):给 PAYMENT_SCREENSHOT 一个独立的"每个付款行的截图上传"UI,目前可暂用 TRANSACTION_DOC 兜底
+4. **阶段 2 认证 UI**(独立大块):登录、登出、role 检查、移除所有 DEV_FALLBACK_ADMIN_ID 兜底
+5. **阶段 7 部署**:迁 PostgreSQL + OSS,把所有"开发期 OK 但生产风险"的决策一一过关
 
 ### 下一轮对话开始时的入口
 
-按你的优先级选一个,告诉 AI:
-
-- **「进 Transaction 管理 UI」**(最大块,做完阶段 5 才真正完整;但工作量大,跟文件无关,是新业务)
-- **「进阶段 6 UI 美化」**(把现有功能视觉打磨,体验跃升明显;不增功能,降坏掉风险低)
-- **「做物理删除入口」**(小钩子,1 小时活,做完心里踏实)
+直接说:**「进阶段 6,UI 美化」** 或 **「先做付款截图管理小里程碑」**

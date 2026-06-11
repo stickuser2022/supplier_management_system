@@ -1,0 +1,139 @@
+import { notFound, redirect } from 'next/navigation';
+import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
+import { prisma } from '@/lib/prisma';
+import { TransactionForm, type TransactionFormInitialData } from '../../_components/TransactionForm';
+import { FileUploader } from '../../../_components/file-uploader';
+import { TransactionDocList } from '../../../_components/transaction-doc-list';
+
+export default async function EditTransactionPage({
+  params,
+}: {
+  params: Promise<{ id: string; transactionId: string }>;
+}) {
+  const { id: idStr, transactionId: txIdStr } = await params;
+  const supplierId = parseInt(idStr, 10);
+  const transactionId = parseInt(txIdStr, 10);
+  if (isNaN(supplierId) || isNaN(transactionId)) notFound();
+
+  const tx = await prisma.transaction.findUnique({
+    where: { id: transactionId },
+    include: {
+      transactionItems: { orderBy: { sortOrder: 'asc' } },
+      payments: { orderBy: { paidAt: 'asc' } },
+    },
+  });
+  if (!tx) notFound();
+  if (tx.supplierId !== supplierId) {
+    redirect(`/suppliers/${tx.supplierId}/transactions/${transactionId}/edit`);
+  }
+
+  const [availableContacts, availableQuotes, transactionDocs, tFiles] = await Promise.all([
+    prisma.contact.findMany({
+      where: { supplierId, status: 'ACTIVE' },
+      select: { id: true, nameZh: true },
+      orderBy: { isPrimary: 'desc' },
+    }),
+    prisma.quote.findMany({
+      where: { supplierId, status: 'ACTIVE' },
+      select: {
+        id: true,
+        productNameZh: true,
+        quotedAt: true,
+        unitPrice: true,
+        currency: true,
+      },
+      orderBy: { quotedAt: 'desc' },
+    }),
+    prisma.file.findMany({
+      where: {
+        transactionId,
+        type: 'TRANSACTION_DOC',
+        isActive: true,
+      },
+      select: {
+        id: true,
+        fileName: true,
+        mimeType: true,
+        sizeBytes: true,
+        titleZh: true,
+        titleRu: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    getTranslations('files'),
+  ]);
+
+  const initialData: TransactionFormInitialData = {
+    id: tx.id,
+    contactId: tx.contactId,
+    orderedAt: tx.orderedAt.toISOString().slice(0, 10),
+    totalAmount: tx.totalAmount.toString(),
+    currency: tx.currency,
+    notesZh: tx.notesZh,
+    notesRu: tx.notesRu,
+    notesRuAutoTranslated: tx.notesRuAutoTranslated,
+    status: tx.status,
+    items: tx.transactionItems.map((it) => ({
+      quoteId: it.quoteId,
+      productNameZh: it.productNameZh,
+      productNameRu: it.productNameRu,
+      productNameRuAutoTranslated: it.productNameRuAutoTranslated,
+      productSpecZh: it.productSpecZh,
+      productSpecRu: it.productSpecRu,
+      productSpecRuAutoTranslated: it.productSpecRuAutoTranslated,
+      quantity: it.quantity,
+      unitZh: it.unitZh,
+      unitRu: it.unitRu,
+      unitPrice: it.unitPrice.toString(),
+      subtotal: it.subtotal.toString(),
+      sortOrder: it.sortOrder,
+    })),
+    payments: tx.payments.map((p) => ({
+      paidAt: p.paidAt.toISOString().slice(0, 10),
+      amount: p.amount.toString(),
+      currency: p.currency,
+      method: p.method,
+      purposeZh: p.purposeZh,
+      purposeRu: p.purposeRu,
+      purposeRuAutoTranslated: p.purposeRuAutoTranslated,
+    })),
+  };
+
+  return (
+    <div className="p-6">
+      <Link
+        href={`/suppliers/${supplierId}`}
+        className="text-sm text-blue-600 hover:underline"
+      >
+        ← 返回供应商详情
+      </Link>
+      <h1 className="text-2xl font-bold mt-2 mb-6">编辑订单 #{tx.id}</h1>
+      <TransactionForm
+        supplierId={supplierId}
+        initialData={initialData}
+        availableContacts={availableContacts}
+        availableQuotes={availableQuotes.map((q) => ({
+          ...q,
+          unitPrice: q.unitPrice.toString(),
+        }))}
+      />
+
+      <section className="mt-8 max-w-4xl">
+        <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
+          {tFiles('transactionDocsTitle')}
+        </h2>
+        <FileUploader
+          ownerId={transactionId}
+          type="TRANSACTION_DOC"
+          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+          maxBytes={30 * 1024 * 1024}
+          label={tFiles('uploadTransactionDocs')}
+          acceptHint={tFiles('transactionDocAcceptHint')}
+        />
+        <TransactionDocList supplierId={supplierId} items={transactionDocs} />
+      </section>
+    </div>
+  );
+}

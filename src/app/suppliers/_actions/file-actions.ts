@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { translateBatch } from '@/lib/translate';
 import { fileTitleSchema } from '../_validations/file-schema';
 import { redirect } from 'next/navigation'; 
+import { storage } from '@/lib/storage';
 
 // ─── 清除 LOGO(原有,保留)────────────────────────────────────
 export async function clearSupplierLogo(
@@ -31,12 +32,16 @@ export async function clearSupplierLogo(
 async function getFileSupplierId(fileId: number): Promise<number | null> {
   const file = await prisma.file.findUnique({
     where: { id: fileId },
-    select: { supplierId: true, quoteId: true, noteId: true },
+    select: {
+      supplierId: true,
+      quoteId: true,
+      noteId: true,
+      transactionId: true,
+      paymentId: true,
+    },
   });
   if (!file) return null;
-  // SUPPLIER_* 类型:直接挂 supplierId
   if (file.supplierId) return file.supplierId;
-  // QUOTE_IMAGE:经 quote 拿 supplierId
   if (file.quoteId) {
     const quote = await prisma.quote.findUnique({
       where: { id: file.quoteId },
@@ -44,7 +49,6 @@ async function getFileSupplierId(fileId: number): Promise<number | null> {
     });
     return quote?.supplierId ?? null;
   }
-  // NOTE_ATTACHMENT:经 note 拿 supplierId
   if (file.noteId) {
     const note = await prisma.note.findUnique({
       where: { id: file.noteId },
@@ -52,7 +56,20 @@ async function getFileSupplierId(fileId: number): Promise<number | null> {
     });
     return note?.supplierId ?? null;
   }
-  // 未来加 PAYMENT_SCREENSHOT / TRANSACTION_DOC 时再加分支
+  if (file.transactionId) {
+    const tx = await prisma.transaction.findUnique({
+      where: { id: file.transactionId },
+      select: { supplierId: true },
+    });
+    return tx?.supplierId ?? null;
+  }
+  if (file.paymentId) {
+    const payment = await prisma.payment.findUnique({
+      where: { id: file.paymentId },
+      select: { transaction: { select: { supplierId: true } } },
+    });
+    return payment?.transaction?.supplierId ?? null;
+  }
   return null;
 }
 
@@ -272,5 +289,44 @@ export async function moveQuoteImage(
     return { ok: true };
   } catch (err) {
     return { error: err instanceof Error ? err.message : '排序失败' };
+  }
+}
+
+export async function physicallyDeleteFile(
+  fileId: number,
+): Promise<{ ok?: true; error?: string }> {
+  try {
+    const file = await prisma.file.findUnique({
+      where: { id: fileId },
+      select: {
+        storageKey: true,
+        thumbnailKey: true,
+        supplierId: true,
+        quoteId: true,
+        noteId: true,
+        transactionId: true,
+        paymentId: true,
+      },
+    });
+    if (!file) return { error: '文件不存在' };
+
+    // 先反查 supplierId(为 revalidate 用),再删
+    const supplierId = await getFileSupplierId(fileId);
+
+    // 删 DB 行(file 表)
+    await prisma.file.delete({ where: { id: fileId } });
+
+    // 删磁盘原文件 + 缩略图(失败不阻断)
+    await storage.delete(file.storageKey).catch(() => {});
+    if (file.thumbnailKey) {
+      await storage.delete(file.thumbnailKey).catch(() => {});
+    }
+
+    if (supplierId) revalidatePath(`/suppliers/${supplierId}`);
+    return { ok: true };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : '物理删除失败',
+    };
   }
 }

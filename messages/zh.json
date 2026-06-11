@@ -1,4 +1,73 @@
 {
+  "transactions": {
+  "title": "订单记录",
+  "newTransaction": "新建订单",
+  "empty": "暂无订单",
+  "itemsUnit": "条",
+  "save": "保存",
+  "saving": "保存中…",
+  "cancel": "取消",
+  "translate": "自动翻译俄文",
+  "lockedRu": "已手工修正(自动翻译会跳过)",
+  "addItem": "添加明细",
+  "removeItem": "删除",
+  "itemRow": "明细",
+  "addPayment": "添加付款",
+  "removePayment": "删除",
+  "paymentRow": "付款",
+  "paymentsEmpty": "暂无付款,可在此添加",
+  "sections": {
+    "main": "订单信息",
+    "items": "订单明细",
+    "payments": "付款流水"
+  },
+  "fields": {
+    "orderedAt": "下单日期",
+    "contact": "经手联系人",
+    "totalAmount": "订单总额",
+    "currency": "币种",
+    "status": "状态",
+    "notesZh": "备注(中文)",
+    "notesRu": "备注(俄文)"
+  },
+  "statuses": {
+    "IN_PROGRESS": "进行中",
+    "COMPLETED": "已完结",
+    "CANCELLED": "已取消"
+  },
+  "columns": {
+    "orderedAt": "日期",
+    "items": "明细",
+    "total": "总额",
+    "paid": "已付",
+    "status": "状态",
+    "actions": "操作"
+  },
+  "actions": {
+    "edit": "编辑",
+    "archive": "停用",
+    "restore": "恢复",
+    "confirmArchive": "确定停用此订单?"
+  },
+  "item": {
+    "linkQuote": "关联报价(可选)",
+    "productNameZh": "产品名(中文)",
+    "productSpecZh": "规格(中文)",
+    "quantity": "数量",
+    "unitZh": "单位",
+    "unitPrice": "单价",
+    "subtotal": "小计"
+  },
+  "payment": {
+    "paidAt": "付款日期",
+    "amount": "金额",
+    "currency": "币种",
+    "method": "方式",
+    "methodPlaceholder": "微信 / 对公转账 / 老李代付",
+    "purposeZh": "用途(中文)",
+    "purposePlaceholder": "定金 / 中款 / 尾款"
+  }
+},
 
 "files": {
   "uploadLogo": "上传 LOGO",
@@ -59,7 +128,11 @@
   "videosTitle": "工厂 / 产线视频",
   "videosEmpty": "暂无视频",
   "uploadVideos": "上传视频",
-  "videoAcceptHint": "视频,最大 200MB"
+  "videoAcceptHint": "视频,最大 200MB",
+  "transactionDocsTitle": "订单单据 / 合同 / 发票",
+  "transactionDocsEmpty": "暂无订单文档",
+  "uploadTransactionDocs": "上传单据",
+  "transactionDocAcceptHint": "图片 / PDF / Word / Excel,最大 30MB"
   
 },
   "notes": {

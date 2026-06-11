@@ -12,6 +12,7 @@ import { FileUploader } from './_components/file-uploader';
 import { BrochureGallery } from './_components/brochure-gallery';
 import { DocList } from './_components/doc-list';
 import { SupplierVideoGallery } from './_components/supplier-video-gallery';
+import { TransactionsList } from './transactions/_components/TransactionsList';
 
 export default async function SupplierDetailPage({
   params,
@@ -244,7 +245,7 @@ const docs = await prisma.file.findMany({
         />
         <DocList supplierId={id} items={docs} />
       </section>
-      <PlaceholderSection title={t('sections.transactions')} t={t} />
+      <TransactionsList supplierId={supplier.id} />
     </div>
   );
 }

@@ -8,6 +8,8 @@ import {
   translateFileTitle,
   type FileTitleFormState,
 } from '@/app/suppliers/_actions/file-actions';
+import { physicallyDeleteFile } from '@/app/suppliers/_actions/file-actions';
+import { useRouter } from 'next/navigation';
 
 const initialState: FileTitleFormState = { status: 'idle' };
 
@@ -124,21 +126,63 @@ export function FileEditForm({
       )}
 
       {/* 按钮组 */}
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
-        >
-          {pending ? t('saving') : t('save')}
-        </button>
-        <Link
-          href={`/suppliers/${supplierId}`}
-          className="px-4 py-2 border rounded text-sm hover:bg-gray-50"
-        >
-          {t('cancel')}
-        </Link>
+      <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={pending}
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+          >
+            {pending ? t('saving') : t('save')}
+          </button>
+          <Link
+            href={`/suppliers/${supplierId}`}
+            className="px-4 py-2 border rounded text-sm hover:bg-gray-50"
+          >
+            {t('cancel')}
+          </Link>
+        </div>
+        <PhysicalDeleteButton fileId={fileId} supplierId={supplierId} />
       </div>
     </form>
+  );
+}
+
+function PhysicalDeleteButton({
+  fileId,
+  supplierId,
+}: {
+  fileId: number;
+  supplierId: number;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  function handleDelete() {
+    if (!confirm('⚠️ 永久删除此文件?数据库记录和磁盘文件都会被清除,无法恢复。')) {
+      return;
+    }
+    if (!confirm('再次确认:真的删除?')) {
+      return;
+    }
+    startTransition(async () => {
+      const res = await physicallyDeleteFile(fileId);
+      if (res.error) {
+        alert(res.error);
+      } else {
+        router.push(`/suppliers/${supplierId}`);
+      }
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleDelete}
+      disabled={pending}
+      className="text-xs text-red-700 hover:underline disabled:opacity-50"
+    >
+      {pending ? '删除中…' : '⚠️ 永久删除'}
+    </button>
   );
 }
