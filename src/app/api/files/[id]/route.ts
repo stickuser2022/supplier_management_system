@@ -44,19 +44,51 @@ export async function GET(
   const key = useThumb ? fileRow.thumbnailKey! : fileRow.storageKey;
   const mime = useThumb ? 'image/webp' : fileRow.mimeType;
 
-  // 5. 读字节并返回
+// 5. 读字节
   if (!(await storage.exists(key))) {
     return NextResponse.json({ error: 'File missing from storage' }, { status: 404 });
   }
   const data = await storage.get(key);
+  const fileSize = data.length;
 
+  // 6. Range 请求处理(视频/音频拖进度条、断点续传等场景需要)
+  const rangeHeader = request.headers.get('range');
+  if (rangeHeader) {
+    const match = /^bytes=(\d+)-(\d*)$/.exec(rangeHeader);
+    if (match) {
+      const start = parseInt(match[1], 10);
+      const end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+
+      if (start >= fileSize || end >= fileSize || start > end) {
+        // 客户端请求范围越界
+        return new NextResponse('Range Not Satisfiable', {
+          status: 416,
+          headers: { 'Content-Range': `bytes */${fileSize}` },
+        });
+      }
+
+      const chunk = data.subarray(start, end + 1);
+      return new NextResponse(new Uint8Array(chunk), {
+        status: 206, // Partial Content
+        headers: {
+          'Content-Type': mime,
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': String(chunk.length),
+          'Cache-Control': 'private, max-age=3600',
+        },
+      });
+    }
+  }
+
+  // 7. 整包返回(图片、PDF 等场景)
   return new NextResponse(new Uint8Array(data), {
     status: 200,
     headers: {
       'Content-Type': mime,
-      // inline:浏览器直接展示(图片/PDF/视频),不强制下载
+      'Content-Length': String(fileSize),
+      'Accept-Ranges': 'bytes', // 关键:告诉浏览器"我支持 range",视频元素才会显示可拖动进度条
       'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(fileRow.fileName)}`,
-      // private:CDN 不缓存(因为权限保护),浏览器自己缓存 1 小时
       'Cache-Control': 'private, max-age=3600',
     },
   });
