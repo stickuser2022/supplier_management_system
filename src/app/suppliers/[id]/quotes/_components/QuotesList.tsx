@@ -14,6 +14,19 @@ export async function QuotesList({ supplierId }: { supplierId: number }) {
     include: { quoteTags: { include: { tag: true } } },
     orderBy: { quotedAt: 'desc' },
   });
+    // 一次查出所有 quote 的封面图,在内存里拼成 Map,N+1 安全
+  const coverFiles = await prisma.file.findMany({
+    where: {
+      quoteId: { in: quotes.map((q) => q.id) },
+      type: 'QUOTE_IMAGE',
+      isActive: true,
+      isCover: true,
+    },
+    select: { id: true, quoteId: true },
+  });
+  const coverMap = new Map<number, number>(
+    coverFiles.map((f) => [f.quoteId!, f.id]),
+  );
 
   return (
     <section className="mb-6">
@@ -45,13 +58,37 @@ export async function QuotesList({ supplierId }: { supplierId: number }) {
               const rowClass = q.status === 'ARCHIVED' ? 'opacity-50' : '';
               return (
                 <tr key={q.id} className={rowClass}>
-                  <td className="border p-2">
-                    {pickLocalized(q.productNameZh, q.productNameRu, locale)}
-                    {q.productSpecZh && (
-                      <div className="text-xs text-gray-500">
-                        {pickLocalized(q.productSpecZh, q.productSpecRu, locale)}
+<td className="border p-2">
+                    <div className="flex items-start gap-2">
+                      {coverMap.has(q.id) ? (
+                        
+                        <a  href={`/api/files/${coverMap.get(q.id)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-shrink-0 w-12 h-12 rounded overflow-hidden bg-gray-50 hover:opacity-80 transition-opacity"
+                          title={t('viewCover')}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`/api/files/${coverMap.get(q.id)}?thumb=1`}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        </a>
+                      ) : (
+                        <div className="flex-shrink-0 w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-300 text-xs">
+                          —
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        {pickLocalized(q.productNameZh, q.productNameRu, locale)}
+                        {q.productSpecZh && (
+                          <div className="text-xs text-gray-500">
+                            {pickLocalized(q.productSpecZh, q.productSpecRu, locale)}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </td>
                   <td className="border p-2 font-mono">
                     {q.unitPrice.toString()} {q.currency}

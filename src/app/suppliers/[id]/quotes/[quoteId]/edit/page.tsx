@@ -2,9 +2,9 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
-import { QuoteForm, type QuoteFormInitialData } from '../../../_components/QuoteForm';
-import { FileUploader } from '../../../../_components/file-uploader';
-import { QuoteImageGallery } from '../../../../_components/quote-image-gallery';
+import { QuoteForm, type QuoteFormInitialData } from '../../_components/QuoteForm';
+import { FileUploader } from '../../../_components/file-uploader';
+import { QuoteImageGallery } from '../../../_components/quote-image-gallery';
 
 export default async function EditQuotePage({
   params,

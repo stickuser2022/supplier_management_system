@@ -8,8 +8,8 @@ import {
   translateQuoteFields,
   type QuoteFormState,
   type QuoteTranslateField,
-} from '../new/_actions/quote-actions';
-import { CURRENCIES } from '../new/_validations/quote-schema';
+} from '../_actions/quote-actions';
+import { CURRENCIES } from '../_validations/quote-schema';
 import { TagMultiSelect } from './TagMultiSelect';
 
 // ===== 类型 =====

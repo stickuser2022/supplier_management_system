@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { archiveQuote, restoreQuote } from '../new/_actions/quote-actions';
+import { archiveQuote, restoreQuote } from '../_actions/quote-actions';
 
 export function QuoteActionsCell({
   quote,

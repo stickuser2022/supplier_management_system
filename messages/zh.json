@@ -75,7 +75,8 @@
       "tags": "品类",
       "quotedAt": "报价日期",
       "validUntil": "有效期",
-      "actions": "操作"
+      "actions": "操作",
+      "viewCover": "查看封面"
     },
     "actions": {
       "edit": "编辑",
