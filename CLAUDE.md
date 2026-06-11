@@ -1016,81 +1016,93 @@ RU    俄文
 
 ---
 
-## 2026.6.10 项目进度日志(阶段 5 里程碑 2a.4 + 2b + quotes 结构清理完成:画册 / 文档 + 报价图全链路)
+## 2026.6.10(续) 项目进度日志(阶段 5 里程碑 2c + 2a.5 完成:笔记附件 + 视频抽帧)
 
-### 当前阶段:阶段 5 第一片 + 第二片完成,准备做 NOTE_ATTACHMENT(2c)和 SUPPLIER_VIDEO(2a.5)
+### 当前阶段:阶段 5 文件子系统基本封顶
+
+完成 6 种 FileType 中能落地的全部:LOGO / BROCHURE / DOC / QUOTE_IMAGE / NOTE_ATTACHMENT / SUPPLIER_VIDEO。剩下 PAYMENT_SCREENSHOT 和 TRANSACTION_DOC 必须等 Transaction 管理 UI 里程碑建好父实体后才能挂。
 
 ### 里程碑范围
 
-本日连战 3 大块:**2a.4 BROCHURE + DOC**(供应商画册和资质文档)、**2b QUOTE_IMAGE**(报价图,挂在 Quote 上)、**quotes 目录结构债清理**(把 `[quoteId]/edit/` 等从 `new/` 子目录搬上来一级)。文件存储基础设施(存储抽象层、上传/读取 API、缩略图、双语标题入库 + 锁定)在 2a.3 已经建好,本日主要是**复用扩展 + 新增能力**(封面唯一性、上下排序、跨实体关联)。
+本批次两个独立小里程碑 + 一个"顺带 bug 修复":
+- **2c NOTE_ATTACHMENT**:Note 沟通记录加附件能力(微信截图、合同照、录音文件等)
+- **2a.5 SUPPLIER_VIDEO**:工厂 / 产线视频上传,ffmpeg 抽第 1 秒一帧做封面缩略图
+- **Range 请求支持**:视频播放器进度条可拖动的服务端基础设施
 
 ### 关键架构决策
 
-- **`FileUploader` 是通用组件,prop 名是 `ownerId`**:不同 type 的 owner 不同(SUPPLIER_* 的 owner 是 supplier,QUOTE_IMAGE 的 owner 是 quote),组件不感知具体业务,只透传给 API。命名从 `supplierId` 改为 `ownerId` 是阶段 5 早期的一次正确重命名,代价是改 3 处调用点,收益是后续每加一种 type 调用点都用对名字、不踩坑
-- **数据库结构统一,UI 差异化**:BROCHURE 用画廊网格(看图认产品)、DOC 用列表 + 文件类型徽章(找到对的文档名)、QUOTE_IMAGE 用画廊 + 封面徽章 + 上下移按钮(比价 + 排序)、SUPPLIER_LOGO 用单图占位(头像式)——所有这些用同一张 File 表 + 同一套上传链路,只是渲染组件不同。这是本项目反复出现的设计哲学,本日得到最充分验证
-- **封面唯一性走 Prisma 事务**:`setQuoteImageCover` 先清同 quote 下其他 `is_cover=true`,再置新封面。任何环节失败整体回滚,不会出现两个或零个封面的中间态。模式与 SUPPLIER_LOGO 唯一性、Contact 主要联系人唯一性完全一致
-- **排序用"整组重新编号"而非"两两交换"**:`moveQuoteImage` 每次操作后把所有非封面同类图重新赋 0、1、2...N-1 的连续 sortOrder。优点:状态永远干净,debugging 时一眼看出当前顺序;缺点:每次写多条但事务包住,小数据量(每 quote 5-10 张图)完全 OK
-- **`getFileSupplierId` helper 必须按 type 分支查不同关联表**:这是阶段 5 设计时埋下的隐患,QUOTE_IMAGE 才暴露。SUPPLIER_* 类型直接拿 `file.supplierId`,QUOTE_IMAGE 经 `file.quoteId → quote.supplierId`,未来 PAYMENT_SCREENSHOT / NOTE_ATTACHMENT / TRANSACTION_DOC 各自需要加分支。**该 helper 是阶段 5 的隐性扩展点**
-- **QuotesList 看图比价的关键查询模式**:供应商详情页 QuotesList 拉所有 quote 后,**用一次 `where: { quoteId: { in: [...] } }` 把所有封面图一次查出来**,在内存里拼成 Map。避免 N+1 查询。任何时候列表里要展示子实体的某个挑选项(比如"每个 quote 的 1 张封面"),都用这个模式
-- **quotes 结构债清理**:1d.2 时落下的"`_actions / _validations / [quoteId]/edit` 全嵌在 `new/` 子目录"的怪结构,本日彻底搬正——所有这些都移到 `quotes/` 直接子级。代价是改 3 个文件的 import 路径 + 1 个组件的 Link href + 清 `.next/` 缓存。**结构正确后,Quote 的 URL 是干净的 `/suppliers/{id}/quotes/{qid}/edit`,与 contacts / notes 风格统一**
-- **PDF 缩略图依然不做**:sharp 处理不了 PDF,系统 Ghostscript 在 Windows 上配置麻烦。BROCHURE / DOC 区段的 PDF 显示红色 PDF 图标。要做 PDF 实缩略图等到更晚阶段单独评估
+- **`ffmpeg-static` 而非系统级 ffmpeg**:Windows 装系统 ffmpeg 麻烦(下二进制 + 加 PATH + 重启 shell),`ffmpeg-static` 把 ffmpeg 二进制打包进 npm 包,`npm install` 自动落地,跨平台开箱即用。代价是 node_modules 多 ~80MB,可接受
+- **视频抽帧走"临时文件中转"**:fluent-ffmpeg 要求真实文件路径,不能直接处理 Buffer。流程:`os.tmpdir()` 写临时 mp4 → 跑 ffmpeg screenshot 抽第 1 秒一帧到临时 PNG → sharp 把 PNG 转成 webp → 通过 storage 抽象层落到正式位置 → finally 删两个临时文件。**所有临时文件清理放 finally 里**,防止异常时残留
+- **`getFileSupplierId` helper 扩展到 NOTE_ATTACHMENT**:加 noteId 分支,经 `note.supplierId` 拿到 supplier。这是上次发现的"helper 必须按 type 分支"模式的第二次应用,模式稳定下来——以后每加一种"非直挂 supplier"的 FileType 必须扩这个 helper
+- **NoteAttachmentList UI:图片混文档的双模式渲染**:与 BrochureGallery 的"画廊"或 DocList 的"列表"不同——note 附件是图片(微信截图)和文档(PDF/Word)混着出现的,所以选**列表模式**(因为更适合混合内容),但**为图片单独走缩略图,非图片走彩色文件类型徽章**。同一组件内根据 mime 类型分支渲染 left 侧的视觉元素
+- **视频画廊的播放按钮覆盖层**:用 CSS `absolute inset-0 + flex center` 在缩略图上盖一个半透明圆形 `▶` 按钮,`group-hover` 时加深背景色提供反馈。比真造一个 video player 嵌进列表项简单太多,**点击则在新 tab 用浏览器原生 player 播放**——简化大于花哨
+- **HTTP Range 请求**:`Accept-Ranges: bytes` 头是关键标识——浏览器靠它判断"服务端支持 seek",才会启用 `<video>` 元素可拖动的进度条。然后 `Range: bytes=X-Y` 请求头要返回 `206 Partial Content` + `Content-Range`。**这套 HTTP 协议是浏览器视频播放体验的隐藏前提**,不实现就只能从头看到尾,看着像个 bug 但其实是缺特性
+- **Range 实现的性能取舍**:当前 `LocalStorageProvider` 读整文件再 `subarray`(每次请求 100MB 视频会读 100MB 内存),个人采购规模够用;上 OSS 时让 OSS provider 实现真正的 `getRange` 走对象存储的 byte range API,内存自然不爆
 
 ### 已完成
 
-**2a.4 BROCHURE + DOC**(分 Chunk A/B/C 推进):
-- ✅ Chunk A:`archiveFile` / `restoreFile` / `updateFileTitle` / `translateFileTitle` 4 个 server action;`fileTitleSchema` Zod 校验;files 命名空间 i18n
-- ✅ Chunk B:`FileUploader`(通用多文件)、`BrochureGallery`(图片网格 + PDF 图标卡)、`DocList`(列表 + 文件类型徽章)、`FileItemActions`(共享编辑/归档控件);供应商详情页嵌入两个 section
-- ✅ Chunk C:`files/[fileId]/edit/` 路径下的标题编辑页 + form(双语 + AI 翻译 + 🔒 锁定徽章 + redirect 回详情页)
+**2c NOTE_ATTACHMENT:**
+- ✅ `getFileSupplierId` 加 noteId 分支
+- ✅ `FileUploader` type union 加 `NOTE_ATTACHMENT`
+- ✅ 新建 `note-attachment-list.tsx`(图片走缩略图、文档走彩色徽章的混合渲染)
+- ✅ files 命名空间 i18n 加 4 条
+- ✅ Note 编辑页嵌入"附件"section
+- ✅ 端到端验证:多类型混合上传 / 缩略图 / 归档 / 编辑标题跳转
 
-**2b QUOTE_IMAGE**(分 Chunk A/B/C 推进):
-- ✅ Chunk A:`setQuoteImageCover` / `moveQuoteImage` 两个 server action(事务保唯一 + 整组重编号);`archiveFile` 加 `isCover: false` 清理;quote 命名空间相关 i18n
-- ✅ Chunk B:`QuoteImageGallery`(画廊 + 紫封面徽章)、`QuoteImageActions`(★ ↑ ↓ 编辑 归档 一排控件);Quote 编辑页嵌入"报价图"section
-- ✅ Chunk C:QuotesList 行新增 48px 封面缩略图(一次查询 + Map 拼接);QuoteActionsCell 编辑链接 URL 修复(配合结构清理)
+**2a.5 SUPPLIER_VIDEO:**
+- ✅ `npm install fluent-ffmpeg ffmpeg-static @types/fluent-ffmpeg`
+- ✅ `/api/upload/route.ts` 加 `generateVideoThumbnail` helper(临时文件中转 + finally 清理)
+- ✅ 缩略图分支从 image 扩展为 image / video 双分支
+- ✅ `FileUploader` type union 加 `SUPPLIER_VIDEO`
+- ✅ 新建 `supplier-video-gallery.tsx`(aspect-video + 播放按钮覆盖层)
+- ✅ files 命名空间 i18n 加 4 条
+- ✅ 供应商详情页嵌入"工厂 / 产线视频"section
+- ✅ 端到端验证:上传 mp4 → 等 5-30 秒 ffmpeg 抽帧 → 卡片显示视频第 1 秒画面 + ▶ 按钮 → 新 tab 浏览器原生播放
 
-**quotes 目录结构债清理**:
-- ✅ `_actions / _validations / [quoteId]/edit/` 全部从 `new/` 子目录搬到 `quotes/` 直接子级
-- ✅ QuoteForm / QuoteActionsCell / edit page.tsx 三个文件的 import 路径全部对齐
-- ✅ QuoteActionsCell 的编辑链接 URL 改回干净版本(`/quotes/{qid}/edit`)
-
-**隐性 bug 修复**:
-- ✅ `getFileSupplierId` 加 QUOTE_IMAGE 的"经 quote 拿 supplierId"分支(以前只查 `file.supplierId`,QUOTE_IMAGE 永远返回 null 导致 archive/cover/move/编辑都报"文件不存在")
-- ✅ 文件编辑页 `[fileId]/edit/page.tsx` 的 supplierId 校验同步改成"算出有效 supplierId 再比"
+**Range 请求支持:**
+- ✅ `/api/files/[id]/route.ts` 新增 Range header 解析 + 206 Partial Content 响应分支
+- ✅ 所有响应统一加 `Accept-Ranges: bytes` 头
+- ✅ 越界请求返回 416 Range Not Satisfiable
+- ✅ 视频拖进度条验证通过
 
 ### 本轮新概念
 
-- **`FileType` 的"owner 多样性"**:File 表有 5 个可空外键(supplierId / quoteId / paymentId / noteId / transactionId),每种 FileType 决定哪个非空,helper 函数(如 `getFileSupplierId`)必须按 type 分支处理跨表查询。**这是文件子系统的核心扩展点**
-- **`is_cover` 字段的"超越 sortOrder"语义**:封面图按 `orderBy: [{ isCover: 'desc' }, { sortOrder: 'asc' }]` 永远排第一,与 sortOrder 在不同维度。封面占用一个"VIP 槽位",其余按手工排序
-- **Prisma 事务里 `tx.file.update` 数组用法**:`prisma.$transaction(siblings.map(s => prisma.file.update(...)))` 接受 PromiseLike 数组,一并提交。比 `prisma.$transaction(async tx => { ... })` 写起来更紧凑,适合"批量同质化操作"
-- **`{ in: [...] }` 一次查多记录避 N+1**:列表里要展示每个父实体关联的某个子记录(如每个 quote 的封面),用 `where: { fk: { in: [父 ids] } }` 一次查出,内存拼 Map,渲染时 O(1) 查找
-- **结构债的连锁影响**:从 `_actions / _validations / edit page` 移动到正确位置,牵动 import 路径(3 个文件)、Link URL(1 处)、`.next/` 缓存。结构改动需要一次性做完,中途测试容易出现"半好半坏"的诡异错误
-- **`pages.tsx`(带 s)是无效的 Next.js 路由文件名**:必须是 `page.tsx`(单数)。带 s 的多半是手抖创建的孤儿文件,删了无害
+- **`ffmpeg-static` 包**:把 ffmpeg 命令行二进制打包成 npm 依赖,免去系统级安装。`import ffmpegPath from 'ffmpeg-static'` 拿到二进制绝对路径,丢给 fluent-ffmpeg 的 `setFfmpegPath()`
+- **`fluent-ffmpeg`**:Node 上的 ffmpeg 命令行包装,提供链式 API。`.screenshots({ timestamps, filename, folder, size })` 是抽帧的常用入口
+- **`os.tmpdir()`**:跨平台拿系统临时目录(Windows 是 `C:\Users\xxx\AppData\Local\Temp\`,Linux 是 `/tmp/`),临时文件中转的标准做法
+- **`try / finally` 清理临时文件**:无论中间环节怎么报错,finally 块保证 unlink 跑一遍,`.catch(() => {})` 吞 ENOENT 防"删不存在的文件"二次报错
+- **HTTP `Range` 头 + `206 Partial Content`**:`<video>` / `<audio>` 元素拖动进度条、断点续传下载的底层机制。`Range: bytes=X-Y` 请求 → `206` + `Content-Range: bytes X-Y/Total` 响应
+- **`Accept-Ranges: bytes` 响应头**:服务端"我支持 seek"的宣告。浏览器看到这个才会启用 video 进度条的可拖动状态,**没有它即使后端实现了 Range 处理,UI 也是灰的**
+- **CSS `aspect-video`(16:9 比例容器)+ `object-cover`**:Tailwind 标准做法,视频缩略图卡片用 16:9 容器,缩略图填充截取
+- **`group-hover`**:Tailwind 模式——父元素加 `group`,子元素用 `group-hover:xxx` 在父元素 hover 时变样式。视频卡片的 ▶ 按钮 hover 加深就用这个
 
 ### 本轮踩到的坑
 
-- ❌ **`translateBatch` 调用签名记错**:每条文件标题翻译都要传 `[{ text, from: 'zh', to: 'ru' }]`,不是 `(text, 'ru')` 两参版。**调用前看 supplier-actions.ts 的真实用法**是最稳的
-- ❌ **`<a>` 开头标签丢失**(粘贴时被吞):BrochureGallery / DocList 复制粘贴时 `<a` 那行的"<a"被吃了,导致一长串 attribute 浮在那里报"JSX 表达式必须有父元素"。粘贴大段 tsx 后扫一眼标签配对
-- ❌ **`pages.tsx` 多了个 s**:quotes/new/ 下有个 pages.tsx,Next.js 不识别,但也不报错,只是文件成孤儿
-- ❌ **`.next/` 缓存死活不肯放过旧路径**:文件移动后,Turbopack 缓存还指着旧位置,产生超长怪报错。**任何"移动/重命名文件"操作之后立即 `Remove-Item -Recurse -Force .next/`**
-- ❌ **i18n 命名空间不能跨用**:`getTranslations('quotes')` 拿到的 `t` 只能查 `quotes.xxx`,把 `viewCover` 加到 `files` 命名空间下会查不到。**写代码时先确认这个 `t` 属于哪个抽屉**
-- ❌ **批量改 prop 名时容易顺手 find-replace**:`supplierId → ownerId` 那次差点出事故,实际只该改 `<FileUploader>` 标签里 2 处,其他几十处 `supplierId` 都是数据库字段或别的组件 prop。**find-replace 谨慎,用 VS Code 的"按位置预览"功能**
+- ❌ **视频进度条灰着拖不动**:第一反应"视频文件坏了 / 浏览器 bug",其实是服务端没实现 Range 请求。**症状离根因远**——MIME 对、文件能播、能听见声、能看见画面,**只有 seek 不行**——这种"功能 99% 对" 的诡异表现,90% 概率是 HTTP 协议层的特性缺失
+- ❌ **`ffmpeg-static` 不是 default export 的常见误解**:`import ffmpegPath from 'ffmpeg-static'` 拿到的是字符串路径,**有时是 null**(平台不支持时)。所以代码里要 `if (ffmpegPath) { ffmpeg.setFfmpegPath(ffmpegPath); }` 防御一下
+- ❌ **`screenshots()` 的 `timestamps: ['1']` 参数容易写错成数字 `[1]`**:fluent-ffmpeg 要字符串,代表"第 1 秒"。数字 `1` 表示"百分之 1 进度位置",语义不同
+- ❌ **临时文件名同毫秒冲突**:多人或单人并发上传时,只用 `Date.now()` 拼路径可能撞名。`Date.now() + Math.random().toString(36).slice(2, 8)` 拼合,够防同毫秒
 
-### 临时安全债清单(阶段 2 / 阶段 6 处理)
+### 临时安全债清单(本轮新增)
 
-- (老的)`/api/upload` 用 `DEV_FALLBACK_ADMIN_ID` 兜底拿 user id,阶段 2 接入认证后改强制 session
-- (老的)所有 server action 与 route handler 都没有 role gate,阶段 2 引入 role 检查
-- (老的)`<img>` 标签直接拼 API URL,无 Image 组件优化,阶段 6 评估
-- **`getFileSupplierId` helper 是隐性扩展点**:每加一种非"直挂 supplier"的 FileType(PAYMENT_SCREENSHOT 等),都要在这里加查询分支。**写新 type 测试归档/编辑时记得检查这个 helper**
+- **`LocalStorageProvider` 的 `get(key)` 读整文件到 Buffer**:Range 请求时每次 100MB 视频都会读 100MB 进内存。**OSS 阶段在 provider 内实现 `getRange(key, start, end)`,直接走对象存储的 byte range API,跳过中间 Buffer**——届时这条债自然消失
+- **`/api/files/[id]` 路由 Range 处理在内存里 subarray**:大文件 + 高并发会吃内存。**和上一条同源,OSS 阶段自动解决**
 
 ### 待办
 
-1. ~~2a.4 BROCHURE + DOC~~ ✅
-2. ~~2b QUOTE_IMAGE(Chunk A/B/C)~~ ✅
-3. ~~quotes 结构债清理~~ ✅
-4. **2c NOTE_ATTACHMENT**(下一步):note 编辑页加附件上传 + 列表 + 归档。基础设施全现成,主要是 `getFileSupplierId` 加 noteId 分支 + 新建一个 list 组件 + 嵌入 note 编辑页
-5. **2a.5 SUPPLIER_VIDEO**:`ffmpeg-static` + `fluent-ffmpeg` 抽帧封面,新建 video gallery(带播放按钮覆盖)
-6. **Transaction 管理 UI** 里程碑(独立大块,与文件无直接关系):TransactionForm + TransactionItem 子表 + Payment 子表;做完之后再补 PAYMENT_SCREENSHOT 和 TRANSACTION_DOC
-7. 阶段 6 UI 美化(把今天搭起来的功能视觉打磨一波)
+1. ~~2c NOTE_ATTACHMENT~~ ✅
+2. ~~2a.5 SUPPLIER_VIDEO~~ ✅
+3. ~~Range 请求支持~~ ✅
+4. **阶段 5 文件子系统封顶**——LOGO / BROCHURE / DOC / QUOTE_IMAGE / NOTE_ATTACHMENT / SUPPLIER_VIDEO 全在线 ✅
+5. (大里程碑)**Transaction 管理 UI**:TransactionForm + TransactionItem 子表 + Payment 子表 CRUD。完了之后才能补 TRANSACTION_DOC / PAYMENT_SCREENSHOT 两种 FileType
+6. **阶段 6 UI 美化**:把全阶段搭起来的功能视觉打磨一波(headers、间距、配色、Image 组件、响应式细节)
+7. (临时小钩子)**物理删除入口**:给"误录想撤销"加一条真删除路径(DB 行 + 磁盘文件一起删)
+8. (临时小钩子)**OSS 上线时的 `getRange` 优化**:LocalStorageProvider 的整文件读法在大量 Range 请求下吃内存,届时切 OSS 实现真 byte range
 
 ### 下一轮对话开始时的入口
 
-直接说:**「继续阶段 5,进 2c NOTE_ATTACHMENT」** 或 **「继续阶段 5,进 2a.5 SUPPLIER_VIDEO」**(取决于你想先做哪个)
+按你的优先级选一个,告诉 AI:
+
+- **「进 Transaction 管理 UI」**(最大块,做完阶段 5 才真正完整;但工作量大,跟文件无关,是新业务)
+- **「进阶段 6 UI 美化」**(把现有功能视觉打磨,体验跃升明显;不增功能,降坏掉风险低)
+- **「做物理删除入口」**(小钩子,1 小时活,做完心里踏实)
