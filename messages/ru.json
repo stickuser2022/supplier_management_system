@@ -50,7 +50,11 @@
   "setAsCover": "Сделать обложкой",
   "moveUp": "Вверх",
   "moveDown": "Вниз",
-  "coverFixed": "Положение обложки фиксировано"
+  "coverFixed": "Положение обложки фиксировано",
+  "noteAttachmentsTitle": "Вложения",
+  "noteAttachmentsEmpty": "Вложения отсутствуют",
+  "uploadNoteAttachments": "Загрузить вложения",
+  "noteAttachmentAcceptHint": "Изображение / PDF / Word / Excel / аудио, до 30 МБ"
 
 },
   "notes": {

@@ -31,7 +31,7 @@ export async function clearSupplierLogo(
 async function getFileSupplierId(fileId: number): Promise<number | null> {
   const file = await prisma.file.findUnique({
     where: { id: fileId },
-    select: { supplierId: true, quoteId: true },
+    select: { supplierId: true, quoteId: true, noteId: true },
   });
   if (!file) return null;
   // SUPPLIER_* 类型:直接挂 supplierId
@@ -44,8 +44,15 @@ async function getFileSupplierId(fileId: number): Promise<number | null> {
     });
     return quote?.supplierId ?? null;
   }
-  // 未来加 PAYMENT_SCREENSHOT / NOTE_ATTACHMENT / TRANSACTION_DOC 时,
-  // 再加 paymentId / noteId / transactionId 的 if 分支
+  // NOTE_ATTACHMENT:经 note 拿 supplierId
+  if (file.noteId) {
+    const note = await prisma.note.findUnique({
+      where: { id: file.noteId },
+      select: { supplierId: true },
+    });
+    return note?.supplierId ?? null;
+  }
+  // 未来加 PAYMENT_SCREENSHOT / TRANSACTION_DOC 时再加分支
   return null;
 }
 

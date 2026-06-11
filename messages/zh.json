@@ -51,7 +51,11 @@
   "setAsCover": "设为封面",
   "moveUp": "上移",
   "moveDown": "下移",
-  "coverFixed": "封面位置固定"
+  "coverFixed": "封面位置固定",
+  "noteAttachmentsTitle": "附件",
+  "noteAttachmentsEmpty": "暂无附件",
+  "uploadNoteAttachments": "上传附件",
+  "noteAttachmentAcceptHint": "图片 / PDF / Word / Excel / 录音,最大 30MB"
   
 },
   "notes": {

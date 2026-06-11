@@ -2,6 +2,9 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { NoteForm, type NoteFormInitialData } from '../../_components/NoteForm';
+import { getTranslations } from 'next-intl/server';
+import { FileUploader } from '../../../_components/file-uploader';
+import { NoteAttachmentList } from '../../../_components/note-attachment-list';
 
 export default async function EditNotePage({
   params,
@@ -29,6 +32,28 @@ export default async function EditNotePage({
     }),
   ]);
 
+  const attachments = await prisma.file.findMany({
+  where: {
+    noteId,
+    type: 'NOTE_ATTACHMENT',
+    isActive: true,
+  },
+  select: {
+    id: true,
+    fileName: true,
+    mimeType: true,
+    sizeBytes: true,
+    thumbnailKey: true,
+    titleZh: true,
+    titleRu: true,
+    createdAt: true,
+  },
+  orderBy: { createdAt: 'desc' },
+});
+
+const tFiles = await getTranslations('files');
+  
+
   const initialData: NoteFormInitialData = {
     id: note.id,
     contactId: note.contactId,
@@ -51,6 +76,22 @@ export default async function EditNotePage({
         availableContacts={availableContacts}
         availableQuotes={availableQuotes}
       />
+      {/* 附件 */}
+<section className="mt-8">
+  <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
+    {tFiles('noteAttachmentsTitle')}
+  </h2>
+  <FileUploader
+    ownerId={noteId}
+    type="NOTE_ATTACHMENT"
+    accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,audio/*"
+    maxBytes={30 * 1024 * 1024}
+    label={tFiles('uploadNoteAttachments')}
+    acceptHint={tFiles('noteAttachmentAcceptHint')}
+  />
+  <NoteAttachmentList supplierId={supplierId} items={attachments} />
+</section>
     </div>
+    
   );
 }
