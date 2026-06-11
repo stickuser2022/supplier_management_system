@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 
 type Props = {
   ownerId: number;
-  type: 'SUPPLIER_BROCHURE' | 'SUPPLIER_DOC' | 'QUOTE_IMAGE' | 'NOTE_ATTACHMENT';
+  type: 'SUPPLIER_BROCHURE' | 'SUPPLIER_DOC' | 'QUOTE_IMAGE' | 'NOTE_ATTACHMENT' | 'SUPPLIER_VIDEO';
   accept: string;     // HTML accept 属性
   maxBytes: number;   // 客户端预校验上限
   label: string;      // 按钮文字

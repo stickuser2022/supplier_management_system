@@ -7,6 +7,49 @@ import { auth } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { storage, keyFor, thumbKeyFor } from '@/lib/storage';
 import type { FileType } from '@/generated/prisma/client';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegPath from 'ffmpeg-static';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+
+// ffmpeg 绑定 static 二进制路径,免去系统装 ffmpeg
+if (ffmpegPath) {
+  ffmpeg.setFfmpegPath(ffmpegPath);
+}
+
+/**
+ * 视频缩略图生成:抽取第 1 秒一帧 → PNG → sharp 转 webp
+ * 用临时文件中转(ffmpeg 要求真实文件路径,不能直接 stream Buffer)
+ */
+async function generateVideoThumbnail(videoBuffer: Buffer): Promise<Buffer> {
+  const tmpDir = os.tmpdir();
+  const stamp = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  const tmpVideoPath = `${tmpDir}/video-${stamp}-${rand}.tmp`;
+  const tmpThumbName = `thumb-${stamp}-${rand}.png`;
+  const tmpThumbPath = `${tmpDir}/${tmpThumbName}`;
+
+  await fs.writeFile(tmpVideoPath, videoBuffer);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(tmpVideoPath)
+        .screenshots({
+          timestamps: ['1'],
+          filename: tmpThumbName,
+          folder: tmpDir,
+          size: '400x?',
+        })
+        .on('end', () => resolve())
+        .on('error', (err) => reject(err));
+    });
+    const pngBuffer = await fs.readFile(tmpThumbPath);
+    return await sharp(pngBuffer).webp({ quality: 80 }).toBuffer();
+  } finally {
+    await fs.unlink(tmpVideoPath).catch(() => {});
+    await fs.unlink(tmpThumbPath).catch(() => {});
+  }
+}
+
 
 // ─── 每个 FileType 的上传约束 ────────────────────────────────
 const TYPE_RULES: Record<FileType, { maxBytes: number; allowedMime: RegExp }> = {
@@ -140,7 +183,7 @@ export async function POST(request: NextRequest) {
   const key = keyFor(type, ownerId, file.name);
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // 6. 缩略图(仅图片;失败不阻断主流程)
+// 6. 缩略图(图片直接 resize;视频抽帧;其他类型不做)
   let thumbnailKey: string | null = null;
   if (file.type.startsWith('image/')) {
     try {
@@ -151,7 +194,16 @@ export async function POST(request: NextRequest) {
       thumbnailKey = thumbKeyFor(key);
       await storage.put(thumbnailKey, thumb, 'image/webp');
     } catch (err) {
-      console.warn('[upload] thumbnail failed (skip):', err);
+      console.warn('[upload] image thumbnail failed (skip):', err);
+      thumbnailKey = null;
+    }
+  } else if (file.type.startsWith('video/')) {
+    try {
+      const thumb = await generateVideoThumbnail(buffer);
+      thumbnailKey = thumbKeyFor(key);
+      await storage.put(thumbnailKey, thumb, 'image/webp');
+    } catch (err) {
+      console.warn('[upload] video thumbnail failed (skip):', err);
       thumbnailKey = null;
     }
   }

@@ -11,6 +11,7 @@ import { SupplierLogo } from './_components/supplier-logo';
 import { FileUploader } from './_components/file-uploader';
 import { BrochureGallery } from './_components/brochure-gallery';
 import { DocList } from './_components/doc-list';
+import { SupplierVideoGallery } from './_components/supplier-video-gallery';
 
 export default async function SupplierDetailPage({
   params,
@@ -76,6 +77,22 @@ const docs = await prisma.file.findMany({
   const tLevel = await getTranslations('cooperationLevel');
   const tFiles = await getTranslations('files');
   const locale = await getLocale();
+  const videos = await prisma.file.findMany({
+  where: {
+    supplierId: id,
+    type: 'SUPPLIER_VIDEO',
+    isActive: true,
+  },
+  select: {
+    id: true,
+    fileName: true,
+    thumbnailKey: true,
+    titleZh: true,
+    titleRu: true,
+    sizeBytes: true,
+  },
+  orderBy: { createdAt: 'desc' },
+});
 
   return (
     <div className="p-6 max-w-5xl">
@@ -194,6 +211,22 @@ const docs = await prisma.file.findMany({
           acceptHint={tFiles('brochureAcceptHint')}
         />
         <BrochureGallery supplierId={id} items={brochures} />
+      </section>
+
+      {/* 工厂 / 产线视频 */}
+      <section className="mb-6">
+        <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
+          {tFiles('videosTitle')}
+        </h2>
+        <FileUploader
+          ownerId={id}
+          type="SUPPLIER_VIDEO"
+          accept="video/mp4,video/quicktime,video/webm,video/x-matroska"
+          maxBytes={200 * 1024 * 1024}
+          label={tFiles('uploadVideos')}
+          acceptHint={tFiles('videoAcceptHint')}
+        />
+        <SupplierVideoGallery supplierId={id} items={videos} />
       </section>
 
       {/* 资质 / 文档 */}

@@ -55,7 +55,11 @@
   "noteAttachmentsTitle": "附件",
   "noteAttachmentsEmpty": "暂无附件",
   "uploadNoteAttachments": "上传附件",
-  "noteAttachmentAcceptHint": "图片 / PDF / Word / Excel / 录音,最大 30MB"
+  "noteAttachmentAcceptHint": "图片 / PDF / Word / Excel / 录音,最大 30MB",
+  "videosTitle": "工厂 / 产线视频",
+  "videosEmpty": "暂无视频",
+  "uploadVideos": "上传视频",
+  "videoAcceptHint": "视频,最大 200MB"
   
 },
   "notes": {

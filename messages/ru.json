@@ -54,7 +54,11 @@
   "noteAttachmentsTitle": "Вложения",
   "noteAttachmentsEmpty": "Вложения отсутствуют",
   "uploadNoteAttachments": "Загрузить вложения",
-  "noteAttachmentAcceptHint": "Изображение / PDF / Word / Excel / аудио, до 30 МБ"
+  "noteAttachmentAcceptHint": "Изображение / PDF / Word / Excel / аудио, до 30 МБ",
+  "videosTitle": "Видео завода / линии",
+  "videosEmpty": "Видео отсутствуют",
+  "uploadVideos": "Загрузить видео",
+  "videoAcceptHint": "Видео, до 200 МБ"
 
 },
   "notes": {
