@@ -1016,94 +1016,81 @@ RU    俄文
 
 ---
 
-## 2026.6.10 项目进度日志(阶段 5 里程碑 2a.0–2a.3 完成:存储抽象层 + LOGO 端到端)
+## 2026.6.10 项目进度日志(阶段 5 里程碑 2a.4 + 2b + quotes 结构清理完成:画册 / 文档 + 报价图全链路)
 
-### 当前阶段:阶段 5 第一片(SUPPLIER 资料文件)进行中,LOGO 跑通,BROCHURE / DOC 待做
+### 当前阶段:阶段 5 第一片 + 第二片完成,准备做 NOTE_ATTACHMENT(2c)和 SUPPLIER_VIDEO(2a.5)
 
 ### 里程碑范围
 
-阶段 5 整体目标是"做一层存储抽象,让业务代码不知道文件是落在本地、OSS 还是 COS",路径与阶段 4 翻译抽象一致。本片(2a)聚焦供应商资料的三种文件类型——LOGO / BROCHURE / DOC,本轮把基础设施(2a.0–2a.2)+ 第一种 type 端到端(2a.3)做完。
+本日连战 3 大块:**2a.4 BROCHURE + DOC**(供应商画册和资质文档)、**2b QUOTE_IMAGE**(报价图,挂在 Quote 上)、**quotes 目录结构债清理**(把 `[quoteId]/edit/` 等从 `new/` 子目录搬上来一级)。文件存储基础设施(存储抽象层、上传/读取 API、缩略图、双语标题入库 + 锁定)在 2a.3 已经建好,本日主要是**复用扩展 + 新增能力**(封面唯一性、上下排序、跨实体关联)。
 
 ### 关键架构决策
 
-- **Route Handler 而非 Server Action**:大文件(画册 PDF 5-20MB、视频 50MB+)走 Next.js Server Action 默认 1MB body 限制扛不住,改走标准 `/api/upload` 多部分表单上传。Server Action 仍用于不涉及上传字节的小操作(如 clearSupplierLogo)
-- **存储抽象层四件套** (`src/lib/storage/`):types.ts 定义 `StorageProvider` 接口(put/get/delete/exists 四方法),key.ts 提供 `keyFor()` / `thumbKeyFor()` 纯函数,local.ts 实现本地文件系统,index.ts 按 `STORAGE_DRIVER` 环境变量挑 provider 并导出单例。未来加 OSS 只需新 provider 文件 + index.ts 加一个 case
-- **`keyFor(type, ownerId, filename)` 集中维护路径风格**:`{业务实体}/{ownerId}/{子分类}/{stamp}-{rand}-{safe-filename}`。改路径风格只改一个文件,业务调用方零感知
-- **`sanitizeFilename` 文件名净化**:非字母数字下划线短横线全替换为 `_`,扩展名小写,截断 60 字符,防止"../"目录穿越和中文文件名跨平台不稳
-- **`thumbKeyFor` 追加 `.thumb.webp` 而非替换扩展名**:`xxx.png` → `xxx.png.thumb.webp`,排错时一眼对得上原图,删原图也能查到孤儿缩略图
-- **写入顺序:存储先 → DB 后**:存储成功 DB 失败时清理孤儿文件,失败模式比"DB 成功存储失败"产生的幽灵记录友好。每条 catch 路径都做反向清理
-- **缩略图同步生成 + 失败容忍**:sharp 处理图片(300x300 inside resize + webp quality 80),缩略图失败只警告不阻断主流程(避免奇葩格式炸了整条链路)。视频缩略图留到 2a.5,需要系统装 ffmpeg
-- **LOGO 唯一性走 Prisma 事务**:同 Contact.isPrimary 模式,事务里 updateMany 旧 LOGO 归档 + create 新 LOGO,任何环节失败整体回滚
-- **文件访问通过专用路由**:`storage/` 不在 `public/`,浏览器不能直接访问。`/api/files/[id]` 校验登录态后流出文件;`?thumb=1` 走缩略图分支。`Content-Disposition: inline` + `filename*=UTF-8''xx` 编码非 ASCII 文件名;`Cache-Control: private, max-age=3600` 浏览器缓存 1 小时,CDN/代理不缓存
-- **临时安全债:DEV_FALLBACK_ADMIN_ID 兜底**:沿用 supplier-actions.ts 同一模式——session 拿不到时兜底为 admin user id。优点是当前阶段无需登录就能联调;**代价是 Route Handler 比 Server Action 暴露面更大**(curl 也能调)。阶段 2 完整接入认证 UI 后必须移除兜底,改强制要求 session,并真正引入 role gate
-- **`<img>` 而非 `<Image>`**:Next.js 的 Image 组件适合静态资源,不适合权限保护的动态 API URL,阶段 6 UI 美化时再视情况切
+- **`FileUploader` 是通用组件,prop 名是 `ownerId`**:不同 type 的 owner 不同(SUPPLIER_* 的 owner 是 supplier,QUOTE_IMAGE 的 owner 是 quote),组件不感知具体业务,只透传给 API。命名从 `supplierId` 改为 `ownerId` 是阶段 5 早期的一次正确重命名,代价是改 3 处调用点,收益是后续每加一种 type 调用点都用对名字、不踩坑
+- **数据库结构统一,UI 差异化**:BROCHURE 用画廊网格(看图认产品)、DOC 用列表 + 文件类型徽章(找到对的文档名)、QUOTE_IMAGE 用画廊 + 封面徽章 + 上下移按钮(比价 + 排序)、SUPPLIER_LOGO 用单图占位(头像式)——所有这些用同一张 File 表 + 同一套上传链路,只是渲染组件不同。这是本项目反复出现的设计哲学,本日得到最充分验证
+- **封面唯一性走 Prisma 事务**:`setQuoteImageCover` 先清同 quote 下其他 `is_cover=true`,再置新封面。任何环节失败整体回滚,不会出现两个或零个封面的中间态。模式与 SUPPLIER_LOGO 唯一性、Contact 主要联系人唯一性完全一致
+- **排序用"整组重新编号"而非"两两交换"**:`moveQuoteImage` 每次操作后把所有非封面同类图重新赋 0、1、2...N-1 的连续 sortOrder。优点:状态永远干净,debugging 时一眼看出当前顺序;缺点:每次写多条但事务包住,小数据量(每 quote 5-10 张图)完全 OK
+- **`getFileSupplierId` helper 必须按 type 分支查不同关联表**:这是阶段 5 设计时埋下的隐患,QUOTE_IMAGE 才暴露。SUPPLIER_* 类型直接拿 `file.supplierId`,QUOTE_IMAGE 经 `file.quoteId → quote.supplierId`,未来 PAYMENT_SCREENSHOT / NOTE_ATTACHMENT / TRANSACTION_DOC 各自需要加分支。**该 helper 是阶段 5 的隐性扩展点**
+- **QuotesList 看图比价的关键查询模式**:供应商详情页 QuotesList 拉所有 quote 后,**用一次 `where: { quoteId: { in: [...] } }` 把所有封面图一次查出来**,在内存里拼成 Map。避免 N+1 查询。任何时候列表里要展示子实体的某个挑选项(比如"每个 quote 的 1 张封面"),都用这个模式
+- **quotes 结构债清理**:1d.2 时落下的"`_actions / _validations / [quoteId]/edit` 全嵌在 `new/` 子目录"的怪结构,本日彻底搬正——所有这些都移到 `quotes/` 直接子级。代价是改 3 个文件的 import 路径 + 1 个组件的 Link href + 清 `.next/` 缓存。**结构正确后,Quote 的 URL 是干净的 `/suppliers/{id}/quotes/{qid}/edit`,与 contacts / notes 风格统一**
+- **PDF 缩略图依然不做**:sharp 处理不了 PDF,系统 Ghostscript 在 Windows 上配置麻烦。BROCHURE / DOC 区段的 PDF 显示红色 PDF 图标。要做 PDF 实缩略图等到更晚阶段单独评估
 
 ### 已完成
 
-**2a.0 准备工作:**
-- ✅ `npm install sharp`(图片处理)
-- ✅ 项目根建 `storage/` 目录 + `.gitignore` 写 `*`(目录入 Git、内容不入)
-- ✅ `.env` / `.env.example` 补 `STORAGE_DRIVER` / `STORAGE_ROOT`
-- ✅ 验证 Prisma 客户端导出 `FileType` 枚举
+**2a.4 BROCHURE + DOC**(分 Chunk A/B/C 推进):
+- ✅ Chunk A:`archiveFile` / `restoreFile` / `updateFileTitle` / `translateFileTitle` 4 个 server action;`fileTitleSchema` Zod 校验;files 命名空间 i18n
+- ✅ Chunk B:`FileUploader`(通用多文件)、`BrochureGallery`(图片网格 + PDF 图标卡)、`DocList`(列表 + 文件类型徽章)、`FileItemActions`(共享编辑/归档控件);供应商详情页嵌入两个 section
+- ✅ Chunk C:`files/[fileId]/edit/` 路径下的标题编辑页 + form(双语 + AI 翻译 + 🔒 锁定徽章 + redirect 回详情页)
 
-**2a.1 存储抽象层** (`src/lib/storage/`):
-- ✅ types.ts — `StorageProvider` 接口契约
-- ✅ key.ts — `keyFor` / `thumbKeyFor` / 内部 `sanitizeFilename` 纯函数
-- ✅ local.ts — `LocalStorageProvider` 类,含 zip slip 防护
-- ✅ index.ts — 按 env 挑 provider,导出 `storage` 单例
+**2b QUOTE_IMAGE**(分 Chunk A/B/C 推进):
+- ✅ Chunk A:`setQuoteImageCover` / `moveQuoteImage` 两个 server action(事务保唯一 + 整组重编号);`archiveFile` 加 `isCover: false` 清理;quote 命名空间相关 i18n
+- ✅ Chunk B:`QuoteImageGallery`(画廊 + 紫封面徽章)、`QuoteImageActions`(★ ↑ ↓ 编辑 归档 一排控件);Quote 编辑页嵌入"报价图"section
+- ✅ Chunk C:QuotesList 行新增 48px 封面缩略图(一次查询 + Map 拼接);QuoteActionsCell 编辑链接 URL 修复(配合结构清理)
 
-**2a.2 两条 API 路由:**
-- ✅ `POST /api/upload`:multipart 解析、类型校验、所有 9 个 FileType 的 MIME / 大小白名单、缩略图、事务唯一性、孤儿清理、revalidatePath
-- ✅ `GET /api/files/[id]`:权限校验、`?thumb=1` 缩略图分支、Content-Disposition inline、Cache-Control private
+**quotes 目录结构债清理**:
+- ✅ `_actions / _validations / [quoteId]/edit/` 全部从 `new/` 子目录搬到 `quotes/` 直接子级
+- ✅ QuoteForm / QuoteActionsCell / edit page.tsx 三个文件的 import 路径全部对齐
+- ✅ QuoteActionsCell 的编辑链接 URL 改回干净版本(`/quotes/{qid}/edit`)
 
-**2a.3 SUPPLIER_LOGO 端到端:**
-- ✅ `src/app/suppliers/_actions/file-actions.ts` — `clearSupplierLogo` server action(无 auth gate,与 archiveSupplier 同模式)
-- ✅ `src/app/suppliers/[id]/_components/supplier-logo.tsx` — 客户端组件,虚框占位 / 缩略图显示 / 替换 / 清除 / loading / 错误提示
-- ✅ `messages/zh.json` + `messages/ru.json` 新增 `files` 命名空间
-- ✅ `[id]/page.tsx` 顶部嵌入 SupplierLogo 组件
-- ✅ 端到端验证:上传一张图 → 缩略图显示 → 替换 → 清除 → DB / 磁盘双向核对(`storage/suppliers/{id}/logo/` 下有原图 + .thumb.webp 两个文件)
+**隐性 bug 修复**:
+- ✅ `getFileSupplierId` 加 QUOTE_IMAGE 的"经 quote 拿 supplierId"分支(以前只查 `file.supplierId`,QUOTE_IMAGE 永远返回 null 导致 archive/cover/move/编辑都报"文件不存在")
+- ✅ 文件编辑页 `[fileId]/edit/page.tsx` 的 supplierId 校验同步改成"算出有效 supplierId 再比"
 
 ### 本轮新概念
 
-- **Route Handler vs Server Action 取舍**:大小、调用方、HTTP 标准、类型链分离的差异
-- **`multipart/form-data` + FormData API**:浏览器端 `fetch + new FormData()` 上传文件的标准姿势,与 Server Action 完全不同的传输方式
-- **`sharp` 库**:Node 上基于 libvips 的快速图片处理,`.resize().webp().toBuffer()` 链式调用
-- **`webp` 格式**:体积小、现代浏览器全支持,作为缩略图统一格式
-- **zip slip 防护**:`path.resolve(root, userKey)` 后用 `startsWith(root)` 校验,阻止恶意 key 含 `..` 穿到 root 外
-- **`Content-Disposition: inline` 与 `filename*=UTF-8''...`**:让浏览器直接展示文件(图片/PDF/视频),并按 RFC 5987 编码中文文件名
-- **`router.refresh()` 与 `revalidatePath` 配合**:服务端清缓存 + 客户端重新拉数据 + 重新渲染,两个都要,缺一个看不到刷新
-- **隐藏 `<input type="file">` + 按钮触发 `click()`**:浏览器原生 file input 没法定制样式,通用做法是隐藏它用其他元素触发
-- **TypeScript `never` 穷举检查**:`switch` 末尾 `const _: never = type` 把"漏 case"提到编译期发现
-- **客户端预校验 + 服务端校验双重保险**:前者早失败友好,后者防绕过
+- **`FileType` 的"owner 多样性"**:File 表有 5 个可空外键(supplierId / quoteId / paymentId / noteId / transactionId),每种 FileType 决定哪个非空,helper 函数(如 `getFileSupplierId`)必须按 type 分支处理跨表查询。**这是文件子系统的核心扩展点**
+- **`is_cover` 字段的"超越 sortOrder"语义**:封面图按 `orderBy: [{ isCover: 'desc' }, { sortOrder: 'asc' }]` 永远排第一,与 sortOrder 在不同维度。封面占用一个"VIP 槽位",其余按手工排序
+- **Prisma 事务里 `tx.file.update` 数组用法**:`prisma.$transaction(siblings.map(s => prisma.file.update(...)))` 接受 PromiseLike 数组,一并提交。比 `prisma.$transaction(async tx => { ... })` 写起来更紧凑,适合"批量同质化操作"
+- **`{ in: [...] }` 一次查多记录避 N+1**:列表里要展示每个父实体关联的某个子记录(如每个 quote 的封面),用 `where: { fk: { in: [父 ids] } }` 一次查出,内存拼 Map,渲染时 O(1) 查找
+- **结构债的连锁影响**:从 `_actions / _validations / edit page` 移动到正确位置,牵动 import 路径(3 个文件)、Link URL(1 处)、`.next/` 缓存。结构改动需要一次性做完,中途测试容易出现"半好半坏"的诡异错误
+- **`pages.tsx`(带 s)是无效的 Next.js 路由文件名**:必须是 `page.tsx`(单数)。带 s 的多半是手抖创建的孤儿文件,删了无害
 
 ### 本轮踩到的坑
 
-- ❌ **`session.user.role` 在 better-auth 默认 User 类型上不存在**:role 字段是 Prisma schema 上的 custom 字段,better-auth 类型层不知道。结论:**阶段 5 不做 role 检查**,与现有 supplier-actions.ts 同步,等阶段 2 完整接入认证再处理 role
-- ❌ **`translateBatch` 签名记错**:它吃**一个**数组参数 `[{text, from, to}, ...]`,不是 `(texts, locale)` 两参。调用前先翻 supplier-actions.ts 看真实姿势
-- ❌ **`npx tsx -e` 不加载 tsconfig paths**:`@/...` 别名在 inline 脚本里解析失败,这种验证不可靠。判断代码是否能跑应该看 `npm run dev` 的编译输出
-- ❌ **PowerShell `echo "*" > file` 可能写 UTF-16 BOM**:`.gitignore` 看似空文件。规避:用 VS Code 直接建文件,默认 UTF-8 无 BOM
-
-### 待办
-
-1. ~~2a.0 准备 / 2a.1 抽象层 / 2a.2 API 路由 / 2a.3 LOGO~~ ✅
-2. **2a.4 BROCHURE + DOC**(下一步):多文件、有 title(走 AI 翻译入库)、列表 UI、归档/恢复/改 title 的 server actions。大部分基础设施(API 路由、存储层、缩略图)已就绪,主要是 UI 复用
-3. **2a.5 SUPPLIER_VIDEO**:系统装 ffmpeg 命令行 + `fluent-ffmpeg` npm 包 + 抽第 1 秒一帧做封面 + 视频播放器 UI
-4. **2b QUOTE_IMAGE**:多图 + sort_order + is_cover(每 Quote 唯一封面事务),与 Quote 详情联动
-5. **2c PAYMENT_SCREENSHOT / NOTE_ATTACHMENT / TRANSACTION_DOC**:挂载到对应实体,UI 复用现有上传组件
-6. 阶段 5 整体收尾后进**阶段 6 UI 美化**
+- ❌ **`translateBatch` 调用签名记错**:每条文件标题翻译都要传 `[{ text, from: 'zh', to: 'ru' }]`,不是 `(text, 'ru')` 两参版。**调用前看 supplier-actions.ts 的真实用法**是最稳的
+- ❌ **`<a>` 开头标签丢失**(粘贴时被吞):BrochureGallery / DocList 复制粘贴时 `<a` 那行的"<a"被吃了,导致一长串 attribute 浮在那里报"JSX 表达式必须有父元素"。粘贴大段 tsx 后扫一眼标签配对
+- ❌ **`pages.tsx` 多了个 s**:quotes/new/ 下有个 pages.tsx,Next.js 不识别,但也不报错,只是文件成孤儿
+- ❌ **`.next/` 缓存死活不肯放过旧路径**:文件移动后,Turbopack 缓存还指着旧位置,产生超长怪报错。**任何"移动/重命名文件"操作之后立即 `Remove-Item -Recurse -Force .next/`**
+- ❌ **i18n 命名空间不能跨用**:`getTranslations('quotes')` 拿到的 `t` 只能查 `quotes.xxx`,把 `viewCover` 加到 `files` 命名空间下会查不到。**写代码时先确认这个 `t` 属于哪个抽屉**
+- ❌ **批量改 prop 名时容易顺手 find-replace**:`supplierId → ownerId` 那次差点出事故,实际只该改 `<FileUploader>` 标签里 2 处,其他几十处 `supplierId` 都是数据库字段或别的组件 prop。**find-replace 谨慎,用 VS Code 的"按位置预览"功能**
 
 ### 临时安全债清单(阶段 2 / 阶段 6 处理)
 
-- `/api/upload` 用 `DEV_FALLBACK_ADMIN_ID` 兜底拿 user id,无 session 也能上传——阶段 2 接入认证后改强制 session
-- 所有 server action 与 route handler 都没有 role gate(viewer 理论上也能调 admin 接口)——阶段 2 引入 role 检查
-- `<img>` 标签直接拼 API URL,无 Image 组件优化——阶段 6 UI 美化时评估
+- (老的)`/api/upload` 用 `DEV_FALLBACK_ADMIN_ID` 兜底拿 user id,阶段 2 接入认证后改强制 session
+- (老的)所有 server action 与 route handler 都没有 role gate,阶段 2 引入 role 检查
+- (老的)`<img>` 标签直接拼 API URL,无 Image 组件优化,阶段 6 评估
+- **`getFileSupplierId` helper 是隐性扩展点**:每加一种非"直挂 supplier"的 FileType(PAYMENT_SCREENSHOT 等),都要在这里加查询分支。**写新 type 测试归档/编辑时记得检查这个 helper**
+
+### 待办
+
+1. ~~2a.4 BROCHURE + DOC~~ ✅
+2. ~~2b QUOTE_IMAGE(Chunk A/B/C)~~ ✅
+3. ~~quotes 结构债清理~~ ✅
+4. **2c NOTE_ATTACHMENT**(下一步):note 编辑页加附件上传 + 列表 + 归档。基础设施全现成,主要是 `getFileSupplierId` 加 noteId 分支 + 新建一个 list 组件 + 嵌入 note 编辑页
+5. **2a.5 SUPPLIER_VIDEO**:`ffmpeg-static` + `fluent-ffmpeg` 抽帧封面,新建 video gallery(带播放按钮覆盖)
+6. **Transaction 管理 UI** 里程碑(独立大块,与文件无直接关系):TransactionForm + TransactionItem 子表 + Payment 子表;做完之后再补 PAYMENT_SCREENSHOT 和 TRANSACTION_DOC
+7. 阶段 6 UI 美化(把今天搭起来的功能视觉打磨一波)
 
 ### 下一轮对话开始时的入口
 
-直接说:**「继续阶段 5,进 2a.4 BROCHURE + DOC」**
-
-2a.4 路线预览:
-1. Server Actions:archiveFile / restoreFile / updateFileTitle / triggerTranslateTitle(类似 Note 的 title 翻译入库 + 锁定)
-2. 复用现有 `/api/upload`(zero 改动),前端组件需要支持多文件选择 + title 输入
-3. 详情页"画册"区段(画廊式缩略图网格 + 点击放大)和"资质文档"区段(列表式 + 文件图标 + 下载链接)
-4. 引入"画廊视图"模式与 LOGO 的单图模式做对比,巩固"数据库一致 / UI 差异化"设计哲学
+直接说:**「继续阶段 5,进 2c NOTE_ATTACHMENT」** 或 **「继续阶段 5,进 2a.5 SUPPLIER_VIDEO」**(取决于你想先做哪个)
