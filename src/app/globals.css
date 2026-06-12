@@ -1,26 +1,78 @@
 @import "tailwindcss";
 
+/* ----- Design tokens — Notion-inspired light theme ----- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces */
+  --background: #fbfbfa;
+  --surface: #ffffff;
+  --surface-hover: #f1f1ef;
+
+  /* Borders */
+  --border: #e9e9e7;
+  --border-strong: #d3d2cf;
+
+  /* Text */
+  --foreground: #37352f;
+  --foreground-muted: #787774;
+  --foreground-subtle: #9b9a97;
+
+  /* Accent — 仅用于主操作按钮和链接 */
+  --accent: #2383e2;
+  --accent-hover: #1a6dc4;
+  --accent-foreground: #ffffff;
+
+  /* Semantic badge pairs (bg + fg) */
+  --success-bg: #ecf3ee;
+  --success-fg: #2d6a4f;
+  --info-bg:    #eaf1f9;
+  --info-fg:    #1e5a8a;
+  --warning-bg: #faf2dc;
+  --warning-fg: #7c5b1e;
+  --danger-bg:  #f7e8e6;
+  --danger-fg:  #8c2a26;
 }
 
+/* ----- Expose tokens as Tailwind utilities ----- */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background:       var(--background);
+  --color-surface:          var(--surface);
+  --color-surface-hover:    var(--surface-hover);
+
+  --color-border:           var(--border);
+  --color-border-strong:    var(--border-strong);
+
+  --color-foreground:         var(--foreground);
+  --color-foreground-muted:   var(--foreground-muted);
+  --color-foreground-subtle:  var(--foreground-subtle);
+
+  --color-accent:             var(--accent);
+  --color-accent-hover:       var(--accent-hover);
+  --color-accent-foreground:  var(--accent-foreground);
+
+  --color-success-bg: var(--success-bg);
+  --color-success-fg: var(--success-fg);
+  --color-info-bg:    var(--info-bg);
+  --color-info-fg:    var(--info-fg);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-fg: var(--warning-fg);
+  --color-danger-bg:  var(--danger-bg);
+  --color-danger-fg:  var(--danger-fg);
+
+  /* Tight Notion-style radii */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+
+  /* Fonts (Geist 来自 next/font,在 layout.tsx 里注册) */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
