@@ -2,7 +2,18 @@ import { getTranslations, getLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { pickLocalized } from '@/i18n/pick-localized';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { SupplierActionsCell } from './_components/SupplierActionsCell';
+import { CooperationLevelBadge } from '@/components/suppliers/cooperation-level-badge';
+import { cn } from '@/lib/utils';
 
 export default async function SuppliersPage({
   searchParams,
@@ -13,7 +24,6 @@ export default async function SuppliersPage({
   const showArchived = params.archived === '1';
 
   const t = await getTranslations('suppliers');
-  const tLevel = await getTranslations('cooperationLevel');
   const locale = await getLocale();
 
   const suppliers = await prisma.supplier.findMany({
@@ -22,74 +32,107 @@ export default async function SuppliersPage({
   });
 
   return (
-    <main className="p-8">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">{t('title')}</h1>
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* 页面头部 */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">{t('title')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t('total', { count: suppliers.length })}
+          </p>
+        </div>
         {!showArchived && (
-          <Link
-            href="/suppliers/new"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            {t('newSupplier')}
-          </Link>
+          <Button asChild>
+            <Link href="/suppliers/new">{t('newSupplier')}</Link>
+          </Button>
         )}
       </div>
 
-      {/* 视图切换 */}
-      <div className="mb-4 flex gap-4 text-sm border-b pb-2">
-        <Link
-          href="/suppliers"
-          className={!showArchived ? 'font-semibold text-blue-600' : 'text-gray-500 hover:text-gray-800'}
-        >
-          {t('activeView')}
-        </Link>
-        <Link
-          href="/suppliers?archived=1"
-          className={showArchived ? 'font-semibold text-blue-600' : 'text-gray-500 hover:text-gray-800'}
-        >
-          {t('archivedView')}
-        </Link>
+      {/* Tab 切换 */}
+      <div className="border-b border-border mb-6">
+        <nav className="flex gap-1 -mb-px">
+          <TabLink href="/suppliers" isActive={!showArchived}>
+            {t('activeView')}
+          </TabLink>
+          <TabLink href="/suppliers?archived=1" isActive={showArchived}>
+            {t('archivedView')}
+          </TabLink>
+        </nav>
       </div>
 
-      <p className="mb-4 text-gray-600">{t('total', { count: suppliers.length })}</p>
+      {/* 供应商表格 */}
+      <div className="border border-border rounded-md overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>{t('columns.code')}</TableHead>
+              <TableHead>{t('columns.name')}</TableHead>
+              <TableHead>{t('columns.location')}</TableHead>
+              <TableHead>{t('columns.cooperationLevel')}</TableHead>
+              <TableHead>{t('columns.createdAt')}</TableHead>
+              <TableHead className="text-right">{t('columns.actions')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {suppliers.map((s) => (
+              <TableRow key={s.id}>
+                <TableCell className="font-mono text-xs text-muted-foreground">
+                  {s.code}
+                </TableCell>
+                <TableCell>
+                  <Link
+                    href={`/suppliers/${s.id}`}
+                    className="font-medium text-foreground hover:text-primary hover:underline"
+                  >
+                    {pickLocalized(s.nameZh, s.nameRu, locale)}
+                  </Link>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {pickLocalized(s.provinceZh, s.provinceRu, locale)}
+                  {' / '}
+                  {pickLocalized(s.cityZh, s.cityRu, locale)}
+                </TableCell>
+                <TableCell>
+                  <CooperationLevelBadge level={s.cooperationLevel} />
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {s.createdAt.toLocaleDateString(locale)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <SupplierActionsCell
+                    supplier={{ id: s.id, nameZh: s.nameZh, isActive: s.isActive }}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
 
-      <table className="min-w-full border border-gray-300">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="border p-2 text-left">{t('columns.code')}</th>
-            <th className="border p-2 text-left">{t('columns.name')}</th>
-            <th className="border p-2 text-left">{t('columns.location')}</th>
-            <th className="border p-2 text-left">{t('columns.cooperationLevel')}</th>
-            <th className="border p-2 text-left">{t('columns.createdAt')}</th>
-            <th className="border p-2 text-left">{t('columns.actions')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {suppliers.map((s) => (
-            <tr key={s.id}>
-              <td className="border p-2">{s.code}</td>
-              <td className="border p-2">
-              <Link
-                href={`/suppliers/${s.id}`}
-                className="text-blue-600 hover:underline"
-              >
-                {pickLocalized(s.nameZh, s.nameRu, locale)}
-              </Link>
-            </td>
-              <td className="border p-2">
-                {pickLocalized(s.provinceZh, s.provinceRu, locale)} / {pickLocalized(s.cityZh, s.cityRu, locale)}
-              </td>
-              <td className="border p-2">{tLevel(s.cooperationLevel)}</td>
-              <td className="border p-2">{s.createdAt.toLocaleDateString(locale)}</td>
-              <td className="border p-2">
-                <SupplierActionsCell
-                  supplier={{ id: s.id, nameZh: s.nameZh, isActive: s.isActive }}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </main>
+function TabLink({
+  href,
+  isActive,
+  children,
+}: {
+  href: string;
+  isActive: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'px-3 py-2 text-sm font-medium border-b-2 transition-colors rounded-t-sm',
+        'focus:outline-none focus-visible:bg-muted/50',   // ← 新增这一行
+        isActive
+          ? 'border-foreground text-foreground'
+          : 'border-transparent text-muted-foreground hover:text-foreground'
+      )}
+    >
+      {children}
+    </Link>
   );
 }

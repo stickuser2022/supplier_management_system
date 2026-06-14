@@ -1,10 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
-import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { FormPage } from '@/components/forms/form-page';
 import { TransactionForm, type TransactionFormInitialData } from '../../_components/TransactionForm';
 import { FileUploader } from '../../../_components/file-uploader';
 import { TransactionDocList } from '../../../_components/transaction-doc-list';
+import { DetailSection } from '../../../_components/detail-section';
 
 export default async function EditTransactionPage({
   params,
@@ -37,28 +38,16 @@ export default async function EditTransactionPage({
     prisma.quote.findMany({
       where: { supplierId, status: 'ACTIVE' },
       select: {
-        id: true,
-        productNameZh: true,
-        quotedAt: true,
-        unitPrice: true,
-        currency: true,
+        id: true, productNameZh: true, quotedAt: true,
+        unitPrice: true, currency: true,
       },
       orderBy: { quotedAt: 'desc' },
     }),
     prisma.file.findMany({
-      where: {
-        transactionId,
-        type: 'TRANSACTION_DOC',
-        isActive: true,
-      },
+      where: { transactionId, type: 'TRANSACTION_DOC', isActive: true },
       select: {
-        id: true,
-        fileName: true,
-        mimeType: true,
-        sizeBytes: true,
-        titleZh: true,
-        titleRu: true,
-        createdAt: true,
+        id: true, fileName: true, mimeType: true, sizeBytes: true,
+        titleZh: true, titleRu: true, createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
     }),
@@ -102,14 +91,12 @@ export default async function EditTransactionPage({
   };
 
   return (
-    <div className="p-6">
-      <Link
-        href={`/suppliers/${supplierId}`}
-        className="text-sm text-blue-600 hover:underline"
-      >
-        ← 返回供应商详情
-      </Link>
-      <h1 className="text-2xl font-bold mt-2 mb-6">编辑订单 #{tx.id}</h1>
+    <FormPage
+      title={`编辑订单 #${tx.id}`}
+      backHref={`/suppliers/${supplierId}`}
+      backLabel="返回供应商详情"
+      maxWidthClass="max-w-5xl"
+    >
       <TransactionForm
         supplierId={supplierId}
         initialData={initialData}
@@ -120,20 +107,19 @@ export default async function EditTransactionPage({
         }))}
       />
 
-      <section className="mt-8 max-w-4xl">
-        <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
-          {tFiles('transactionDocsTitle')}
-        </h2>
-        <FileUploader
-          ownerId={transactionId}
-          type="TRANSACTION_DOC"
-          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
-          maxBytes={30 * 1024 * 1024}
-          label={tFiles('uploadTransactionDocs')}
-          acceptHint={tFiles('transactionDocAcceptHint')}
-        />
-        <TransactionDocList supplierId={supplierId} items={transactionDocs} />
-      </section>
-    </div>
+      <div className="mt-8">
+        <DetailSection title={tFiles('transactionDocsTitle')}>
+          <FileUploader
+            ownerId={transactionId}
+            type="TRANSACTION_DOC"
+            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+            maxBytes={30 * 1024 * 1024}
+            label={tFiles('uploadTransactionDocs')}
+            acceptHint={tFiles('transactionDocAcceptHint')}
+          />
+          <TransactionDocList supplierId={supplierId} items={transactionDocs} />
+        </DetailSection>
+      </div>
+    </FormPage>
   );
 }

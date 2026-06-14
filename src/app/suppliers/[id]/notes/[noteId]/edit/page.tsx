@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
-import { prisma } from '@/lib/prisma';
-import { NoteForm, type NoteFormInitialData } from '../../_components/NoteForm';
 import { getTranslations } from 'next-intl/server';
+import { prisma } from '@/lib/prisma';
+import { FormPage } from '@/components/forms/form-page';
+import { NoteForm, type NoteFormInitialData } from '../../_components/NoteForm';
 import { FileUploader } from '../../../_components/file-uploader';
 import { NoteAttachmentList } from '../../../_components/note-attachment-list';
+import { DetailSection } from '../../../_components/detail-section';
 
 export default async function EditNotePage({
   params,
@@ -19,7 +20,7 @@ export default async function EditNotePage({
   const note = await prisma.note.findUnique({ where: { id: noteId } });
   if (!note || note.supplierId !== supplierId) notFound();
 
-  const [availableContacts, availableQuotes] = await Promise.all([
+  const [availableContacts, availableQuotes, attachments, tFiles] = await Promise.all([
     prisma.contact.findMany({
       where: { supplierId, status: 'ACTIVE' },
       select: { id: true, nameZh: true },
@@ -30,29 +31,16 @@ export default async function EditNotePage({
       select: { id: true, productNameZh: true, quotedAt: true },
       orderBy: { quotedAt: 'desc' },
     }),
+    prisma.file.findMany({
+      where: { noteId, type: 'NOTE_ATTACHMENT', isActive: true },
+      select: {
+        id: true, fileName: true, mimeType: true, sizeBytes: true,
+        thumbnailKey: true, titleZh: true, titleRu: true, createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    getTranslations('files'),
   ]);
-
-  const attachments = await prisma.file.findMany({
-  where: {
-    noteId,
-    type: 'NOTE_ATTACHMENT',
-    isActive: true,
-  },
-  select: {
-    id: true,
-    fileName: true,
-    mimeType: true,
-    sizeBytes: true,
-    thumbnailKey: true,
-    titleZh: true,
-    titleRu: true,
-    createdAt: true,
-  },
-  orderBy: { createdAt: 'desc' },
-});
-
-const tFiles = await getTranslations('files');
-  
 
   const initialData: NoteFormInitialData = {
     id: note.id,
@@ -65,33 +53,32 @@ const tFiles = await getTranslations('files');
   };
 
   return (
-    <div className="p-6">
-      <Link href={`/suppliers/${supplierId}`} className="text-sm text-blue-600 hover:underline">
-        ← 返回供应商详情
-      </Link>
-      <h1 className="text-2xl font-bold mt-2 mb-6">编辑沟通记录 #{note.id}</h1>
+    <FormPage
+      title={`编辑沟通记录 #${note.id}`}
+      backHref={`/suppliers/${supplierId}`}
+      backLabel="返回供应商详情"
+      maxWidthClass="max-w-5xl"
+    >
       <NoteForm
         supplierId={supplierId}
         initialData={initialData}
         availableContacts={availableContacts}
         availableQuotes={availableQuotes}
       />
-      {/* 附件 */}
-<section className="mt-8">
-  <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
-    {tFiles('noteAttachmentsTitle')}
-  </h2>
-  <FileUploader
-    ownerId={noteId}
-    type="NOTE_ATTACHMENT"
-    accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,audio/*"
-    maxBytes={30 * 1024 * 1024}
-    label={tFiles('uploadNoteAttachments')}
-    acceptHint={tFiles('noteAttachmentAcceptHint')}
-  />
-  <NoteAttachmentList supplierId={supplierId} items={attachments} />
-</section>
-    </div>
-    
+
+      <div className="mt-8">
+        <DetailSection title={tFiles('noteAttachmentsTitle')}>
+          <FileUploader
+            ownerId={noteId}
+            type="NOTE_ATTACHMENT"
+            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,audio/*"
+            maxBytes={30 * 1024 * 1024}
+            label={tFiles('uploadNoteAttachments')}
+            acceptHint={tFiles('noteAttachmentAcceptHint')}
+          />
+          <NoteAttachmentList supplierId={supplierId} items={attachments} />
+        </DetailSection>
+      </div>
+    </FormPage>
   );
 }

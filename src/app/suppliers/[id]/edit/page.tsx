@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { FormPage } from '@/components/forms/form-page';
 import { SupplierForm, type SupplierFormInitialData } from '../../_components/SupplierForm';
 
 export default async function EditSupplierPage({
@@ -47,12 +47,13 @@ export default async function EditSupplierPage({
   };
 
   return (
-    <div className="p-6">
-      <Link href="/suppliers" className="text-sm text-blue-600 hover:underline">
-        ← 返回列表
-      </Link>
-      <h1 className="text-2xl font-bold mb-6 mt-2">编辑 {supplier.nameZh}</h1>
+    <FormPage
+      title={`编辑 ${supplier.nameZh}`}
+      backHref={`/suppliers/${id}`}
+      backLabel="返回详情"
+      maxWidthClass="max-w-5xl"
+    >
       <SupplierForm initialData={initialData} />
-    </div>
+    </FormPage>
   );
 }

@@ -29,7 +29,7 @@ export function TagMultiSelect({
     <div>
       <div className="flex flex-wrap gap-2 mb-2">
         {availableTags.length === 0 && (
-          <p className="text-sm text-gray-500 italic">
+          <p className="text-sm text-muted-foreground italic">
             没有可选品类标签。请在 Prisma Studio 的 tags 表添加 PRODUCT 类型 tag。
           </p>
         )}
@@ -41,10 +41,10 @@ export function TagMultiSelect({
               key={tag.id}
               type="button"
               onClick={() => toggle(tag.id)}
-              className={`px-3 py-1 rounded-full text-sm border transition ${
+              className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                 selected
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-foreground border-border hover:bg-muted'
               }`}
             >
               {label}
@@ -52,11 +52,10 @@ export function TagMultiSelect({
           );
         })}
       </div>
-      {/* 每个被选 id 一个 hidden input,提交时 formData.getAll('tagIds') 拿全部 */}
       {Array.from(selectedIds).map((id) => (
         <input key={id} type="hidden" name="tagIds" value={id} />
       ))}
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-muted-foreground">
         已选 {selectedIds.size} 个标签
       </p>
     </div>

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { getLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { FormPage } from '@/components/forms/form-page';
 import { QuoteForm } from '../_components/QuoteForm';
 
 export default async function NewQuotePage({
@@ -31,19 +31,18 @@ export default async function NewQuotePage({
   ]);
 
   return (
-    <div className="p-6">
-      <Link href={`/suppliers/${supplierId}`} className="text-sm text-blue-600 hover:underline">
-        ← 返回供应商详情
-      </Link>
-      <h1 className="text-2xl font-bold mt-2 mb-6">
-        为「{supplier.nameZh}」新建报价
-      </h1>
+    <FormPage
+      title={`为「${supplier.nameZh}」新建报价`}
+      backHref={`/suppliers/${supplierId}`}
+      backLabel="返回供应商详情"
+      maxWidthClass="max-w-5xl"
+    >
       <QuoteForm
         supplierId={supplierId}
         availableContacts={availableContacts}
         availableTags={availableTags}
         locale={locale}
       />
-    </div>
+    </FormPage>
   );
 }

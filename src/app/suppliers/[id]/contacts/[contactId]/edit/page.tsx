@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { FormPage } from '@/components/forms/form-page';
 import { ContactForm, type ContactFormInitialData } from '../../_components/ContactForm';
 
 export default async function EditContactPage({
@@ -37,12 +37,13 @@ export default async function EditContactPage({
   };
 
   return (
-    <div className="p-6">
-      <Link href={`/suppliers/${supplierId}`} className="text-sm text-blue-600 hover:underline">
-        ← 返回供应商详情
-      </Link>
-      <h1 className="text-2xl font-bold mt-2 mb-6">编辑「{contact.nameZh}」</h1>
+    <FormPage
+      title={`编辑「${contact.nameZh}」`}
+      backHref={`/suppliers/${supplierId}`}
+      backLabel="返回供应商详情"
+      maxWidthClass="max-w-5xl"
+    >
       <ContactForm supplierId={supplierId} initialData={initialData} />
-    </div>
+    </FormPage>
   );
 }

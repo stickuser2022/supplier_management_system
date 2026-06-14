@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { FormPage } from '@/components/forms/form-page';
 import { QuoteForm, type QuoteFormInitialData } from '../../_components/QuoteForm';
 import { FileUploader } from '../../../_components/file-uploader';
 import { QuoteImageGallery } from '../../../_components/quote-image-gallery';
+import { DetailSection } from '../../../_components/detail-section';
 
 export default async function EditQuotePage({
   params,
@@ -34,19 +35,10 @@ export default async function EditQuotePage({
       orderBy: { nameZh: 'asc' },
     }),
     prisma.file.findMany({
-      where: {
-        quoteId,
-        type: 'QUOTE_IMAGE',
-        isActive: true,
-      },
+      where: { quoteId, type: 'QUOTE_IMAGE', isActive: true },
       select: {
-        id: true,
-        fileName: true,
-        thumbnailKey: true,
-        isCover: true,
-        titleZh: true,
-        titleRu: true,
-        sizeBytes: true,
+        id: true, fileName: true, thumbnailKey: true, isCover: true,
+        titleZh: true, titleRu: true, sizeBytes: true,
       },
       orderBy: [
         { isCover: 'desc' },
@@ -81,11 +73,12 @@ export default async function EditQuotePage({
   };
 
   return (
-    <div className="p-6">
-      <Link href={`/suppliers/${supplierId}`} className="text-sm text-blue-600 hover:underline">
-        ← 返回供应商详情
-      </Link>
-      <h1 className="text-2xl font-bold mt-2 mb-6">编辑报价 #{quote.id}</h1>
+    <FormPage
+      title={`编辑报价 #${quote.id}`}
+      backHref={`/suppliers/${supplierId}`}
+      backLabel="返回供应商详情"
+      maxWidthClass="max-w-5xl"
+    >
       <QuoteForm
         supplierId={supplierId}
         initialData={initialData}
@@ -94,21 +87,19 @@ export default async function EditQuotePage({
         locale={locale}
       />
 
-      {/* 报价图 */}
-      <section className="mt-8">
-        <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
-          {tFiles('quoteImagesTitle')}
-        </h2>
-        <FileUploader
-          ownerId={quoteId}
-          type="QUOTE_IMAGE"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          maxBytes={10 * 1024 * 1024}
-          label={tFiles('uploadQuoteImages')}
-          acceptHint={tFiles('quoteImageAcceptHint')}
-        />
-        <QuoteImageGallery supplierId={supplierId} items={quoteImages} />
-      </section>
-    </div>
+      <div className="mt-8">
+        <DetailSection title={tFiles('quoteImagesTitle')}>
+          <FileUploader
+            ownerId={quoteId}
+            type="QUOTE_IMAGE"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            maxBytes={10 * 1024 * 1024}
+            label={tFiles('uploadQuoteImages')}
+            acceptHint={tFiles('quoteImageAcceptHint')}
+          />
+          <QuoteImageGallery supplierId={supplierId} items={quoteImages} />
+        </DetailSection>
+      </div>
+    </FormPage>
   );
 }

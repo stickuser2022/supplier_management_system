@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { Loader2 } from 'lucide-react';
 import { signIn } from '@/lib/auth-client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,72 +15,85 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSubmitting(true);
     setError(null);
-    setIsLoading(true);
 
-    const result = await signIn.username({
-      username,
-      password,
-    });
-
-    if (result.error) {
-      setError(result.error.message ?? t('errorDefault'));
-      setIsLoading(false);
-    } else {
+    try {
+      const result = await signIn.username({ username, password });
+      if (result.error) {
+        setError(t('errorDefault'));
+        setSubmitting(false);
+        return;
+      }
       router.push('/suppliers');
+      router.refresh();
+    } catch {
+      setError(t('errorDefault'));
+      setSubmitting(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-semibold mb-6 text-gray-800">{t('title')}</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-700 mb-1">{t('username')}</label>
-            <input
+    <div className="min-h-screen flex items-center justify-center bg-background p-6">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-semibold text-foreground">青格力供应商</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">{t('title')}</p>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="bg-card border border-border rounded-md p-6 space-y-4 shadow-sm"
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="username">{t('username')}</Label>
+            <Input
+              id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              required
               autoComplete="username"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+              autoFocus
+              disabled={submitting}
             />
           </div>
-          <div>
-            <label className="block text-sm text-gray-700 mb-1">{t('password')}</label>
-            <input
+
+          <div className="space-y-1.5">
+            <Label htmlFor="password">{t('password')}</Label>
+            <Input
+              id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
               autoComplete="current-password"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+              disabled={submitting}
             />
           </div>
+
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+            <div className="text-sm text-danger-fg bg-danger-bg border border-danger-fg/20 rounded-md p-2.5">
               {error}
             </div>
           )}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? t('submitting') : t('submit')}
-          </button>
+
+          <Button type="submit" disabled={submitting} className="w-full">
+            {submitting ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                {t('submitting')}
+              </>
+            ) : (
+              t('submit')
+            )}
+          </Button>
         </form>
       </div>
     </div>
   );
 }
-
-//useRouter + router.push('/suppliers') —— Next.js 的客户端跳转工具。打个比方:浏览器地址栏自己跳,但不刷新整个页面(像 SPA 那样无缝过渡)
-//<form onSubmit={...}> + e.preventDefault() —— 拦截浏览器默认的"表单提交=刷新页面"行为,改用我们自己的 async 函数处理
-//disabled={isLoading} —— 登录请求飞行期间禁用按钮,防止用户多点重复提交(常见小坑预防)
-//三个 useState 并存 —— 一个组件里可以有任意多个 useState,各管各的状态(用户名 / 密码 / 报错 / loading)

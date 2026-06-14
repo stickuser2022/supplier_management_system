@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { FormPage } from '@/components/forms/form-page';
 import { ContactForm } from '../_components/ContactForm';
 
 export default async function NewContactPage({
@@ -16,14 +16,13 @@ export default async function NewContactPage({
   if (!supplier || !supplier.isActive) notFound();
 
   return (
-    <div className="p-6">
-      <Link href={`/suppliers/${supplierId}`} className="text-sm text-blue-600 hover:underline">
-        ← 返回供应商详情
-      </Link>
-      <h1 className="text-2xl font-bold mt-2 mb-6">
-        为「{supplier.nameZh}」新建联系人
-      </h1>
+    <FormPage
+      title={`为「${supplier.nameZh}」新建联系人`}
+      backHref={`/suppliers/${supplierId}`}
+      backLabel="返回供应商详情"
+      maxWidthClass="max-w-5xl"
+    >
       <ContactForm supplierId={supplierId} />
-    </div>
+    </FormPage>
   );
 }

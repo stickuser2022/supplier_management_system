@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Lock, Sparkles, Loader2 } from 'lucide-react';
 import {
   createContact,
   updateContact,
@@ -9,8 +10,14 @@ import {
   type ContactFormState,
   type ContactTranslateField,
 } from '../_actions/contact-actions';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { FormSection } from '@/components/forms/form-section';
+import { FormField } from '@/components/forms/form-field';
+import { FormActions } from '@/components/forms/form-actions';
 
-// ===== 类型 =====
+// ===== 类型与常量(未变动)=====
+
 export type ContactFormInitialData = {
   id: number;
   nameZh: string;
@@ -67,26 +74,20 @@ const FIELD_PAIRS: FieldPair[] = [
   { key: 'role', zhFieldName: 'roleZh', ruFieldName: 'roleRu', flagFieldName: 'roleRuAutoTranslated', zhLabel: '职位(中文)', ruLabel: '职位(俄文)' },
 ];
 
-// ===== 小组件 =====
-function FieldError({ errors }: { errors?: string[] }) {
-  if (!errors || errors.length === 0) return null;
-  return <p className="text-red-600 text-sm mt-1">{errors[0]}</p>;
-}
+// ===== 子组件 =====
 
 function SubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-    >
+    <Button type="submit" disabled={pending}>
+      {pending && <Loader2 className="size-4 animate-spin" />}
       {pending ? '保存中…' : isEdit ? '更新' : '保存'}
-    </button>
+    </Button>
   );
 }
 
 // ===== 主组件 =====
+
 export function ContactForm({
   supplierId,
   initialData,
@@ -95,16 +96,13 @@ export function ContactForm({
   initialData?: ContactFormInitialData;
 }) {
   const isEdit = Boolean(initialData);
-
   const action = isEdit
     ? updateContact.bind(null, initialData!.id)
     : createContact.bind(null, supplierId);
   const [state, formAction] = useActionState(action, INITIAL_FORM_STATE);
-
   const [bi, setBi] = useState<BilingualState>(() => buildBilingualFromInitial(initialData));
   const [isTranslating, startTranslating] = useTransition();
   const [translateError, setTranslateError] = useState<string | null>(null);
-
   const errors = state.errors;
 
   const handleZhChange = (key: keyof BilingualState, value: string) =>
@@ -147,121 +145,173 @@ export function ContactForm({
   };
 
   return (
-    <form action={formAction} className="space-y-6 max-w-5xl">
+    <form action={formAction} className="space-y-6">
       {state.status === 'error' && state.message && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700">{state.message}</div>
+        <div className="p-3 rounded-md border border-danger-fg/20 bg-danger-bg text-danger-fg text-sm">
+          {state.message}
+        </div>
       )}
       {translateError && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-700">{translateError}</div>
+        <div className="p-3 rounded-md border border-warning-fg/20 bg-warning-bg text-warning-fg text-sm">
+          {translateError}
+        </div>
       )}
 
-      {/* 翻译按钮 */}
-      <div className="flex items-center gap-4 p-4 bg-gray-50 border rounded">
-        <button
+      {/* 自动翻译辅助区 */}
+      <div className="flex items-start gap-4 p-4 rounded-md border border-border bg-muted/40">
+        <Button
           type="button"
           onClick={handleTranslate}
           disabled={isTranslating}
-          className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+          variant="secondary"
+          size="sm"
+          className="flex-shrink-0"
         >
-          {isTranslating ? '翻译中…' : '🌐 自动翻译俄文'}
-        </button>
-        <p className="text-sm text-gray-600">翻译姓名和职位 2 个字段。手改后该字段会上锁。</p>
+          {isTranslating ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              翻译中…
+            </>
+          ) : (
+            <>
+              <Sparkles className="size-4" />
+              自动翻译俄文
+            </>
+          )}
+        </Button>
+        <p className="text-xs text-muted-foreground leading-relaxed pt-1">
+          翻译姓名和职位 2 个字段。手改后该字段会上锁(再次翻译不覆盖)。
+        </p>
       </div>
 
-      {/* 姓名 + 职位双语对照 */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">基本信息</h2>
+      <FormSection title="基本信息">
         {FIELD_PAIRS.map((pair) => {
           const zhValue = bi[pair.zhFieldName] as string;
           const ruValue = bi[pair.ruFieldName] as string;
           const flagValue = bi[pair.flagFieldName] as boolean;
+          const isLocked = !flagValue;
+          const zhFieldId = `${pair.key}-zh`;
+          const ruFieldId = `${pair.key}-ru`;
+
           return (
-            <div key={pair.key} className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm mb-1">
-                  {pair.zhLabel}{pair.required && <span className="text-red-500"> *</span>}
-                </label>
-                <input
+            <div key={pair.key} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                label={pair.zhLabel}
+                htmlFor={zhFieldId}
+                required={pair.required}
+                error={errors?.[pair.zhFieldName]?.[0]}
+              >
+                <Input
+                  id={zhFieldId}
                   type="text"
                   name={pair.zhFieldName}
                   value={zhValue}
                   onChange={(e) => handleZhChange(pair.zhFieldName, e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
                 />
-                <FieldError errors={errors?.[pair.zhFieldName]} />
-              </div>
-              <div>
-                <label className="text-sm mb-1 flex items-center gap-2">
-                  <span>{pair.ruLabel}</span>
-                  {!flagValue && <span className="text-xs text-amber-600">🔒 已手改</span>}
-                </label>
-                <input
+              </FormField>
+              <FormField
+                label={
+                  <>
+                    <span>{pair.ruLabel}</span>
+                    {isLocked && (
+                      <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
+                        <Lock className="size-3" />
+                        已手改
+                      </span>
+                    )}
+                  </>
+                }
+                htmlFor={ruFieldId}
+              >
+                <Input
+                  id={ruFieldId}
                   type="text"
                   name={pair.ruFieldName}
                   value={ruValue}
                   onChange={(e) => handleRuChange(pair.ruFieldName, pair.flagFieldName, e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
                 />
                 <input type="hidden" name={pair.flagFieldName} value={flagValue ? 'true' : 'false'} />
-              </div>
+              </FormField>
             </div>
           );
         })}
-      </section>
+      </FormSection>
 
-      {/* 6 个联系方式(全平铺,空的不填) */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">联系方式(空着即可不填)</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm mb-1">手机</label>
-            <input
+      <FormSection title="联系方式" description="空着即可不填,多号码用 / 分隔">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField label="手机" htmlFor="phone">
+            <Input
+              id="phone"
               type="text"
               name="phone"
               defaultValue={initialData?.phone ?? ''}
-              placeholder="多号码用 / 分隔"
-              className="w-full px-3 py-2 border rounded"
+              placeholder="13800138000"
             />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">微信</label>
-            <input type="text" name="wechat" defaultValue={initialData?.wechat ?? ''} className="w-full px-3 py-2 border rounded" />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">邮箱</label>
-            <input type="text" name="email" defaultValue={initialData?.email ?? ''} className="w-full px-3 py-2 border rounded" />
-            <FieldError errors={errors?.email} />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">WhatsApp</label>
-            <input type="text" name="whatsapp" defaultValue={initialData?.whatsapp ?? ''} className="w-full px-3 py-2 border rounded" />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Telegram</label>
-            <input type="text" name="telegram" defaultValue={initialData?.telegram ?? ''} className="w-full px-3 py-2 border rounded" />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">QQ</label>
-            <input type="text" name="qq" defaultValue={initialData?.qq ?? ''} className="w-full px-3 py-2 border rounded" />
-          </div>
+          </FormField>
+          <FormField label="微信" htmlFor="wechat">
+            <Input
+              id="wechat"
+              type="text"
+              name="wechat"
+              defaultValue={initialData?.wechat ?? ''}
+            />
+          </FormField>
+          <FormField label="邮箱" htmlFor="email" error={errors?.email?.[0]}>
+            <Input
+              id="email"
+              type="email"
+              name="email"
+              defaultValue={initialData?.email ?? ''}
+            />
+          </FormField>
+          <FormField label="WhatsApp" htmlFor="whatsapp">
+            <Input
+              id="whatsapp"
+              type="text"
+              name="whatsapp"
+              defaultValue={initialData?.whatsapp ?? ''}
+            />
+          </FormField>
+          <FormField label="Telegram" htmlFor="telegram">
+            <Input
+              id="telegram"
+              type="text"
+              name="telegram"
+              defaultValue={initialData?.telegram ?? ''}
+            />
+          </FormField>
+          <FormField label="QQ" htmlFor="qq">
+            <Input
+              id="qq"
+              type="text"
+              name="qq"
+              defaultValue={initialData?.qq ?? ''}
+            />
+          </FormField>
         </div>
-      </section>
+      </FormSection>
 
-      {/* 主要联系人勾选 */}
-      <section>
-        <label className="flex items-center gap-2 cursor-pointer">
+      <FormSection>
+        <label className="flex items-start gap-2.5 cursor-pointer">
           <input
             type="checkbox"
             name="isPrimary"
             value="true"
             defaultChecked={initialData?.isPrimary ?? false}
-            className="w-4 h-4"
+            className="size-4 mt-0.5 rounded border-border accent-primary cursor-pointer"
           />
-          <span className="text-sm">设为主要联系人(同一供应商下只能有 1 个,勾选会自动取消其他人的主要标记)</span>
+          <span className="text-sm text-foreground leading-snug">
+            设为主要联系人
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              同一供应商下只能有 1 个,勾选会自动取消其他人的主要标记
+            </span>
+          </span>
         </label>
-      </section>
+      </FormSection>
 
-      <SubmitButton isEdit={isEdit} />
+      <FormActions>
+        <SubmitButton isEdit={isEdit} />
+      </FormActions>
     </form>
   );
 }

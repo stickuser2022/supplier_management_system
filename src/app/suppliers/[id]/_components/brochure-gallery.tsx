@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { FileText } from 'lucide-react';
 import { FileItemActions } from './file-item-actions';
 
 type BrochureItem = {
@@ -24,11 +25,15 @@ export function BrochureGallery({
   const t = useTranslations('files');
 
   if (items.length === 0) {
-    return <p className="text-sm text-gray-500 italic mt-2">{t('brochuresEmpty')}</p>;
+    return (
+      <p className="text-sm text-muted-foreground italic mt-2">
+        {t('brochuresEmpty')}
+      </p>
+    );
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-2">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">
       {items.map((item) => {
         const isImage = item.mimeType.startsWith('image/');
         const title = item.titleZh || item.fileName;
@@ -36,34 +41,37 @@ export function BrochureGallery({
         return (
           <div
             key={item.id}
-            className="border rounded-lg overflow-hidden bg-white flex flex-col"
+            className="border border-border rounded-md overflow-hidden bg-card flex flex-col"
           >
             
             <a  href={`/api/files/${item.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="block aspect-square bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors"
+              className="block aspect-square bg-muted flex items-center justify-center hover:bg-muted/70 transition-colors"
             >
               {isImage && item.thumbnailKey ? (
-                // eslint-disable-next-line @next/next/no-img-element
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={`/api/files/${item.id}?thumb=1`}
                   alt={item.fileName}
-                  className="w-full h-full object-contain"
+                  className="size-full object-contain"
                 />
               ) : (
-                <PdfIcon />
+                <div className="flex flex-col items-center gap-1.5 text-danger-fg">
+                  <FileText className="size-10" />
+                  <span className="text-xs font-medium">PDF</span>
+                </div>
               )}
             </a>
-            <div className="p-2 border-t bg-white">
+            <div className="p-2.5 border-t border-border">
               <div
-                className="text-sm font-medium truncate"
+                className="text-sm font-medium text-foreground truncate"
                 title={title}
               >
                 {title}
               </div>
-              <div className="flex items-center justify-between mt-1 gap-2">
-                <span className="text-xs text-gray-400 whitespace-nowrap">
+              <div className="flex items-center justify-between gap-2 mt-1">
+                <span className="text-xs text-foreground-subtle whitespace-nowrap">
                   {formatSize(item.sizeBytes)}
                 </span>
                 <FileItemActions fileId={item.id} supplierId={supplierId} />
@@ -72,17 +80,6 @@ export function BrochureGallery({
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function PdfIcon() {
-  return (
-    <div className="flex flex-col items-center gap-2 text-red-500">
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-16 h-16">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z" />
-      </svg>
-      <span className="text-xs font-semibold">PDF</span>
     </div>
   );
 }

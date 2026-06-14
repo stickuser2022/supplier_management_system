@@ -4,7 +4,12 @@ import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { Pencil, Archive, Loader2 } from 'lucide-react';
 import { archiveFile } from '@/app/suppliers/_actions/file-actions';
+import { cn } from '@/lib/utils';
+
+const baseClasses =
+  'inline-flex items-center gap-1 text-xs transition-colors disabled:opacity-50 disabled:pointer-events-none';
 
 export function FileItemActions({
   fileId,
@@ -27,20 +32,26 @@ export function FileItemActions({
   }
 
   return (
-    <div className="flex items-center gap-2 text-xs whitespace-nowrap">
+    <div className="flex items-center gap-3 whitespace-nowrap">
       <Link
         href={`/suppliers/${supplierId}/files/${fileId}/edit`}
-        className="text-blue-600 hover:underline"
+        className={cn(baseClasses, 'text-muted-foreground hover:text-foreground')}
       >
+        <Pencil className="size-3" />
         {t('editTitle')}
       </Link>
       <button
         type="button"
         onClick={handleArchive}
         disabled={pending}
-        className="text-red-600 hover:underline disabled:opacity-50"
+        className={cn(baseClasses, 'text-muted-foreground hover:text-danger-fg')}
       >
-        {pending ? '…' : t('archiveFile')}
+        {pending ? (
+          <Loader2 className="size-3 animate-spin" />
+        ) : (
+          <Archive className="size-3" />
+        )}
+        {t('archiveFile')}
       </button>
     </div>
   );

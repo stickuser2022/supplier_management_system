@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { FileText, FileSpreadsheet, Image as ImageIcon, File } from 'lucide-react';
 import { FileItemActions } from './file-item-actions';
 
 type DocItem = {
@@ -23,30 +24,30 @@ export function DocList({
   const t = useTranslations('files');
 
   if (items.length === 0) {
-    return <p className="text-sm text-gray-500 italic mt-2">{t('docsEmpty')}</p>;
+    return <p className="text-sm text-muted-foreground italic mt-2">{t('docsEmpty')}</p>;
   }
 
   return (
-    <ul className="divide-y rounded border bg-white mt-2">
+    <ul className="divide-y divide-border rounded-md border border-border bg-card mt-2 overflow-hidden">
       {items.map((item) => {
         const title = item.titleZh || item.fileName;
         return (
           <li
             key={item.id}
-            className="flex items-center gap-3 p-3 hover:bg-gray-50"
+            className="flex items-center gap-3 p-3 hover:bg-muted/40 transition-colors"
           >
             <FileTypeIcon mime={item.mimeType} />
             <div className="flex-1 min-w-0">
               
-               <a href={`/api/files/${item.id}`}
+              <a  href={`/api/files/${item.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm font-medium text-blue-600 hover:underline truncate block"
+                className="text-sm font-medium text-foreground hover:text-primary hover:underline truncate block"
                 title={title}
               >
                 {title}
               </a>
-              <div className="text-xs text-gray-500 flex gap-3 mt-1">
+              <div className="text-xs text-muted-foreground flex gap-3 mt-1">
                 <span>{formatSize(item.sizeBytes)}</span>
                 <span>{new Date(item.createdAt).toLocaleDateString()}</span>
               </div>
@@ -60,26 +61,27 @@ export function DocList({
 }
 
 function FileTypeIcon({ mime }: { mime: string }) {
-  let label = 'FILE';
-  let color = 'bg-gray-500';
+  let Icon = File;
+  let toneClass = 'bg-muted text-muted-foreground';
+
   if (mime.startsWith('image/')) {
-    label = 'IMG';
-    color = 'bg-purple-500';
+    Icon = ImageIcon;
   } else if (mime === 'application/pdf') {
-    label = 'PDF';
-    color = 'bg-red-500';
+    Icon = FileText;
+    toneClass = 'bg-danger-bg text-danger-fg';
   } else if (mime.includes('word') || mime.includes('msword')) {
-    label = 'DOC';
-    color = 'bg-blue-500';
+    Icon = FileText;
+    toneClass = 'bg-info-bg text-info-fg';
   } else if (mime.includes('excel') || mime.includes('spreadsheet')) {
-    label = 'XLS';
-    color = 'bg-green-500';
+    Icon = FileSpreadsheet;
+    toneClass = 'bg-success-bg text-success-fg';
   }
+
   return (
     <div
-      className={`w-10 h-10 rounded ${color} text-white text-xs font-bold flex items-center justify-center flex-shrink-0`}
+      className={`size-9 rounded-md flex items-center justify-center flex-shrink-0 ${toneClass}`}
     >
-      {label}
+      <Icon className="size-4" />
     </div>
   );
 }

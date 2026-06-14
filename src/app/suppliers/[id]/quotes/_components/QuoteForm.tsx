@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Lock, Sparkles, Loader2 } from 'lucide-react';
 import {
   createQuote,
   updateQuote,
@@ -11,8 +12,12 @@ import {
 } from '../_actions/quote-actions';
 import { CURRENCIES } from '../_validations/quote-schema';
 import { TagMultiSelect } from './TagMultiSelect';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { FormSection } from '@/components/forms/form-section';
+import { FormField } from '@/components/forms/form-field';
+import { FormActions } from '@/components/forms/form-actions';
 
-// ===== 类型 =====
 export type QuoteFormInitialData = {
   id: number;
   contactId: number | null;
@@ -22,13 +27,13 @@ export type QuoteFormInitialData = {
   productSpecZh: string | null;
   productSpecRu: string | null;
   productSpecRuAutoTranslated: boolean;
-  unitPrice: string;  // 已 toString() 由 parent 处理
+  unitPrice: string;
   currency: typeof CURRENCIES[number];
   unitZh: string | null;
   unitRu: string | null;
   moq: number | null;
-  quotedAt: string;  // YYYY-MM-DD
-  validUntil: string | null;  // YYYY-MM-DD or null
+  quotedAt: string;
+  validUntil: string | null;
   leadTimeDays: number | null;
   paymentTerms: string | null;
   source: string | null;
@@ -74,26 +79,19 @@ const FIELD_PAIRS: FieldPair[] = [
   { key: 'productSpec', zhFieldName: 'productSpecZh', ruFieldName: 'productSpecRu', flagFieldName: 'productSpecRuAutoTranslated', zhLabel: '规格(中文)', ruLabel: '规格(俄文)' },
 ];
 
-// ===== 小组件 =====
-function FieldError({ errors }: { errors?: string[] }) {
-  if (!errors || errors.length === 0) return null;
-  return <p className="text-red-600 text-sm mt-1">{errors[0]}</p>;
-}
+const SELECT_CLASS =
+  'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 function SubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-    >
+    <Button type="submit" disabled={pending}>
+      {pending && <Loader2 className="size-4 animate-spin" />}
       {pending ? '保存中…' : isEdit ? '更新' : '保存'}
-    </button>
+    </Button>
   );
 }
 
-// ===== 主组件 =====
 export function QuoteForm({
   supplierId,
   initialData,
@@ -115,9 +113,7 @@ export function QuoteForm({
   const [bi, setBi] = useState<BilingualState>(() => buildBiFromInitial(initialData));
   const [isTranslating, startTranslating] = useTransition();
   const [translateError, setTranslateError] = useState<string | null>(null);
-
   const errors = state.errors;
-  const baseClass = 'w-full px-3 py-2 border rounded';
 
   const handleZhChange = (key: keyof BilingualState, value: string) =>
     setBi((s) => ({ ...s, [key]: value }));
@@ -140,7 +136,10 @@ export function QuoteForm({
     }
     startTranslating(async () => {
       const res = await translateQuoteFields(requests);
-      if (!res.ok) { setTranslateError(res.error); return; }
+      if (!res.ok) {
+        setTranslateError(res.error);
+        return;
+      }
       setBi((s) => {
         const next = { ...s };
         for (const r of res.results) {
@@ -155,147 +154,231 @@ export function QuoteForm({
   };
 
   return (
-    <form action={formAction} className="space-y-6 max-w-5xl">
+    <form action={formAction} className="space-y-6">
       {state.status === 'error' && state.message && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700">{state.message}</div>
+        <div className="p-3 rounded-md border border-danger-fg/20 bg-danger-bg text-danger-fg text-sm">
+          {state.message}
+        </div>
       )}
       {translateError && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-700">{translateError}</div>
+        <div className="p-3 rounded-md border border-warning-fg/20 bg-warning-bg text-warning-fg text-sm">
+          {translateError}
+        </div>
       )}
 
-      {/* 翻译按钮 */}
-      <div className="flex items-center gap-4 p-4 bg-gray-50 border rounded">
-        <button type="button" onClick={handleTranslate} disabled={isTranslating}
-          className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50">
-          {isTranslating ? '翻译中…' : '🌐 自动翻译俄文'}
-        </button>
-        <p className="text-sm text-gray-600">翻译产品名和规格 2 个字段。手改后该字段会上锁。</p>
+      <div className="flex items-start gap-4 p-4 rounded-md border border-border bg-muted/40">
+        <Button
+          type="button"
+          onClick={handleTranslate}
+          disabled={isTranslating}
+          variant="secondary"
+          size="sm"
+          className="flex-shrink-0"
+        >
+          {isTranslating ? (
+            <><Loader2 className="size-4 animate-spin" />翻译中…</>
+          ) : (
+            <><Sparkles className="size-4" />自动翻译俄文</>
+          )}
+        </Button>
+        <p className="text-xs text-muted-foreground leading-relaxed pt-1">
+          翻译产品名和规格 2 个字段。手改后该字段会上锁(再次翻译不覆盖)。
+        </p>
       </div>
 
-      {/* 产品信息(双语) */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">产品信息</h2>
+      <FormSection title="产品信息">
         {FIELD_PAIRS.map((pair) => {
           const zhValue = bi[pair.zhFieldName] as string;
           const ruValue = bi[pair.ruFieldName] as string;
           const flagValue = bi[pair.flagFieldName] as boolean;
+          const isLocked = !flagValue;
+          const zhFieldId = `${pair.key}-zh`;
+          const ruFieldId = `${pair.key}-ru`;
+
           return (
-            <div key={pair.key} className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm mb-1">
-                  {pair.zhLabel}{pair.required && <span className="text-red-500"> *</span>}
-                </label>
-                <input type="text" name={pair.zhFieldName} value={zhValue}
+            <div key={pair.key} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                label={pair.zhLabel}
+                htmlFor={zhFieldId}
+                required={pair.required}
+                error={errors?.[pair.zhFieldName]?.[0]}
+              >
+                <Input
+                  id={zhFieldId}
+                  type="text"
+                  name={pair.zhFieldName}
+                  value={zhValue}
                   onChange={(e) => handleZhChange(pair.zhFieldName, e.target.value)}
-                  className={baseClass} />
-                <FieldError errors={errors?.[pair.zhFieldName]} />
-              </div>
-              <div>
-                <label className="text-sm mb-1 flex items-center gap-2">
-                  <span>{pair.ruLabel}</span>
-                  {!flagValue && <span className="text-xs text-amber-600">🔒 已手改</span>}
-                </label>
-                <input type="text" name={pair.ruFieldName} value={ruValue}
+                />
+              </FormField>
+              <FormField
+                label={
+                  <>
+                    <span>{pair.ruLabel}</span>
+                    {isLocked && (
+                      <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
+                        <Lock className="size-3" />
+                        已手改
+                      </span>
+                    )}
+                  </>
+                }
+                htmlFor={ruFieldId}
+              >
+                <Input
+                  id={ruFieldId}
+                  type="text"
+                  name={pair.ruFieldName}
+                  value={ruValue}
                   onChange={(e) => handleRuChange(pair.ruFieldName, pair.flagFieldName, e.target.value)}
-                  className={baseClass} />
+                />
                 <input type="hidden" name={pair.flagFieldName} value={flagValue ? 'true' : 'false'} />
-              </div>
+              </FormField>
             </div>
           );
         })}
-      </section>
+      </FormSection>
 
-      {/* 价格 + 货币 + 单位 + 起订量 */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">价格与数量</h2>
-        <div className="grid grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm mb-1">单价 <span className="text-red-500">*</span></label>
-            <input type="number" step="0.01" name="unitPrice" defaultValue={initialData?.unitPrice ?? ''} className={baseClass} />
-            <FieldError errors={errors?.unitPrice} />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">货币</label>
-            <select name="currency" defaultValue={initialData?.currency ?? 'CNY'} className={baseClass}>
+      <FormSection title="价格与数量">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <FormField label="单价" htmlFor="unitPrice" required error={errors?.unitPrice?.[0]}>
+            <Input
+              id="unitPrice"
+              type="number"
+              step="0.01"
+              name="unitPrice"
+              defaultValue={initialData?.unitPrice ?? ''}
+            />
+          </FormField>
+          <FormField label="货币" htmlFor="currency">
+            <select
+              id="currency"
+              name="currency"
+              defaultValue={initialData?.currency ?? 'CNY'}
+              className={SELECT_CLASS}
+            >
               {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm mb-1">单位(中)</label>
-            <input type="text" name="unitZh" defaultValue={initialData?.unitZh ?? ''} placeholder="如 件 / 个 / 箱" className={baseClass} list="unit-zh-suggestions" />
+          </FormField>
+          <FormField label="单位(中)" htmlFor="unitZh">
+            <Input
+              id="unitZh"
+              type="text"
+              name="unitZh"
+              defaultValue={initialData?.unitZh ?? ''}
+              placeholder="如 件 / 个 / 箱"
+              list="unit-zh-suggestions"
+            />
             <datalist id="unit-zh-suggestions">
               <option value="件" /><option value="个" /><option value="箱" /><option value="打" /><option value="米" /><option value="千克" />
             </datalist>
-          </div>
-          <div>
-            <label className="block text-sm mb-1">单位(俄)</label>
-            <input type="text" name="unitRu" defaultValue={initialData?.unitRu ?? ''} placeholder="шт / коробка / дюжина" className={baseClass} list="unit-ru-suggestions" />
+          </FormField>
+          <FormField label="单位(俄)" htmlFor="unitRu">
+            <Input
+              id="unitRu"
+              type="text"
+              name="unitRu"
+              defaultValue={initialData?.unitRu ?? ''}
+              placeholder="шт / коробка"
+              list="unit-ru-suggestions"
+            />
             <datalist id="unit-ru-suggestions">
               <option value="шт" /><option value="коробка" /><option value="дюжина" /><option value="м" /><option value="кг" />
             </datalist>
-          </div>
+          </FormField>
         </div>
-        <div>
-          <label className="block text-sm mb-1">起订量(MOQ)</label>
-          <input type="number" name="moq" defaultValue={initialData?.moq ?? ''} placeholder="选填,如 100" className={baseClass} />
-          <FieldError errors={errors?.moq} />
-        </div>
-      </section>
+        <FormField label="起订量(MOQ)" htmlFor="moq" error={errors?.moq?.[0]}>
+          <Input id="moq" type="number" name="moq" defaultValue={initialData?.moq ?? ''} placeholder="选填,如 100" />
+        </FormField>
+      </FormSection>
 
-      {/* 时间 */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">时间</h2>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm mb-1">报价日期 <span className="text-red-500">*</span></label>
-            <input type="date" name="quotedAt" defaultValue={initialData?.quotedAt ?? new Date().toISOString().slice(0, 10)} className={baseClass} />
-            <FieldError errors={errors?.quotedAt} />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">有效期至</label>
-            <input type="date" name="validUntil" defaultValue={initialData?.validUntil ?? ''} className={baseClass} />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">交货天数</label>
-            <input type="number" name="leadTimeDays" defaultValue={initialData?.leadTimeDays ?? ''} placeholder="选填,如 30" className={baseClass} />
-            <FieldError errors={errors?.leadTimeDays} />
-          </div>
+      <FormSection title="时间">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <FormField label="报价日期" htmlFor="quotedAt" required error={errors?.quotedAt?.[0]}>
+            <Input
+              id="quotedAt"
+              type="date"
+              name="quotedAt"
+              defaultValue={initialData?.quotedAt ?? new Date().toISOString().slice(0, 10)}
+            />
+          </FormField>
+          <FormField label="有效期至" htmlFor="validUntil">
+            <Input
+              id="validUntil"
+              type="date"
+              name="validUntil"
+              defaultValue={initialData?.validUntil ?? ''}
+            />
+          </FormField>
+          <FormField label="交货天数" htmlFor="leadTimeDays" error={errors?.leadTimeDays?.[0]}>
+            <Input
+              id="leadTimeDays"
+              type="number"
+              name="leadTimeDays"
+              defaultValue={initialData?.leadTimeDays ?? ''}
+              placeholder="选填,如 30"
+            />
+          </FormField>
         </div>
-      </section>
+      </FormSection>
 
-      {/* 关联 + 来源 + 付款条款 */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">其他信息</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm mb-1">关联联系人</label>
-            <select name="contactId" defaultValue={initialData?.contactId?.toString() ?? ''} className={baseClass}>
+      <FormSection title="其他信息">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField label="关联联系人" htmlFor="contactId">
+            <select
+              id="contactId"
+              name="contactId"
+              defaultValue={initialData?.contactId?.toString() ?? ''}
+              className={SELECT_CLASS}
+            >
               <option value="">— 不指定 —</option>
               {availableContacts.map((c) => (
                 <option key={c.id} value={c.id}>{c.nameZh}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm mb-1">报价来源</label>
-            <input type="text" name="source" defaultValue={initialData?.source ?? ''} placeholder="如 微信语音 / 展会现场 / 邮件" className={baseClass} />
-          </div>
+          </FormField>
+          <FormField label="报价来源" htmlFor="source">
+            <Input
+              id="source"
+              type="text"
+              name="source"
+              defaultValue={initialData?.source ?? ''}
+              placeholder="如 微信语音 / 展会现场 / 邮件"
+            />
+          </FormField>
         </div>
-        <div>
-          <label className="block text-sm mb-1">
-            付款条件 <span className="text-xs text-gray-500">(用英文国际贸易术语,如 FOB / 30% downpayment / Net 30)</span>
-          </label>
-          <input type="text" name="paymentTerms" defaultValue={initialData?.paymentTerms ?? ''} placeholder="EXW / FOB / 30% downpayment, balance against B/L" className={baseClass} />
-        </div>
-      </section>
+        <FormField
+          label={
+            <>
+              付款条件
+              <span className="ml-1 text-xs text-muted-foreground font-normal">
+                (英文国际贸易术语,如 FOB / 30% downpayment / Net 30)
+              </span>
+            </>
+          }
+          htmlFor="paymentTerms"
+        >
+          <Input
+            id="paymentTerms"
+            type="text"
+            name="paymentTerms"
+            defaultValue={initialData?.paymentTerms ?? ''}
+            placeholder="EXW / FOB / 30% downpayment, balance against B/L"
+          />
+        </FormField>
+      </FormSection>
 
-      {/* 品类标签 */}
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">品类标签</h2>
-        <TagMultiSelect availableTags={availableTags} initialSelectedIds={initialData?.tagIds ?? []} locale={locale} />
-      </section>
+      <FormSection title="品类标签">
+        <TagMultiSelect
+          availableTags={availableTags}
+          initialSelectedIds={initialData?.tagIds ?? []}
+          locale={locale}
+        />
+      </FormSection>
 
-      <SubmitButton isEdit={isEdit} />
+      <FormActions>
+        <SubmitButton isEdit={isEdit} />
+      </FormActions>
     </form>
   );
 }

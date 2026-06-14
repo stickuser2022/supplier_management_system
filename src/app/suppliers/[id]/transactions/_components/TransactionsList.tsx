@@ -1,6 +1,17 @@
 import Link from 'next/link';
 import { getTranslations, getLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { TransactionStatusBadge } from '@/components/transactions/transaction-status-badge';
+import { DetailSection } from '../../_components/detail-section';
 import { TransactionActionsCell } from './TransactionActionsCell';
 
 export async function TransactionsList({
@@ -21,69 +32,70 @@ export async function TransactionsList({
   });
 
   return (
-    <section className="mb-6">
-      <div className="flex items-center justify-between mb-3 pb-1 border-b">
-        <h2 className="text-lg font-semibold">{t('title')}</h2>
-        <Link
-          href={`/suppliers/${supplierId}/transactions/new`}
-          className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          {t('newTransaction')}
-        </Link>
-      </div>
-
+    <DetailSection
+      title={t('title')}
+      action={
+        <Button asChild size="sm">
+          <Link href={`/suppliers/${supplierId}/transactions/new`}>
+            {t('newTransaction')}
+          </Link>
+        </Button>
+      }
+    >
       {transactions.length === 0 ? (
-        <p className="text-sm text-gray-500 italic">{t('empty')}</p>
+        <p className="text-sm text-muted-foreground italic">{t('empty')}</p>
       ) : (
-        <table className="min-w-full border border-gray-300 text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="border p-2 text-left">{t('columns.orderedAt')}</th>
-              <th className="border p-2 text-left">{t('columns.items')}</th>
-              <th className="border p-2 text-left">{t('columns.total')}</th>
-              <th className="border p-2 text-left">{t('columns.paid')}</th>
-              <th className="border p-2 text-left">{t('columns.status')}</th>
-              <th className="border p-2 text-left">{t('columns.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((tx) => {
-              const totalPaid = tx.payments.reduce(
-                (sum, p) => sum + Number(p.amount),
-                0,
-              );
-              return (
-                <tr key={tx.id} className={!tx.isActive ? 'opacity-50' : ''}>
-                  <td className="border p-2 text-xs">
-                    {tx.orderedAt.toLocaleDateString(locale)}
-                  </td>
-                  <td className="border p-2 text-xs">
-                    {tx.transactionItems.length} {t('itemsUnit')}
-                  </td>
-                  <td className="border p-2 font-mono text-xs">
-                    {tx.totalAmount.toString()} {tx.currency}
-                  </td>
-                  <td className="border p-2 font-mono text-xs">
-                    {totalPaid} {tx.currency}
-                  </td>
-                  <td className="border p-2 text-xs">
-                    {t(`statuses.${tx.status}`)}
-                  </td>
-                  <td className="border p-2">
-                    <TransactionActionsCell
-                      transaction={{
-                        id: tx.id,
-                        supplierId: tx.supplierId,
-                        isActive: tx.isActive,
-                      }}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="border border-border rounded-md overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>{t('columns.orderedAt')}</TableHead>
+                <TableHead>{t('columns.items')}</TableHead>
+                <TableHead>{t('columns.total')}</TableHead>
+                <TableHead>{t('columns.paid')}</TableHead>
+                <TableHead>{t('columns.status')}</TableHead>
+                <TableHead className="text-right">{t('columns.actions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transactions.map((tx) => {
+                const totalPaid = tx.payments.reduce(
+                  (sum, p) => sum + Number(p.amount),
+                  0,
+                );
+                return (
+                  <TableRow key={tx.id} className={!tx.isActive ? 'opacity-50' : ''}>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {tx.orderedAt.toLocaleDateString(locale)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {tx.transactionItems.length} {t('itemsUnit')}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {tx.totalAmount.toString()} {tx.currency}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {totalPaid} {tx.currency}
+                    </TableCell>
+                    <TableCell>
+                      <TransactionStatusBadge status={tx.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <TransactionActionsCell
+                        transaction={{
+                          id: tx.id,
+                          supplierId: tx.supplierId,
+                          isActive: tx.isActive,
+                        }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       )}
-    </section>
+    </DetailSection>
   );
 }

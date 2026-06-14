@@ -3,7 +3,9 @@
 import { useState, useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { Upload, ImageOff } from 'lucide-react';
 import { clearSupplierLogo } from '@/app/suppliers/_actions/file-actions';
+import { cn } from '@/lib/utils';
 
 type LogoFile = {
   id: number;
@@ -33,7 +35,6 @@ export function SupplierLogo({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 客户端预校验(服务端还会再校验,这层只是早失败、好体验)
     if (file.size > 5 * 1024 * 1024) {
       setError(t('errorTooLarge', { max: '5MB' }));
       return;
@@ -58,13 +59,11 @@ export function SupplierLogo({
         setError(data.error ?? `Upload failed: ${res.status}`);
         return;
       }
-      // route 已 revalidatePath,但客户端要 refresh 才会看到新数据
       router.refresh();
     } catch (err) {
       setError(String(err));
     } finally {
       setUploading(false);
-      // 清空 input,下次选同一文件也能触发 change
       if (inputRef.current) inputRef.current.value = '';
     }
   }
@@ -80,55 +79,50 @@ export function SupplierLogo({
   }
 
   return (
-    <div className="flex items-start gap-4">
-      {/* LOGO 显示区(点击触发上传) */}
+    <div className="flex items-start gap-2">
       <button
         type="button"
         onClick={openPicker}
         disabled={uploading || isPending}
-        className="relative w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 overflow-hidden flex items-center justify-center bg-gray-50 disabled:opacity-50 cursor-pointer transition-colors"
+        className={cn(
+          'relative size-16 rounded-md overflow-hidden flex items-center justify-center flex-shrink-0',
+          'border border-dashed border-border-strong bg-muted',
+          'hover:bg-muted/70 hover:border-foreground-subtle transition-colors',
+          'disabled:opacity-50 disabled:cursor-not-allowed',
+        )}
         aria-label={currentLogo ? t('replaceLogo') : t('uploadLogo')}
       >
         {currentLogo ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={`/api/files/${currentLogo.id}?thumb=1`}
             alt={currentLogo.fileName}
-            className="w-full h-full object-contain"
+            className="size-full object-contain"
           />
+        ) : uploading ? (
+          <span className="text-xs text-muted-foreground">{t('uploading')}</span>
         ) : (
-          <span className="text-gray-400 text-xs text-center px-2 leading-tight">
-            {uploading ? t('uploading') : `+ ${t('uploadLogo')}`}
-          </span>
+          <Upload className="size-5 text-foreground-subtle" />
         )}
       </button>
 
-      {/* 操作按钮 */}
-      <div className="flex flex-col gap-1 pt-1">
-        <button
-          type="button"
-          onClick={openPicker}
-          disabled={uploading || isPending}
-          className="text-sm text-blue-600 hover:underline disabled:opacity-50 text-left"
-        >
-          {currentLogo ? t('replaceLogo') : t('uploadLogo')}
-        </button>
-        {currentLogo && (
-          <button
-            type="button"
-            onClick={handleRemove}
-            disabled={uploading || isPending}
-            className="text-sm text-red-600 hover:underline disabled:opacity-50 text-left"
-          >
-            {t('removeLogo')}
-          </button>
-        )}
-        {error && (
-          <div className="text-xs text-red-600 max-w-xs">{error}</div>
-        )}
-      </div>
+      {(error || currentLogo) && (
+        <div className="flex flex-col gap-0.5 pt-0.5 text-xs">
+          {currentLogo && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              disabled={uploading || isPending}
+              className="inline-flex items-center gap-1 text-muted-foreground hover:text-danger-fg disabled:opacity-50 transition-colors"
+            >
+              <ImageOff className="size-3" />
+              {t('removeLogo')}
+            </button>
+          )}
+          {error && <div className="text-danger-fg max-w-xs">{error}</div>}
+        </div>
+      )}
 
-      {/* 隐藏的 file input */}
       <input
         ref={inputRef}
         type="file"

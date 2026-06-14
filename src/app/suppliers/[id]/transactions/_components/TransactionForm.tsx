@@ -3,6 +3,7 @@
 import { useState, useActionState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { Plus, Trash2, Sparkles, Lock, Loader2 } from 'lucide-react';
 import {
   createTransaction,
   updateTransaction,
@@ -13,6 +14,12 @@ import {
   CURRENCIES,
   TRANSACTION_STATUSES,
 } from '../_validations/transaction-schema';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { FormSection } from '@/components/forms/form-section';
+import { FormField } from '@/components/forms/form-field';
+import { FormActions } from '@/components/forms/form-actions';
 
 type ItemRow = {
   quoteId: number | null;
@@ -55,6 +62,12 @@ export type TransactionFormInitialData = {
 };
 
 const initialState: TransactionFormState = { status: 'idle' };
+
+const SELECT_CLASS =
+  'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
+
+const SELECT_CLASS_SM =
+  'flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 const emptyItem = (): ItemRow => ({
   quoteId: null,
@@ -154,367 +167,350 @@ export function TransactionForm({
   }
 
   return (
-    <form action={formAction} className="space-y-6 max-w-4xl">
+    <form action={formAction} className="space-y-6">
       <input type="hidden" name="items" value={JSON.stringify(items)} />
       <input type="hidden" name="payments" value={JSON.stringify(payments)} />
 
-      {/* 主信息 */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold border-b pb-1">{t('sections.main')}</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm mb-1">{t('fields.orderedAt')}</label>
-            <input
+      <FormSection title={t('sections.main')}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField label={t('fields.orderedAt')} htmlFor="orderedAt" required>
+            <Input
+              id="orderedAt"
               type="date"
               name="orderedAt"
               value={orderedAt}
               onChange={(e) => setOrderedAt(e.target.value)}
               required
-              className="w-full px-3 py-2 border rounded text-sm"
             />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">{t('fields.contact')}</label>
+          </FormField>
+          <FormField label={t('fields.contact')} htmlFor="contactId">
             <select
+              id="contactId"
               name="contactId"
               value={contactId}
               onChange={(e) => setContactId(e.target.value)}
-              className="w-full px-3 py-2 border rounded text-sm"
+              className={SELECT_CLASS}
             >
               <option value="">—</option>
               {availableContacts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nameZh}
-                </option>
+                <option key={c.id} value={c.id}>{c.nameZh}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm mb-1">{t('fields.totalAmount')}</label>
-            <input
+          </FormField>
+          <FormField label={t('fields.totalAmount')} htmlFor="totalAmount" required>
+            <Input
+              id="totalAmount"
               type="text"
               name="totalAmount"
               value={totalAmount}
               onChange={(e) => setTotalAmount(e.target.value)}
               required
-              className="w-full px-3 py-2 border rounded text-sm font-mono"
+              className="font-mono"
             />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">{t('fields.currency')}</label>
+          </FormField>
+          <FormField label={t('fields.currency')} htmlFor="currency">
             <select
+              id="currency"
               name="currency"
               value={currency}
-              onChange={(e) =>
-                setCurrency(e.target.value as (typeof CURRENCIES)[number])
-              }
-              className="w-full px-3 py-2 border rounded text-sm"
+              onChange={(e) => setCurrency(e.target.value as (typeof CURRENCIES)[number])}
+              className={SELECT_CLASS}
             >
-              {CURRENCIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
-          </div>
-          <div className="col-span-2">
-            <label className="block text-sm mb-1">{t('fields.status')}</label>
-            <select
-              name="status"
-              value={status}
-              onChange={(e) =>
-                setStatus(e.target.value as (typeof TRANSACTION_STATUSES)[number])
-              }
-              className="w-full px-3 py-2 border rounded text-sm"
-            >
-              {TRANSACTION_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {t(`statuses.${s}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-2">
-            <label className="block text-sm mb-1">{t('fields.notesZh')}</label>
-            <textarea
-              name="notesZh"
-              value={notesZh}
-              onChange={(e) => setNotesZh(e.target.value)}
-              rows={2}
-              className="w-full px-3 py-2 border rounded text-sm"
-            />
-          </div>
-          <div className="col-span-2">
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-sm">{t('fields.notesRu')}</label>
+          </FormField>
+        </div>
+
+        <FormField label={t('fields.status')} htmlFor="status">
+          <select
+            id="status"
+            name="status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as (typeof TRANSACTION_STATUSES)[number])}
+            className={SELECT_CLASS}
+          >
+            {TRANSACTION_STATUSES.map((s) => (
+              <option key={s} value={s}>{t(`statuses.${s}`)}</option>
+            ))}
+          </select>
+        </FormField>
+
+        <FormField label={t('fields.notesZh')} htmlFor="notesZh">
+          <Textarea
+            id="notesZh"
+            name="notesZh"
+            value={notesZh}
+            onChange={(e) => setNotesZh(e.target.value)}
+            rows={2}
+          />
+        </FormField>
+
+        <FormField
+          label={
+            <span className="inline-flex items-center justify-between w-full">
+              <span className="inline-flex items-center gap-1">
+                <span>{t('fields.notesRu')}</span>
+                {!notesRuAutoTranslated && notesRu && (
+                  <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
+                    <Lock className="size-3" />
+                    {t('lockedRu')}
+                  </span>
+                )}
+              </span>
               <button
                 type="button"
                 onClick={handleTranslateNotes}
                 disabled={translatingNotes || !notesZh.trim()}
-                className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-50 transition-colors font-normal"
               >
-                {translatingNotes ? '…' : t('translate')}
+                {translatingNotes ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3" />
+                )}
+                {t('translate')}
               </button>
-            </div>
-            <textarea
-              name="notesRu"
-              value={notesRu}
-              onChange={(e) => {
-                setNotesRu(e.target.value);
-                setNotesRuAutoTranslated(false);
-              }}
-              rows={2}
-              className="w-full px-3 py-2 border rounded text-sm"
-            />
-            <input
-              type="hidden"
-              name="notesRuAutoTranslated"
-              value={String(notesRuAutoTranslated)}
-            />
-            {!notesRuAutoTranslated && notesRu && (
-              <p className="text-xs text-gray-500 mt-1">🔒 {t('lockedRu')}</p>
-            )}
-          </div>
-        </div>
-      </section>
+            </span>
+          }
+          htmlFor="notesRu"
+        >
+          <Textarea
+            id="notesRu"
+            name="notesRu"
+            value={notesRu}
+            onChange={(e) => {
+              setNotesRu(e.target.value);
+              setNotesRuAutoTranslated(false);
+            }}
+            rows={2}
+          />
+          <input type="hidden" name="notesRuAutoTranslated" value={String(notesRuAutoTranslated)} />
+        </FormField>
+      </FormSection>
 
-      {/* 明细 Items */}
-      <section className="space-y-3">
-        <div className="flex justify-between items-center border-b pb-1">
-          <h2 className="text-lg font-semibold">{t('sections.items')}</h2>
-          <button
+      {/* Items */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
+          <h2 className="text-base font-medium text-foreground">{t('sections.items')}</h2>
+          <Button
             type="button"
             onClick={() => setItems([...items, emptyItem()])}
-            className="text-sm text-blue-600 hover:underline"
+            variant="outline"
+            size="sm"
           >
-            + {t('addItem')}
-          </button>
+            <Plus className="size-4" />
+            {t('addItem')}
+          </Button>
         </div>
-        {items.map((item, idx) => (
-          <div key={idx} className="border rounded p-3 bg-gray-50 space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">
-                {t('itemRow')} #{idx + 1}
-              </span>
-              <button
-                type="button"
-                onClick={() => setItems(items.filter((_, i) => i !== idx))}
-                disabled={items.length === 1}
-                className="text-xs text-red-600 hover:underline disabled:opacity-30"
-              >
-                {t('removeItem')}
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-3">
-                <label className="block text-xs mb-1">{t('item.linkQuote')}</label>
-                <select
-                  value={item.quoteId != null ? String(item.quoteId) : ''}
-                  onChange={(e) =>
-                    updateItem(
-                      idx,
-                      'quoteId',
-                      e.target.value === '' ? null : Number(e.target.value),
-                    )
-                  }
-                  className="w-full px-2 py-1 border rounded text-xs"
-                >
-                  <option value="">—</option>
-                  {availableQuotes.map((q) => (
-                    <option key={q.id} value={q.id}>
-                      {q.productNameZh} · {q.unitPrice} {q.currency} ·{' '}
-                      {q.quotedAt.toISOString().slice(0, 10)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs mb-1">{t('item.productNameZh')}</label>
-                <input
-                  type="text"
-                  value={item.productNameZh}
-                  onChange={(e) => updateItem(idx, 'productNameZh', e.target.value)}
-                  required
-                  className="w-full px-2 py-1 border rounded text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs mb-1">{t('item.quantity')}</label>
-                <input
-                  type="number"
-                  value={item.quantity}
-                  onChange={(e) =>
-                    updateItem(idx, 'quantity', Number(e.target.value) || 0)
-                  }
-                  required
-                  min={1}
-                  className="w-full px-2 py-1 border rounded text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs mb-1">{t('item.unitZh')}</label>
-                <input
-                  type="text"
-                  value={item.unitZh || ''}
-                  onChange={(e) => updateItem(idx, 'unitZh', e.target.value || null)}
-                  className="w-full px-2 py-1 border rounded text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs mb-1">{t('item.unitPrice')}</label>
-                <input
-                  type="text"
-                  value={item.unitPrice}
-                  onChange={(e) => updateItem(idx, 'unitPrice', e.target.value)}
-                  required
-                  className="w-full px-2 py-1 border rounded text-sm font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-xs mb-1">{t('item.subtotal')}</label>
-                <input
-                  type="text"
-                  value={item.subtotal}
-                  onChange={(e) => updateItem(idx, 'subtotal', e.target.value)}
-                  required
-                  className="w-full px-2 py-1 border rounded text-sm font-mono"
-                />
-              </div>
-              <div className="col-span-3">
-                <label className="block text-xs mb-1">{t('item.productSpecZh')}</label>
-                <input
-                  type="text"
-                  value={item.productSpecZh || ''}
-                  onChange={(e) =>
-                    updateItem(idx, 'productSpecZh', e.target.value || null)
-                  }
-                  className="w-full px-2 py-1 border rounded text-sm"
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-      </section>
-
-      {/* 付款 Payments */}
-      <section className="space-y-3">
-        <div className="flex justify-between items-center border-b pb-1">
-          <h2 className="text-lg font-semibold">{t('sections.payments')}</h2>
-          <button
-            type="button"
-            onClick={() => setPayments([...payments, emptyPayment()])}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            + {t('addPayment')}
-          </button>
-        </div>
-        {payments.length === 0 ? (
-          <p className="text-sm text-gray-500 italic">{t('paymentsEmpty')}</p>
-        ) : (
-          payments.map((p, idx) => (
-            <div key={idx} className="border rounded p-3 bg-gray-50 space-y-2">
+        <div className="space-y-3">
+          {items.map((item, idx) => (
+            <div key={idx} className="border border-border rounded-md p-4 bg-muted/30 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500">
-                  {t('paymentRow')} #{idx + 1}
+                <span className="text-xs text-muted-foreground font-medium">
+                  {t('itemRow')} #{idx + 1}
                 </span>
                 <button
                   type="button"
-                  onClick={() =>
-                    setPayments(payments.filter((_, i) => i !== idx))
-                  }
-                  className="text-xs text-red-600 hover:underline"
+                  onClick={() => setItems(items.filter((_, i) => i !== idx))}
+                  disabled={items.length === 1}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-danger-fg disabled:opacity-30 disabled:pointer-events-none transition-colors"
                 >
-                  {t('removePayment')}
+                  <Trash2 className="size-3" />
+                  {t('removeItem')}
                 </button>
               </div>
-              <div className="grid grid-cols-4 gap-2">
-                <div>
-                  <label className="block text-xs mb-1">{t('payment.paidAt')}</label>
-                  <input
-                    type="date"
-                    value={p.paidAt}
-                    onChange={(e) => updatePayment(idx, 'paidAt', e.target.value)}
-                    required
-                    className="w-full px-2 py-1 border rounded text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs mb-1">{t('payment.amount')}</label>
-                  <input
-                    type="text"
-                    value={p.amount}
-                    onChange={(e) => updatePayment(idx, 'amount', e.target.value)}
-                    required
-                    className="w-full px-2 py-1 border rounded text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs mb-1">{t('payment.currency')}</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-3 space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('item.linkQuote')}</label>
                   <select
-                    value={p.currency}
+                    value={item.quoteId != null ? String(item.quoteId) : ''}
                     onChange={(e) =>
-                      updatePayment(
-                        idx,
-                        'currency',
-                        e.target.value as (typeof CURRENCIES)[number],
-                      )
+                      updateItem(idx, 'quoteId', e.target.value === '' ? null : Number(e.target.value))
                     }
-                    className="w-full px-2 py-1 border rounded text-sm"
+                    className={SELECT_CLASS_SM}
                   >
-                    {CURRENCIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
+                    <option value="">—</option>
+                    {availableQuotes.map((q) => (
+                      <option key={q.id} value={q.id}>
+                        {q.productNameZh} · {q.unitPrice} {q.currency} ·{' '}
+                        {q.quotedAt.toISOString().slice(0, 10)}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs mb-1">{t('payment.method')}</label>
-                  <input
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('item.productNameZh')}</label>
+                  <Input
                     type="text"
-                    value={p.method || ''}
-                    onChange={(e) => updatePayment(idx, 'method', e.target.value || null)}
-                    placeholder={t('payment.methodPlaceholder')}
-                    className="w-full px-2 py-1 border rounded text-sm"
+                    value={item.productNameZh}
+                    onChange={(e) => updateItem(idx, 'productNameZh', e.target.value)}
+                    required
+                    className="h-8 text-sm"
                   />
                 </div>
-                <div className="col-span-4">
-                  <label className="block text-xs mb-1">{t('payment.purposeZh')}</label>
-                  <input
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('item.quantity')}</label>
+                  <Input
+                    type="number"
+                    value={item.quantity}
+                    onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value) || 0)}
+                    required
+                    min={1}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('item.unitZh')}</label>
+                  <Input
                     type="text"
-                    value={p.purposeZh || ''}
-                    onChange={(e) =>
-                      updatePayment(idx, 'purposeZh', e.target.value || null)
-                    }
-                    placeholder={t('payment.purposePlaceholder')}
-                    className="w-full px-2 py-1 border rounded text-sm"
+                    value={item.unitZh || ''}
+                    onChange={(e) => updateItem(idx, 'unitZh', e.target.value || null)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('item.unitPrice')}</label>
+                  <Input
+                    type="text"
+                    value={item.unitPrice}
+                    onChange={(e) => updateItem(idx, 'unitPrice', e.target.value)}
+                    required
+                    className="h-8 text-sm font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('item.subtotal')}</label>
+                  <Input
+                    type="text"
+                    value={item.subtotal}
+                    onChange={(e) => updateItem(idx, 'subtotal', e.target.value)}
+                    required
+                    className="h-8 text-sm font-mono"
+                  />
+                </div>
+                <div className="sm:col-span-3 space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('item.productSpecZh')}</label>
+                  <Input
+                    type="text"
+                    value={item.productSpecZh || ''}
+                    onChange={(e) => updateItem(idx, 'productSpecZh', e.target.value || null)}
+                    className="h-8 text-sm"
                   />
                 </div>
               </div>
             </div>
-          ))
+          ))}
+        </div>
+      </section>
+
+      {/* Payments */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
+          <h2 className="text-base font-medium text-foreground">{t('sections.payments')}</h2>
+          <Button
+            type="button"
+            onClick={() => setPayments([...payments, emptyPayment()])}
+            variant="outline"
+            size="sm"
+          >
+            <Plus className="size-4" />
+            {t('addPayment')}
+          </Button>
+        </div>
+        {payments.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">{t('paymentsEmpty')}</p>
+        ) : (
+          <div className="space-y-3">
+            {payments.map((p, idx) => (
+              <div key={idx} className="border border-border rounded-md p-4 bg-muted/30 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground font-medium">
+                    {t('paymentRow')} #{idx + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPayments(payments.filter((_, i) => i !== idx))}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-danger-fg transition-colors"
+                  >
+                    <Trash2 className="size-3" />
+                    {t('removePayment')}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">{t('payment.paidAt')}</label>
+                    <Input
+                      type="date"
+                      value={p.paidAt}
+                      onChange={(e) => updatePayment(idx, 'paidAt', e.target.value)}
+                      required
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">{t('payment.amount')}</label>
+                    <Input
+                      type="text"
+                      value={p.amount}
+                      onChange={(e) => updatePayment(idx, 'amount', e.target.value)}
+                      required
+                      className="h-8 text-sm font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">{t('payment.currency')}</label>
+                    <select
+                      value={p.currency}
+                      onChange={(e) =>
+                        updatePayment(idx, 'currency', e.target.value as (typeof CURRENCIES)[number])
+                      }
+                      className={SELECT_CLASS_SM}
+                    >
+                      {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">{t('payment.method')}</label>
+                    <Input
+                      type="text"
+                      value={p.method || ''}
+                      onChange={(e) => updatePayment(idx, 'method', e.target.value || null)}
+                      placeholder={t('payment.methodPlaceholder')}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="col-span-2 sm:col-span-4 space-y-1">
+                    <label className="text-xs text-muted-foreground">{t('payment.purposeZh')}</label>
+                    <Input
+                      type="text"
+                      value={p.purposeZh || ''}
+                      onChange={(e) => updatePayment(idx, 'purposeZh', e.target.value || null)}
+                      placeholder={t('payment.purposePlaceholder')}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </section>
 
       {state.status === 'error' && state.message && (
-        <p className="text-sm text-red-600">{state.message}</p>
+        <div className="p-3 rounded-md border border-danger-fg/20 bg-danger-bg text-danger-fg text-sm">
+          {state.message}
+        </div>
       )}
 
-      <div className="flex gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
-        >
+      <FormActions>
+        <Button variant="outline" asChild>
+          <Link href={`/suppliers/${supplierId}`}>{t('cancel')}</Link>
+        </Button>
+        <Button type="submit" disabled={pending}>
+          {pending && <Loader2 className="size-4 animate-spin" />}
           {pending ? t('saving') : t('save')}
-        </button>
-        <Link
-          href={`/suppliers/${supplierId}`}
-          className="px-4 py-2 border rounded text-sm hover:bg-gray-50"
-        >
-          {t('cancel')}
-        </Link>
-      </div>
+        </Button>
+      </FormActions>
     </form>
   );
 }

@@ -1,18 +1,22 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { ChevronLeft } from 'lucide-react';
 import { getTranslations, getLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { pickLocalized } from '@/i18n/pick-localized';
+import { CooperationLevelBadge } from '@/components/suppliers/cooperation-level-badge';
 import { SupplierActionsCell } from '../_components/SupplierActionsCell';
 import { ContactsList } from './contacts/_components/ContactsList';
 import { QuotesList } from './quotes/_components/QuotesList';
 import { NotesList } from './notes/_components/NotesList';
+import { TransactionsList } from './transactions/_components/TransactionsList';
 import { SupplierLogo } from './_components/supplier-logo';
 import { FileUploader } from './_components/file-uploader';
 import { BrochureGallery } from './_components/brochure-gallery';
 import { DocList } from './_components/doc-list';
 import { SupplierVideoGallery } from './_components/supplier-video-gallery';
-import { TransactionsList } from './transactions/_components/TransactionsList';
+import { DetailSection } from './_components/detail-section';
+import { DetailField, DetailFieldList } from './_components/detail-field-list';
 
 export default async function SupplierDetailPage({
   params,
@@ -25,125 +29,103 @@ export default async function SupplierDetailPage({
 
   const supplier = await prisma.supplier.findUnique({ where: { id } });
   if (!supplier) notFound();
-  const currentLogo = await prisma.file.findFirst({
-  where: {
-    supplierId: id,
-    type: 'SUPPLIER_LOGO',
-    isActive: true,
-  },
-  select: {
-    id: true,
-    fileName: true,
-  },
-  
-  orderBy: { createdAt: 'desc' },  // 防御性,理论上只有 1 个
-  });
-  const brochures = await prisma.file.findMany({
-  where: {
-    supplierId: id,
-    type: 'SUPPLIER_BROCHURE',
-    isActive: true,
-  },
-  select: {
-    id: true,
-    fileName: true,
-    mimeType: true,
-    sizeBytes: true,
-    thumbnailKey: true,
-    titleZh: true,
-    titleRu: true,
-    createdAt: true,
-  },
-  orderBy: { createdAt: 'desc' },
-});
 
-const docs = await prisma.file.findMany({
-  where: {
-    supplierId: id,
-    type: 'SUPPLIER_DOC',
-    isActive: true,
-  },
-  select: {
-    id: true,
-    fileName: true,
-    mimeType: true,
-    sizeBytes: true,
-    titleZh: true,
-    titleRu: true,
-    createdAt: true,
-  },
-  orderBy: { createdAt: 'desc' },
-});
+  // 并行查 4 类文件,代替原来的串行 4 次 await,首屏更快
+  const [currentLogo, brochures, docs, videos] = await Promise.all([
+    prisma.file.findFirst({
+      where: { supplierId: id, type: 'SUPPLIER_LOGO', isActive: true },
+      select: { id: true, fileName: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.file.findMany({
+      where: { supplierId: id, type: 'SUPPLIER_BROCHURE', isActive: true },
+      select: {
+        id: true, fileName: true, mimeType: true, sizeBytes: true,
+        thumbnailKey: true, titleZh: true, titleRu: true, createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.file.findMany({
+      where: { supplierId: id, type: 'SUPPLIER_DOC', isActive: true },
+      select: {
+        id: true, fileName: true, mimeType: true, sizeBytes: true,
+        titleZh: true, titleRu: true, createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.file.findMany({
+      where: { supplierId: id, type: 'SUPPLIER_VIDEO', isActive: true },
+      select: {
+        id: true, fileName: true, thumbnailKey: true,
+        titleZh: true, titleRu: true, sizeBytes: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
+
   const t = await getTranslations('supplierDetail');
-  const tLevel = await getTranslations('cooperationLevel');
   const tFiles = await getTranslations('files');
   const locale = await getLocale();
-  const videos = await prisma.file.findMany({
-  where: {
-    supplierId: id,
-    type: 'SUPPLIER_VIDEO',
-    isActive: true,
-  },
-  select: {
-    id: true,
-    fileName: true,
-    thumbnailKey: true,
-    titleZh: true,
-    titleRu: true,
-    sizeBytes: true,
-  },
-  orderBy: { createdAt: 'desc' },
-});
 
   return (
-    <div className="p-6 max-w-5xl">
+    <div className="p-6 max-w-5xl mx-auto">
       {/* 返回链接 */}
-      <Link href="/suppliers" className="text-sm text-blue-600 hover:underline">
+      <Link
+        href="/suppliers"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ChevronLeft className="size-4" />
         {t('back')}
       </Link>
 
-      {/* 标题 + 操作按钮(复用 SupplierActionsCell)*/}
-      <div className="flex items-start justify-between mt-2 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">
-            {pickLocalized(supplier.nameZh, supplier.nameRu, locale)}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1 font-mono">{supplier.code}</p>
+      {/* 页面头部:logo + 名称(含徽章)+ 编号 | 操作按钮 */}
+      <div className="mt-3 mb-6 flex items-start justify-between gap-6">
+        <div className="flex items-start gap-4 min-w-0 flex-1">
+          <SupplierLogo supplierId={id} currentLogo={currentLogo} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-semibold text-foreground">
+                {pickLocalized(supplier.nameZh, supplier.nameRu, locale)}
+              </h1>
+              <CooperationLevelBadge level={supplier.cooperationLevel} />
+            </div>
+            <p className="mt-1 font-mono text-sm text-muted-foreground">
+              {supplier.code}
+            </p>
+          </div>
         </div>
-        <SupplierLogo supplierId={id} currentLogo={currentLogo} />
-        <SupplierActionsCell
-          supplier={{ id: supplier.id, nameZh: supplier.nameZh, isActive: supplier.isActive }}
-        />
+        <div className="flex-shrink-0">
+          <SupplierActionsCell
+            supplier={{ id: supplier.id, nameZh: supplier.nameZh, isActive: supplier.isActive }}
+          />
+        </div>
       </div>
 
       {/* 已停用警示 */}
       {!supplier.isActive && (
-        <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded text-amber-700">
+        <div className="mb-6 p-3 rounded-md border border-warning-fg/20 bg-warning-bg text-warning-fg text-sm">
           {t('archivedWarning')}
         </div>
       )}
 
-      {/* 基本信息区段 */}
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
-          {t('sections.basicInfo')}
-        </h2>
-        <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-          <dt className="text-gray-500">{t('fields.code')}</dt>
-          <dd className="font-mono">{supplier.code}</dd>
+      {/* 基本信息 */}
+      <DetailSection title={t('sections.basicInfo')}>
+        <DetailFieldList>
+          <DetailField label={t('fields.code')}>
+            <span className="font-mono text-sm">{supplier.code}</span>
+          </DetailField>
 
-          <dt className="text-gray-500">{t('fields.name')}</dt>
-          <dd>{pickLocalized(supplier.nameZh, supplier.nameRu, locale)}</dd>
+          <DetailField label={t('fields.name')}>
+            {pickLocalized(supplier.nameZh, supplier.nameRu, locale)}
+          </DetailField>
 
           {(supplier.shortNameZh ?? '') !== '' && (
-            <>
-              <dt className="text-gray-500">{t('fields.shortName')}</dt>
-              <dd>{pickLocalized(supplier.shortNameZh ?? '', supplier.shortNameRu, locale)}</dd>
-            </>
+            <DetailField label={t('fields.shortName')}>
+              {pickLocalized(supplier.shortNameZh ?? '', supplier.shortNameRu, locale)}
+            </DetailField>
           )}
 
-          <dt className="text-gray-500">{t('fields.address')}</dt>
-          <dd>
+          <DetailField label={t('fields.address')}>
             {pickLocalized(supplier.provinceZh, supplier.provinceRu, locale)}
             {' / '}
             {pickLocalized(supplier.cityZh, supplier.cityRu, locale)}
@@ -153,56 +135,59 @@ const docs = await prisma.file.findMany({
             {supplier.addressZh && (
               <> / {pickLocalized(supplier.addressZh, supplier.addressRu, locale)}</>
             )}
-          </dd>
+          </DetailField>
 
-          <dt className="text-gray-500">{t('fields.coordinates')}</dt>
-          <dd className="font-mono text-xs">{supplier.latitude}, {supplier.longitude}</dd>
+          <DetailField label={t('fields.coordinates')}>
+            <span className="font-mono text-xs text-muted-foreground">
+              {supplier.latitude}, {supplier.longitude}
+            </span>
+          </DetailField>
 
-          <dt className="text-gray-500">{t('fields.cooperationLevel')}</dt>
-          <dd>{tLevel(supplier.cooperationLevel)}</dd>
+          <DetailField label={t('fields.cooperationLevel')}>
+            <CooperationLevelBadge level={supplier.cooperationLevel} />
+          </DetailField>
 
-          <dt className="text-gray-500">{t('fields.discoveredVia')}</dt>
-          <dd>{supplier.discoveredVia}</dd>
+          <DetailField label={t('fields.discoveredVia')}>
+            {supplier.discoveredVia}
+          </DetailField>
 
           {supplier.website && (
-            <>
-              <dt className="text-gray-500">{t('fields.website')}</dt>
-              <dd>
-                <a
-                  href={supplier.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  {supplier.website}
-                </a>
-              </dd>
-            </>
+            <DetailField label={t('fields.website')}>
+              <a
+                href={supplier.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                {supplier.website}
+              </a>
+            </DetailField>
           )}
 
           {supplier.descriptionZh && (
-            <>
-              <dt className="text-gray-500">{t('fields.description')}</dt>
-              <dd className="whitespace-pre-wrap">
+            <DetailField label={t('fields.description')}>
+              <span className="whitespace-pre-wrap">
                 {pickLocalized(supplier.descriptionZh, supplier.descriptionRu, locale)}
-              </dd>
-            </>
+              </span>
+            </DetailField>
           )}
 
-          <dt className="text-gray-500">{t('fields.createdAt')}</dt>
-          <dd>{supplier.createdAt.toLocaleDateString(locale)}</dd>
-        </dl>
-      </section>
+          <DetailField label={t('fields.createdAt')}>
+            <span className="text-muted-foreground">
+              {supplier.createdAt.toLocaleDateString(locale)}
+            </span>
+          </DetailField>
+        </DetailFieldList>
+      </DetailSection>
 
-      {/* 4 个占位区段(后续里程碑填充)*/}
+      {/* 联系人 / 报价 / 沟通 / 订单 */}
       <ContactsList supplierId={supplier.id} />
       <QuotesList supplierId={supplier.id} />
       <NotesList supplierId={supplier.id} />
-      {/* 画册 / 产品目录 */}
-      <section className="mb-6">
-        <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
-          {tFiles('brochuresTitle')}
-        </h2>
+      <TransactionsList supplierId={supplier.id} />
+
+      {/* 文件区段:画册 / 视频 / 文档 */}
+      <DetailSection title={tFiles('brochuresTitle')}>
         <FileUploader
           ownerId={id}
           type="SUPPLIER_BROCHURE"
@@ -212,13 +197,9 @@ const docs = await prisma.file.findMany({
           acceptHint={tFiles('brochureAcceptHint')}
         />
         <BrochureGallery supplierId={id} items={brochures} />
-      </section>
+      </DetailSection>
 
-      {/* 工厂 / 产线视频 */}
-      <section className="mb-6">
-        <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
-          {tFiles('videosTitle')}
-        </h2>
+      <DetailSection title={tFiles('videosTitle')}>
         <FileUploader
           ownerId={id}
           type="SUPPLIER_VIDEO"
@@ -228,13 +209,9 @@ const docs = await prisma.file.findMany({
           acceptHint={tFiles('videoAcceptHint')}
         />
         <SupplierVideoGallery supplierId={id} items={videos} />
-      </section>
+      </DetailSection>
 
-      {/* 资质 / 文档 */}
-      <section className="mb-6">
-        <h2 className="text-lg font-semibold mb-3 pb-1 border-b">
-          {tFiles('docsTitle')}
-        </h2>
+      <DetailSection title={tFiles('docsTitle')}>
         <FileUploader
           ownerId={id}
           type="SUPPLIER_DOC"
@@ -244,33 +221,7 @@ const docs = await prisma.file.findMany({
           acceptHint={tFiles('docAcceptHint')}
         />
         <DocList supplierId={id} items={docs} />
-      </section>
-      <TransactionsList supplierId={supplier.id} />
+      </DetailSection>
     </div>
-  );
-}
-
-// 占位区段:1d.1 / 1d.2 / 1d.3 时各自替换为真实组件
-function PlaceholderSection({
-  title,
-  t,
-}: {
-  title: string;
-  t: (key: string) => string;
-}) {
-  return (
-    <section className="mb-6">
-      <div className="flex items-center justify-between mb-3 pb-1 border-b">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <button
-          type="button"
-          disabled
-          className="text-sm px-3 py-1 border rounded bg-gray-100 text-gray-400 cursor-not-allowed"
-        >
-          {t('placeholder.addButton')}
-        </button>
-      </div>
-      <p className="text-sm text-gray-500 italic">{t('placeholder.notImplemented')}</p>
-    </section>
   );
 }

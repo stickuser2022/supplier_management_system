@@ -1016,55 +1016,73 @@ RU    俄文
 
 ---
 
-## 2026.6.10(终)项目进度日志(阶段 5 全部完成 + Transaction 管理 UI + 物理删除)
+## 2026.6.11 项目进度日志(阶段 6a 完成 - UI 美化打地基)
 
-### 当前阶段:阶段 5 完整封顶,所有数据模型 + 文件子系统在线
+### 当前阶段:阶段 6 启动,Phase 6a 4 个里程碑全落地
 
-阶段 5 历史上最大的一天。本日累计完成:文件子系统全 6 种 type、Transaction 管理 UI(主表 + Item + Payment 子表)、TRANSACTION_DOC 文件挂载、物理删除入口。**Phase 5 完整收工。**
+阶段 6 目标是 UI 美化,准备给海外家人正式使用。Phase 6a 是"打地基"——风格调性、组件库、布局、字体四件事一次到位,**视觉地基铺完,Phase 6b 才进入逐页打磨**。
 
-### 里程碑范围
+### 风格定调:Notion 柔和现代
 
-- **Transaction 管理 UI**:主表 CRUD + 内嵌 Items 子表 + 内嵌 Payments 子表,使用 JSON 隐藏字段传递子表数据,服务端 Zod 数组校验 + Prisma 事务包裹"先删后插"刷新子表
-- **TRANSACTION_DOC**:基础设施全复用,挂在 transaction,出现在订单编辑页底部
-- **PAYMENT_SCREENSHOT 延后**:File 表 type 已预留,UI 等"付款详情管理"小里程碑做(数据库无需改动)
-- **物理删除入口**:文件标题编辑页右下角加"⚠️ 永久删除"按钮,双重 confirm,DB 行 + 磁盘文件原图 + 缩略图一并清除
+对比了 Notion / Vercel / shadcn / 暖色 CRM 等参考样式后,选定 Notion 风。具体落地:
+
+- 略暖灰白底 `#fbfbfa`
+- Notion 褐黑正文 `#37352f`(不是纯黑)
+- 低饱和度状态色(战略合作淡绿、常规淡蓝、试单淡黄、暂停淡红、初步接触中性灰)
+- 2-4px 圆角(几乎直角,只切锐利感)
+- 留白克制、几乎无装饰
+- 强调蓝 `#2383e2` 仅用于主操作按钮和链接
 
 ### 关键架构决策
 
-- **Transaction 子表:JSON 序列化传值 + 先删后插**:Items 和 Payments 不走独立 CRUD action,直接在 TransactionForm 里维护 state,提交时序列化成 JSON 放进隐藏 input,server action 解析 JSON 用 Zod 数组校验。更新时事务里 deleteMany + createMany,简单可靠
-- **AVAILABLE_QUOTES 下拉显示复合识别信息**:`{产品名} · {单价} {币种} · {日期}`,Admin 一眼能选对哪条 Quote 来源
-- **物理删除 = DB delete + storage delete + 软容错**:DB 删除是事务性必须成功的;磁盘文件删除是"尽力而为",失败不阻断(因为磁盘文件可能已经被外部清理过)。两个分开看待,削除"DB 删了但磁盘没删"和"磁盘没了但 DB 留着"两种诡异中间态
-- **getFileSupplierId helper 五分支完整版**:SUPPLIER_* / QUOTE_IMAGE / NOTE_ATTACHMENT / TRANSACTION_DOC / PAYMENT_SCREENSHOT(经 payment → transaction 两跳),覆盖所有 FileType。**阶段 5 隐性扩展点正式完成**
+- **Token 双层结构(`:root` + `@theme inline`)**:实际值放 `:root`,Tailwind 工具类映射放 `@theme inline`。这是 shadcn 默认结构,**也是将来加深色模式的基础**——只需在 `.dark { ... }` 里覆盖 `:root` 那层值,`@theme` 那层不动,Tailwind 类名永不改
+- **Token 命名对齐 shadcn 标准**(6a.1 → 6a.2 改了一次命名):放弃自创的 `--surface` / `--surface-hover` / `--accent`(蓝),全部换成 shadcn 的 `--card` / `--muted` / `--primary` / `--secondary` / `--accent`(中性灰)等。颜色值不变,**好处是以后从 shadcn 文档复制任何组件代码过来,零改名直接能用**
+- **`--primary` 是品牌蓝、shadcn 的 `--accent` 是中性灰**:这是 shadcn 反直觉的命名,记下不再混淆。我们项目的"主要操作色"叫 `--primary`(`#2383e2` 蓝),`--accent` 是 hover / 高亮等中性灰场景
+- **5 档合作深度 → 4 档语义色 + 1 档中性**:战略合作 → success(淡绿)、常规 → info(淡蓝)、试单 → warning(淡黄)、暂停 → danger(淡红)、初步接触 → muted(中性灰)。语义色用项目自定义的 `--success-bg/fg` / `--info-bg/fg` / `--warning-bg/fg` / `--danger-bg/fg` 双字段,跟 shadcn `--destructive` 互不冲突
+- **从顶栏改为左侧栏**:5+ section 顶栏会挤;Notion 也是侧栏;shadcn Sidebar 自带移动端抽屉,响应式免费
+- **字体三段栈**:Geist(拉丁 + 俄文)→ Noto SC(汉字)→ 系统字体兜底。浏览器按字符自动匹配,一行 font-family 处理三种文字
+- **shadcn 安装配置**:base color = Stone(最接近 Notion 暖灰)、component library = Radix(5 年成熟度)、preset = Nova(自带 Lucide + Geist,对齐已有决策)
 
 ### 已完成
 
-**Transaction 管理 UI:**
-- ✅ `transactions/_validations/transaction-schema.ts`(主表 + Item + Payment 数组校验)
-- ✅ `transactions/_actions/transaction-actions.ts`(create / update / archive / restore / translate)
-- ✅ `TransactionForm`(主信息 + 动态 Items 行 + 动态 Payments 行)
-- ✅ `TransactionsList`(供应商详情页内,替换原占位)
-- ✅ `TransactionActionsCell`(编辑 / 停用 / 恢复)
-- ✅ `new/page.tsx` + `[transactionId]/edit/page.tsx`
-- ✅ `transactions` i18n 命名空间
+**6a.1 设计 token:**
+- ✅ 全套 token 落 `src/app/globals.css`:背景/卡片/边框/3 级文字/accent/4 组语义色对
+- ✅ 圆角整套压到 Notion 风(2/4/6/8px)
+- ✅ 修复默认 globals.css 中 body font-family 写死 Arial 覆盖 Geist 的 bug
+- ✅ 删除默认 `prefers-color-scheme: dark`(本阶段不做深色模式,保留 token 结构供以后加)
 
-**TRANSACTION_DOC:**
-- ✅ `getFileSupplierId` 加 transactionId / paymentId 分支
-- ✅ `FileUploader` type union 加 TRANSACTION_DOC + PAYMENT_SCREENSHOT
-- ✅ `transaction-doc-list.tsx`
-- ✅ 订单编辑页底部嵌入"订单单据 / 合同 / 发票"区段
+**6a.2 shadcn/ui 引入:**
+- ✅ `npx shadcn init`,base color = Stone,component library = Radix,preset = Nova
+- ✅ globals.css token 命名换轨:`--surface` → `--card`,`--surface-hover` → `--muted`,`--accent`(蓝)→ `--primary`,颜色值零变更
+- ✅ 装首批 14 个组件:button / input / label / textarea / card / badge / dialog / dropdown-menu / sonner / skeleton / separator / tabs / select / sidebar
 
-**物理删除:**
-- ✅ `physicallyDeleteFile(fileId)` action(DB 删 + 磁盘删 + 容错)
-- ✅ 文件标题编辑页右下角"⚠️ 永久删除"按钮(双重 confirm)
+**6a.3 布局壳:**
+- ✅ 改造根 layout.tsx:`SidebarProvider` + `AppSidebar` + `SidebarInset`(顶部小工具栏 + main)
+- ✅ 新增 `components/layout/app-sidebar.tsx`:供应商/地图 2 项导航(后续加 标签管理/用户管理/设置),当前路由自动高亮
+- ✅ 新增 `components/layout/app-header.tsx`:汉堡按钮 + locale 切换(中 / Py 两按钮)+ 用户菜单(DropdownMenu)+ 退出
+- ✅ AppSidebar / AppHeader 都做 `/login` 路径 + 未认证状态跳过渲染,行为与原 Navbar 一致
+- ✅ 移动端响应式由 shadcn Sidebar 在 768px 断点自动切换为抽屉,无需手写
+- ✅ 删除老 `src/components/Navbar.tsx`,功能 100% 迁移完成
 
-### 待办(阶段 5 之外)
+**6a.4 字体 + 排版:**
+- ✅ next/font 加载 Noto Sans SC(weight 400/500/700)
+- ✅ Geist 加 `cyrillic` subset,正式支持俄文渲染
+- ✅ globals.css body font-family 三段栈:`var(--font-sans), var(--font-noto-sc), 'PingFang SC', 'Microsoft YaHei', sans-serif`
+- ✅ 排版字号沿用 Tailwind v4 默认,不预设自定义 scale(等真正用页面时再细调)
 
-1. ~~阶段 5 全部~~ ✅
-2. **阶段 6 UI 美化**(下一阶段):整体视觉打磨,准备给海外家人正式使用
-3. **付款详情管理**(小里程碑):给 PAYMENT_SCREENSHOT 一个独立的"每个付款行的截图上传"UI,目前可暂用 TRANSACTION_DOC 兜底
-4. **阶段 2 认证 UI**(独立大块):登录、登出、role 检查、移除所有 DEV_FALLBACK_ADMIN_ID 兜底
-5. **阶段 7 部署**:迁 PostgreSQL + OSS,把所有"开发期 OK 但生产风险"的决策一一过关
+### 待办(Phase 6b 起步,逐页打磨)
+
+1. ~~Phase 6a 全部~~ ✅
+2. **Phase 6b 逐页打磨**(下一里程碑):
+   - 6b.1 项目级 `<StatusBadge>` 组件:封装 5 档合作深度 + 4 档语义色,统一全站徽章样式
+   - 6b.2 供应商列表页改造:用 shadcn Table / Tabs + 项目 token,可考虑卡片墙 vs 表格双视图
+   - 6b.3 供应商详情页改造:信息分组重排 + 时间线视图重做
+   - 6b.4 各类表单统一(Supplier/Contact/Quote/Transaction/Note 录入页)
+   - 6b.5 空态 / loading 态 / 错误态全站统一
+   - 6b.6 i18n 文案审查(Phase 6a 期间可能引入了未翻译的英文字)
+3. **登录页打磨**(独立小块,可插入 6b 任何位置):目前界面朴素,Notion 风改造一下
+4. **测试卡片清理**:Phase 6b.1 开始前把 `src/app/page.tsx` 还原为正常首页
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进阶段 6,UI 美化」** 或 **「先做付款截图管理小里程碑」**
+直接说:**「进 Phase 6b.1,建 StatusBadge 组件」**

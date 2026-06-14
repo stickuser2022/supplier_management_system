@@ -2,12 +2,19 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Lock, Sparkles, Loader2 } from 'lucide-react';
 import {
   createNote,
   updateNote,
   translateNoteFields,
   type NoteFormState,
 } from '../_actions/note-actions';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { FormSection } from '@/components/forms/form-section';
+import { FormField } from '@/components/forms/form-field';
+import { FormActions } from '@/components/forms/form-actions';
 
 export type NoteFormInitialData = {
   id: number;
@@ -16,26 +23,21 @@ export type NoteFormInitialData = {
   contentZh: string;
   contentRu: string | null;
   contentRuAutoTranslated: boolean;
-  happenedAt: string;  // YYYY-MM-DD
+  happenedAt: string;
 };
 
 const INITIAL_FORM_STATE: NoteFormState = { status: 'idle' };
 
-function FieldError({ errors }: { errors?: string[] }) {
-  if (!errors || errors.length === 0) return null;
-  return <p className="text-red-600 text-sm mt-1">{errors[0]}</p>;
-}
+const SELECT_CLASS =
+  'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 function SubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-    >
+    <Button type="submit" disabled={pending}>
+      {pending && <Loader2 className="size-4 animate-spin" />}
       {pending ? '保存中…' : isEdit ? '更新' : '保存'}
-    </button>
+    </Button>
   );
 }
 
@@ -56,7 +58,6 @@ export function NoteForm({
     : createNote.bind(null, supplierId);
   const [state, formAction] = useActionState(action, INITIAL_FORM_STATE);
 
-  // 受控状态(只 content 中俄两个 + 翻译标记)
   const [contentZh, setContentZh] = useState(initialData?.contentZh ?? '');
   const [contentRu, setContentRu] = useState(initialData?.contentRu ?? '');
   const [autoTranslated, setAutoTranslated] = useState(
@@ -64,13 +65,11 @@ export function NoteForm({
   );
   const [isTranslating, startTranslating] = useTransition();
   const [translateError, setTranslateError] = useState<string | null>(null);
-
   const errors = state.errors;
-  const baseClass = 'w-full px-3 py-2 border rounded';
 
   const handleContentRuChange = (value: string) => {
     setContentRu(value);
-    setAutoTranslated(false);  // 手改即解锁
+    setAutoTranslated(false);
   };
 
   const handleTranslate = () => {
@@ -85,94 +84,128 @@ export function NoteForm({
     }
     startTranslating(async () => {
       const res = await translateNoteFields([{ field: 'content', text: contentZh }]);
-      if (!res.ok) { setTranslateError(res.error); return; }
+      if (!res.ok) {
+        setTranslateError(res.error);
+        return;
+      }
       setContentRu(res.results[0].translated);
       setAutoTranslated(true);
     });
   };
 
   return (
-    <form action={formAction} className="space-y-6 max-w-5xl">
+    <form action={formAction} className="space-y-6">
       {state.status === 'error' && state.message && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700">{state.message}</div>
+        <div className="p-3 rounded-md border border-danger-fg/20 bg-danger-bg text-danger-fg text-sm">
+          {state.message}
+        </div>
       )}
       {translateError && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-700">{translateError}</div>
+        <div className="p-3 rounded-md border border-warning-fg/20 bg-warning-bg text-warning-fg text-sm">
+          {translateError}
+        </div>
       )}
 
-      {/* 翻译按钮 */}
-      <div className="flex items-center gap-4 p-4 bg-gray-50 border rounded">
-        <button type="button" onClick={handleTranslate} disabled={isTranslating}
-          className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50">
-          {isTranslating ? '翻译中…' : '🌐 自动翻译俄文'}
-        </button>
-        <p className="text-sm text-gray-600">填好中文后点这个按钮自动翻译。手改俄文后该字段会上锁。</p>
+      <div className="flex items-start gap-4 p-4 rounded-md border border-border bg-muted/40">
+        <Button
+          type="button"
+          onClick={handleTranslate}
+          disabled={isTranslating}
+          variant="secondary"
+          size="sm"
+          className="flex-shrink-0"
+        >
+          {isTranslating ? (
+            <><Loader2 className="size-4 animate-spin" />翻译中…</>
+          ) : (
+            <><Sparkles className="size-4" />自动翻译俄文</>
+          )}
+        </Button>
+        <p className="text-xs text-muted-foreground leading-relaxed pt-1">
+          填好中文后点这个按钮自动翻译。手改俄文后该字段会上锁(再次翻译不覆盖)。
+        </p>
       </div>
 
-      {/* content 双语 */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">记录内容</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm mb-1">
-              中文内容 <span className="text-red-500">*</span>
-            </label>
-            <textarea
+      <FormSection title="记录内容">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField label="中文内容" htmlFor="content-zh" required error={errors?.contentZh?.[0]}>
+            <Textarea
+              id="content-zh"
               name="contentZh"
               value={contentZh}
               onChange={(e) => setContentZh(e.target.value)}
               rows={6}
-              className={baseClass}
               placeholder="如:5/10 微信沟通,客户问起 30cm 玩具熊报价,对方表示要先样品..."
             />
-            <FieldError errors={errors?.contentZh} />
-          </div>
-          <div>
-            <label className="text-sm mb-1 flex items-center gap-2">
-              <span>俄文内容</span>
-              {!autoTranslated && <span className="text-xs text-amber-600">🔒 已手改</span>}
-            </label>
-            <textarea
+          </FormField>
+          <FormField
+            label={
+              <>
+                <span>俄文内容</span>
+                {!autoTranslated && (
+                  <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
+                    <Lock className="size-3" />
+                    已手改
+                  </span>
+                )}
+              </>
+            }
+            htmlFor="content-ru"
+          >
+            <Textarea
+              id="content-ru"
               name="contentRu"
               value={contentRu}
               onChange={(e) => handleContentRuChange(e.target.value)}
               rows={6}
-              className={baseClass}
             />
             <input type="hidden" name="contentRuAutoTranslated" value={autoTranslated ? 'true' : 'false'} />
-          </div>
+          </FormField>
         </div>
-      </section>
+      </FormSection>
 
-      {/* 时间 + 可选关联 */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">时间与关联</h2>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm mb-1">
-              事件日期 <span className="text-red-500">*</span>
-              <span className="text-xs text-gray-500 ml-1">(可填过去补录)</span>
-            </label>
-            <input
+      <FormSection title="时间与关联">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <FormField
+            label={
+              <>
+                事件日期
+                <span className="ml-1 text-xs text-muted-foreground font-normal">
+                  (可填过去补录)
+                </span>
+              </>
+            }
+            htmlFor="happenedAt"
+            required
+            error={errors?.happenedAt?.[0]}
+          >
+            <Input
+              id="happenedAt"
               type="date"
               name="happenedAt"
               defaultValue={initialData?.happenedAt ?? new Date().toISOString().slice(0, 10)}
-              className={baseClass}
             />
-            <FieldError errors={errors?.happenedAt} />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">关联联系人</label>
-            <select name="contactId" defaultValue={initialData?.contactId?.toString() ?? ''} className={baseClass}>
+          </FormField>
+          <FormField label="关联联系人" htmlFor="contactId">
+            <select
+              id="contactId"
+              name="contactId"
+              defaultValue={initialData?.contactId?.toString() ?? ''}
+              className={SELECT_CLASS}
+            >
               <option value="">— 不指定 —</option>
               {availableContacts.map((c) => (
                 <option key={c.id} value={c.id}>{c.nameZh}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm mb-1">关联报价</label>
-            <select name="quoteId" defaultValue={initialData?.quoteId?.toString() ?? ''} className={baseClass}>
+          </FormField>
+          <FormField label="关联报价" htmlFor="quoteId">
+            <select
+              id="quoteId"
+              name="quoteId"
+              defaultValue={initialData?.quoteId?.toString() ?? ''}
+              className={SELECT_CLASS}
+            >
               <option value="">— 不指定 —</option>
               {availableQuotes.map((q) => (
                 <option key={q.id} value={q.id}>
@@ -180,11 +213,13 @@ export function NoteForm({
                 </option>
               ))}
             </select>
-          </div>
+          </FormField>
         </div>
-      </section>
+      </FormSection>
 
-      <SubmitButton isEdit={isEdit} />
+      <FormActions>
+        <SubmitButton isEdit={isEdit} />
+      </FormActions>
     </form>
   );
 }

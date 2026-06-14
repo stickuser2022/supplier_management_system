@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import {
-  archiveTransaction,
-  restoreTransaction,
-} from '../_actions/transaction-actions';
+import { Pencil, Archive, ArchiveRestore } from 'lucide-react';
+import { archiveTransaction, restoreTransaction } from '../_actions/transaction-actions';
+import { cn } from '@/lib/utils';
+
+const baseClasses =
+  'inline-flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50 disabled:pointer-events-none';
 
 export function TransactionActionsCell({
   transaction,
@@ -22,6 +24,7 @@ export function TransactionActionsCell({
       await archiveTransaction(transaction.id);
     });
   };
+
   const handleRestore = () =>
     startTransition(async () => {
       await restoreTransaction(transaction.id);
@@ -29,33 +32,38 @@ export function TransactionActionsCell({
 
   if (transaction.isActive) {
     return (
-      <div className="flex gap-3 text-sm">
+      <div className="flex items-center justify-end gap-4">
         <Link
           href={`/suppliers/${transaction.supplierId}/transactions/${transaction.id}/edit`}
-          className="text-blue-600 hover:underline"
+          className={cn(baseClasses, 'text-muted-foreground hover:text-foreground')}
         >
-          ✏️ {t('edit')}
+          <Pencil className="size-3.5" />
+          {t('edit')}
         </Link>
         <button
           type="button"
           onClick={handleArchive}
           disabled={isPending}
-          className="text-amber-600 hover:underline disabled:opacity-50"
+          className={cn(baseClasses, 'text-muted-foreground hover:text-danger-fg')}
         >
-          🗄️ {t('archive')}
+          <Archive className="size-3.5" />
+          {t('archive')}
         </button>
       </div>
     );
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleRestore}
-      disabled={isPending}
-      className="text-sm text-emerald-600 hover:underline disabled:opacity-50"
-    >
-      ↩️ {t('restore')}
-    </button>
+    <div className="flex items-center justify-end">
+      <button
+        type="button"
+        onClick={handleRestore}
+        disabled={isPending}
+        className={cn(baseClasses, 'text-muted-foreground hover:text-success-fg')}
+      >
+        <ArchiveRestore className="size-3.5" />
+        {t('restore')}
+      </button>
+    </div>
   );
 }

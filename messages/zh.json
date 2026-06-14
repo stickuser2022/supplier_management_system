@@ -103,7 +103,7 @@
   "translateTitle": "自动翻译俄文",
   "titleRuLocked": "已手工修正(自动翻译会跳过)",
   "uploadBatchDone": "上传完成:{ok} 成功,{fail} 失败",
-
+  "clear": "清空",
   "errorBrochureType": "画册仅接受图片或 PDF",
   "errorDocType": "文档接受图片 / PDF / Word / Excel",
   "editTitleHeading": "编辑文件标题",
@@ -150,6 +150,7 @@
     "title": "报价记录",
     "newQuote": "+ 新建报价",
     "empty": "暂无报价",
+    "expired": "(已过期)",
     "columns": {
       "product": "产品",
       "price": "单价",
@@ -224,7 +225,7 @@
     }
   },
   "supplierDetail": {
-    "back": "← 返回列表",
+    "back": "返回列表",
     "archivedWarning": "⚠️ 此供应商已停用,数据仅供查看。恢复后可编辑。",
     "sections": {
       "basicInfo": "基本信息",

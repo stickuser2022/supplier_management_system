@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { FormPage } from '@/components/forms/form-page';
 import { TransactionForm } from '../_components/TransactionForm';
 
 export default async function NewTransactionPage({
@@ -22,11 +22,8 @@ export default async function NewTransactionPage({
     prisma.quote.findMany({
       where: { supplierId, status: 'ACTIVE' },
       select: {
-        id: true,
-        productNameZh: true,
-        quotedAt: true,
-        unitPrice: true,
-        currency: true,
+        id: true, productNameZh: true, quotedAt: true,
+        unitPrice: true, currency: true,
       },
       orderBy: { quotedAt: 'desc' },
     }),
@@ -34,14 +31,12 @@ export default async function NewTransactionPage({
   if (!supplier) notFound();
 
   return (
-    <div className="p-6">
-      <Link
-        href={`/suppliers/${supplierId}`}
-        className="text-sm text-blue-600 hover:underline"
-      >
-        ← {supplier.nameZh}
-      </Link>
-      <h1 className="text-2xl font-bold mt-2 mb-6">新建订单</h1>
+    <FormPage
+      title={`为「${supplier.nameZh}」新建订单`}
+      backHref={`/suppliers/${supplierId}`}
+      backLabel="返回供应商详情"
+      maxWidthClass="max-w-5xl"
+    >
       <TransactionForm
         supplierId={supplierId}
         availableContacts={availableContacts}
@@ -50,6 +45,6 @@ export default async function NewTransactionPage({
           unitPrice: q.unitPrice.toString(),
         }))}
       />
-    </div>
+    </FormPage>
   );
 }

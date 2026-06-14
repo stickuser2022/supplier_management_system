@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { Star } from 'lucide-react';
 import { QuoteImageActions } from './quote-image-actions';
 
 type QuoteImageItem = {
@@ -24,13 +25,12 @@ export function QuoteImageGallery({
 
   if (items.length === 0) {
     return (
-      <p className="text-sm text-gray-500 italic mt-2">
+      <p className="text-sm text-muted-foreground italic mt-2">
         {t('quoteImagesEmpty')}
       </p>
     );
   }
 
-  // 父组件计算非封面项的首尾,传给 actions 用于禁用边界按钮
   const nonCover = items.filter((i) => !i.isCover);
   const firstNonCoverId = nonCover[0]?.id ?? -1;
   const lastNonCoverId = nonCover[nonCover.length - 1]?.id ?? -1;
@@ -42,20 +42,20 @@ export function QuoteImageGallery({
         return (
           <div
             key={item.id}
-            className="border rounded-lg overflow-hidden bg-white flex flex-col relative"
+            className="border border-border rounded-md overflow-hidden bg-card flex flex-col relative"
           >
-            {/* 封面徽章 */}
             {item.isCover && (
-              <div className="absolute top-2 left-2 z-10 bg-purple-600 text-white text-xs px-2 py-0.5 rounded shadow">
-                ★ {t('cover')}
+              <div className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 bg-warning-bg text-warning-fg text-xs px-2 py-0.5 rounded-md border border-warning-fg/20 shadow-sm">
+                <Star className="size-3 fill-warning-fg" />
+                {t('cover')}
               </div>
             )}
 
-            <a
-              href={`/api/files/${item.id}`}
+            
+            <a  href={`/api/files/${item.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="block aspect-square bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors"
+              className="block aspect-square bg-muted/40 hover:bg-muted/60 transition-colors flex items-center justify-center"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -65,15 +65,15 @@ export function QuoteImageGallery({
               />
             </a>
 
-            <div className="p-2 border-t bg-white">
+            <div className="p-2 border-t border-border bg-card">
               <div
-                className="text-sm font-medium truncate"
+                className="text-sm font-medium text-foreground truncate"
                 title={title}
               >
                 {title}
               </div>
               <div className="flex items-center justify-between mt-1 gap-2">
-                <span className="text-xs text-gray-400 whitespace-nowrap">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
                   {formatSize(item.sizeBytes)}
                 </span>
                 <QuoteImageActions

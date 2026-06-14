@@ -3,14 +3,23 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { Upload, Check, X, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 type Props = {
   ownerId: number;
-  type: 'SUPPLIER_BROCHURE' | 'SUPPLIER_DOC' | 'QUOTE_IMAGE' | 'NOTE_ATTACHMENT' | 'SUPPLIER_VIDEO' | 'PAYMENT_SCREENSHOT' | 'TRANSACTION_DOC';
-  accept: string;     // HTML accept 属性
-  maxBytes: number;   // 客户端预校验上限
-  label: string;      // 按钮文字
-  acceptHint: string; // 按钮旁的格式提示
+  type:
+    | 'SUPPLIER_BROCHURE'
+    | 'SUPPLIER_DOC'
+    | 'QUOTE_IMAGE'
+    | 'NOTE_ATTACHMENT'
+    | 'SUPPLIER_VIDEO'
+    | 'PAYMENT_SCREENSHOT'
+    | 'TRANSACTION_DOC';
+  accept: string;
+  maxBytes: number;
+  label: string;
+  acceptHint: string;
 };
 
 type UploadStatus = {
@@ -42,7 +51,6 @@ export function FileUploader({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // 客户端预校验:超大的直接标错,不发请求
     const maxMB = Math.round(maxBytes / 1024 / 1024);
     const initial: UploadStatus[] = Array.from(files).map((file) => ({
       file,
@@ -55,7 +63,6 @@ export function FileUploader({
     setUploads(initial);
     setWorking(true);
 
-    // 顺序上传(并行会让翻译 API + sharp 同时跑,容易扛不住)
     for (let i = 0; i < initial.length; i++) {
       if (initial[i].status === 'error') continue;
 
@@ -95,7 +102,7 @@ export function FileUploader({
 
     setWorking(false);
     if (inputRef.current) inputRef.current.value = '';
-    router.refresh(); // 刷新服务端组件,新文件出现在列表里
+    router.refresh();
   }
 
   const okCount = uploads.filter((u) => u.status === 'success').length;
@@ -105,15 +112,26 @@ export function FileUploader({
   return (
     <div className="mb-4">
       <div className="flex items-center gap-3 mb-3">
-        <button
+        <Button
           type="button"
           onClick={openPicker}
           disabled={working}
-          className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+          variant="secondary"
+          size="sm"
         >
-          {working ? t('uploading') : `+ ${label}`}
-        </button>
-        <span className="text-xs text-gray-500">{acceptHint}</span>
+          {working ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              {t('uploading')}
+            </>
+          ) : (
+            <>
+              <Upload className="size-4" />
+              {label}
+            </>
+          )}
+        </Button>
+        <span className="text-xs text-muted-foreground">{acceptHint}</span>
       </div>
 
       <input
@@ -126,35 +144,48 @@ export function FileUploader({
       />
 
       {uploads.length > 0 && (
-        <div className="space-y-1 text-sm border rounded p-2 bg-gray-50">
+        <div className="space-y-1 text-sm border border-border rounded-md p-3 bg-muted/40">
           {uploads.map((u, idx) => (
             <div key={idx} className="flex items-center gap-2">
-              <span className="flex-1 truncate text-xs">{u.file.name}</span>
-              <span className="text-xs">
-                {u.status === 'pending' && <span className="text-gray-400">…</span>}
-                {u.status === 'uploading' && (
-                  <span className="text-blue-600">{t('uploading')}</span>
+              <span className="flex-1 truncate text-xs text-foreground">
+                {u.file.name}
+              </span>
+              <span className="text-xs inline-flex items-center gap-1">
+                {u.status === 'pending' && (
+                  <span className="text-foreground-subtle">…</span>
                 )}
-                {u.status === 'success' && <span className="text-green-600">✓</span>}
+                {u.status === 'uploading' && (
+                  <span className="inline-flex items-center gap-1 text-primary">
+                    <Loader2 className="size-3 animate-spin" />
+                    {t('uploading')}
+                  </span>
+                )}
+                {u.status === 'success' && (
+                  <Check className="size-3.5 text-success-fg" />
+                )}
                 {u.status === 'error' && (
-                  <span className="text-red-600" title={u.error}>
-                    ✗ {u.error}
+                  <span
+                    className="inline-flex items-center gap-1 text-danger-fg"
+                    title={u.error}
+                  >
+                    <X className="size-3.5" />
+                    {u.error}
                   </span>
                 )}
               </span>
             </div>
           ))}
           {allDone && (
-            <div className="text-xs text-gray-600 pt-2 mt-1 border-t flex items-center justify-between">
+            <div className="text-xs text-muted-foreground pt-2 mt-1 border-t border-border flex items-center justify-between">
               <span>
                 {t('uploadBatchDone', { ok: okCount, fail: failCount })}
               </span>
               <button
                 type="button"
                 onClick={() => setUploads([])}
-                className="text-blue-600 hover:underline"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                清空
+                {t('clear')}
               </button>
             </div>
           )}

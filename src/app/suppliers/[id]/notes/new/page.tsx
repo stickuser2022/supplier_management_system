@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { FormPage } from '@/components/forms/form-page';
 import { NoteForm } from '../_components/NoteForm';
 
 export default async function NewNotePage({
@@ -29,18 +29,17 @@ export default async function NewNotePage({
   ]);
 
   return (
-    <div className="p-6">
-      <Link href={`/suppliers/${supplierId}`} className="text-sm text-blue-600 hover:underline">
-        ← 返回供应商详情
-      </Link>
-      <h1 className="text-2xl font-bold mt-2 mb-6">
-        为「{supplier.nameZh}」添加沟通记录
-      </h1>
+    <FormPage
+      title={`为「${supplier.nameZh}」添加沟通记录`}
+      backHref={`/suppliers/${supplierId}`}
+      backLabel="返回供应商详情"
+      maxWidthClass="max-w-5xl"
+    >
       <NoteForm
         supplierId={supplierId}
         availableContacts={availableContacts}
         availableQuotes={availableQuotes}
       />
-    </div>
+    </FormPage>
   );
 }

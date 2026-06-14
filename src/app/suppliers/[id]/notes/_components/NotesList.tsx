@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import { getTranslations, getLocale } from 'next-intl/server';
+import { Calendar, User, DollarSign } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { pickLocalized } from '@/i18n/pick-localized';
+import { Button } from '@/components/ui/button';
+import { DetailSection } from '../../_components/detail-section';
 import { NoteActionsCell } from './NoteActionsCell';
 
 export async function NotesList({ supplierId }: { supplierId: number }) {
@@ -15,45 +18,57 @@ export async function NotesList({ supplierId }: { supplierId: number }) {
   });
 
   return (
-    <section className="mb-6">
-      <div className="flex items-center justify-between mb-3 pb-1 border-b">
-        <h2 className="text-lg font-semibold">{t('title')}</h2>
-        <Link href={`/suppliers/${supplierId}/notes/new`}
-          className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
-          {t('newNote')}
-        </Link>
-      </div>
-
+    <DetailSection
+      title={t('title')}
+      action={
+        <Button asChild size="sm">
+          <Link href={`/suppliers/${supplierId}/notes/new`}>
+            {t('newNote')}
+          </Link>
+        </Button>
+      }
+    >
       {notes.length === 0 ? (
-        <p className="text-sm text-gray-500 italic">{t('empty')}</p>
+        <p className="text-sm text-muted-foreground italic">{t('empty')}</p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {notes.map((n) => (
             <div
               key={n.id}
-              className={`p-4 border rounded ${n.isActive ? 'bg-white' : 'bg-gray-50 opacity-60'}`}
+              className={`p-4 border border-border rounded-md ${
+                n.isActive ? 'bg-card' : 'bg-muted/40 opacity-60'
+              }`}
             >
-              <div className="flex items-start justify-between mb-2">
-                <div className="text-sm text-gray-500">
-                  📅 {n.happenedAt.toLocaleDateString(locale)}
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Calendar className="size-3.5" />
+                  {n.happenedAt.toLocaleDateString(locale)}
                 </div>
                 <NoteActionsCell
-                  note={{ id: n.id, supplierId: n.supplierId, contentZh: n.contentZh, isActive: n.isActive }}
+                  note={{
+                    id: n.id,
+                    supplierId: n.supplierId,
+                    contentZh: n.contentZh,
+                    isActive: n.isActive,
+                  }}
                 />
               </div>
-              <p className="text-sm whitespace-pre-wrap mb-2">
+              <p className="text-sm text-foreground whitespace-pre-wrap mb-3 leading-relaxed">
                 {pickLocalized(n.contentZh, n.contentRu, locale)}
               </p>
               {(n.contact || n.quote) && (
-                <div className="text-xs text-gray-500 flex gap-3 flex-wrap">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   {n.contact && (
-                    <span>
-                      👤 {pickLocalized(n.contact.nameZh, n.contact.nameRu, locale)}
+                    <span className="inline-flex items-center gap-1">
+                      <User className="size-3" />
+                      {pickLocalized(n.contact.nameZh, n.contact.nameRu, locale)}
                     </span>
                   )}
                   {n.quote && (
-                    <span>
-                      💰 #{n.quote.id} {pickLocalized(n.quote.productNameZh, n.quote.productNameRu, locale)}
+                    <span className="inline-flex items-center gap-1">
+                      <DollarSign className="size-3" />
+                      #{n.quote.id}{' '}
+                      {pickLocalized(n.quote.productNameZh, n.quote.productNameRu, locale)}
                     </span>
                   )}
                 </div>
@@ -62,6 +77,6 @@ export async function NotesList({ supplierId }: { supplierId: number }) {
           ))}
         </div>
       )}
-    </section>
+    </DetailSection>
   );
 }

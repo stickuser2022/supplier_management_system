@@ -1,7 +1,18 @@
 import Link from 'next/link';
 import { getTranslations, getLocale } from 'next-intl/server';
+import { Star, Phone, Mail } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { pickLocalized } from '@/i18n/pick-localized';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { DetailSection } from '../../_components/detail-section';
 import { ContactActionsCell } from './ContactActionsCell';
 
 export async function ContactsList({ supplierId }: { supplierId: number }) {
@@ -14,65 +25,103 @@ export async function ContactsList({ supplierId }: { supplierId: number }) {
   });
 
   return (
-    <section className="mb-6">
-      <div className="flex items-center justify-between mb-3 pb-1 border-b">
-        <h2 className="text-lg font-semibold">{t('title')}</h2>
-        <Link
-          href={`/suppliers/${supplierId}/contacts/new`}
-          className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          {t('newContact')}
-        </Link>
-      </div>
-
+    <DetailSection
+      title={t('title')}
+      action={
+        <Button asChild size="sm">
+          <Link href={`/suppliers/${supplierId}/contacts/new`}>
+            {t('newContact')}
+          </Link>
+        </Button>
+      }
+    >
       {contacts.length === 0 ? (
-        <p className="text-sm text-gray-500 italic">{t('empty')}</p>
+        <p className="text-sm text-muted-foreground italic">{t('empty')}</p>
       ) : (
-        <table className="min-w-full border border-gray-300 text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="border p-2 text-left">{t('columns.name')}</th>
-              <th className="border p-2 text-left">{t('columns.role')}</th>
-              <th className="border p-2 text-left">{t('columns.contact')}</th>
-              <th className="border p-2 text-left">{t('columns.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {contacts.map((c) => (
-              <tr key={c.id} className={c.status === 'ARCHIVED' ? 'opacity-50' : ''}>
-                <td className="border p-2">
-                  {c.isPrimary && <span className="mr-1">⭐</span>}
-                  {pickLocalized(c.nameZh, c.nameRu, locale)}
-                </td>
-                <td className="border p-2">
-                  {c.roleZh ? pickLocalized(c.roleZh, c.roleRu, locale) : '—'}
-                </td>
-                <td className="border p-2 text-xs">
-                  {[
-                    c.phone && `📱 ${c.phone}`,
-                    c.wechat && `💬 ${c.wechat}`,
-                    c.email && `✉️ ${c.email}`,
-                    c.whatsapp && `📲 ${c.whatsapp}`,
-                    c.telegram && `✈️ ${c.telegram}`,
-                    c.qq && `🐧 ${c.qq}`,
-                  ].filter(Boolean).join(' · ') || '—'}
-                </td>
-                <td className="border p-2">
-                  <ContactActionsCell
-                    contact={{
-                      id: c.id,
-                      supplierId: c.supplierId,
-                      nameZh: c.nameZh,
-                      status: c.status,
-                      isPrimary: c.isPrimary,
-                    }}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="border border-border rounded-md overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>{t('columns.name')}</TableHead>
+                <TableHead>{t('columns.role')}</TableHead>
+                <TableHead>{t('columns.contact')}</TableHead>
+                <TableHead className="text-right">{t('columns.actions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {contacts.map((c) => (
+                <TableRow key={c.id} className={c.status === 'ARCHIVED' ? 'opacity-50' : ''}>
+                  <TableCell className="font-medium">
+                    <div className="inline-flex items-center gap-1.5">
+                      {c.isPrimary && (
+                        <Star className="size-3.5 fill-warning-fg text-warning-fg" />
+                      )}
+                      {pickLocalized(c.nameZh, c.nameRu, locale)}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {c.roleZh ? pickLocalized(c.roleZh, c.roleRu, locale) : '—'}
+                  </TableCell>
+                  <TableCell>
+                    <ContactMethodList contact={c} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <ContactActionsCell
+                      contact={{
+                        id: c.id,
+                        supplierId: c.supplierId,
+                        nameZh: c.nameZh,
+                        status: c.status,
+                        isPrimary: c.isPrimary,
+                      }}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
-    </section>
+    </DetailSection>
+  );
+}
+
+function ContactMethodList({
+  contact,
+}: {
+  contact: {
+    phone: string | null;
+    wechat: string | null;
+    email: string | null;
+    whatsapp: string | null;
+    telegram: string | null;
+    qq: string | null;
+  };
+}) {
+  const items = [
+    contact.phone && (
+      <span className="inline-flex items-center gap-1">
+        <Phone className="size-3" />
+        {contact.phone}
+      </span>
+    ),
+    contact.email && (
+      <span className="inline-flex items-center gap-1">
+        <Mail className="size-3" />
+        {contact.email}
+      </span>
+    ),
+    contact.wechat && <span>WeChat: {contact.wechat}</span>,
+    contact.whatsapp && <span>WhatsApp: {contact.whatsapp}</span>,
+    contact.telegram && <span>Telegram: {contact.telegram}</span>,
+    contact.qq && <span>QQ: {contact.qq}</span>,
+  ].filter(Boolean);
+
+  if (items.length === 0) return <span className="text-muted-foreground">—</span>;
+
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      {items.map((item, i) => <span key={i}>{item}</span>)}
+    </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Lock, Sparkles, Loader2 } from 'lucide-react';
 import {
   createSupplier,
   updateSupplier,
@@ -10,8 +11,15 @@ import {
   type SupplierTranslateField,
 } from '../_actions/supplier-actions';
 import { COOPERATION_LEVELS } from '../_validations/supplier-schema';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { FormSection } from '@/components/forms/form-section';
+import { FormField } from '@/components/forms/form-field';
+import { FormActions } from '@/components/forms/form-actions';
+import { cn } from '@/lib/utils';
 
-// ===== 类型与常量 =====
+// ===== 类型与常量(未变动)=====
 
 const COOPERATION_LEVEL_LABELS: Record<typeof COOPERATION_LEVELS[number], string> = {
   INITIAL_CONTACT: '初步接触',
@@ -21,7 +29,6 @@ const COOPERATION_LEVEL_LABELS: Record<typeof COOPERATION_LEVELS[number], string
   INACTIVE: '已暂停',
 };
 
-// 编辑模式下传入的初始数据形状
 export type SupplierFormInitialData = {
   id: number;
   code: string;
@@ -73,7 +80,6 @@ const EMPTY_BILINGUAL: BilingualState = {
   descriptionZh: '', descriptionRu: '', descriptionRuAutoTranslated: true,
 };
 
-// 根据 initialData 算出 BilingualState 初值(null → '')
 function buildBilingualFromInitial(d?: SupplierFormInitialData): BilingualState {
   if (!d) return EMPTY_BILINGUAL;
   return {
@@ -125,23 +131,15 @@ const FIELD_PAIRS: FieldPair[] = [
   { key: 'description', zhFieldName: 'descriptionZh', ruFieldName: 'descriptionRu', flagFieldName: 'descriptionRuAutoTranslated', zhLabel: '备注 / 描述', ruLabel: '俄文备注 / 描述', multiline: true },
 ];
 
-// ===== 小组件 =====
-
-function FieldError({ errors }: { errors?: string[] }) {
-  if (!errors || errors.length === 0) return null;
-  return <p className="text-red-600 text-sm mt-1">{errors[0]}</p>;
-}
+// ===== 子组件 =====
 
 function SubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-    >
+    <Button type="submit" disabled={pending}>
+      {pending && <Loader2 className="size-4 animate-spin" />}
       {pending ? '保存中…' : isEdit ? '更新' : '保存'}
-    </button>
+    </Button>
   );
 }
 
@@ -157,33 +155,72 @@ function BilingualFieldRow({
   const zhValue = bi[pair.zhFieldName] as string;
   const ruValue = bi[pair.ruFieldName] as string;
   const flagValue = bi[pair.flagFieldName] as boolean;
-  const baseClass = 'w-full px-3 py-2 border rounded';
+  const isLocked = !flagValue;
+  const zhFieldId = `${pair.key}-zh`;
+  const ruFieldId = `${pair.key}-ru`;
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <label className="block text-sm mb-1">
-          {pair.zhLabel}{pair.required && <span className="text-red-500"> *</span>}
-        </label>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <FormField
+        label={pair.zhLabel}
+        htmlFor={zhFieldId}
+        required={pair.required}
+        error={errors?.[pair.zhFieldName]?.[0]}
+      >
         {pair.multiline ? (
-          <textarea name={pair.zhFieldName} value={zhValue} onChange={(e) => onZhChange(pair.zhFieldName, e.target.value)} rows={3} className={baseClass} placeholder={pair.zhPlaceholder} />
+          <Textarea
+            id={zhFieldId}
+            name={pair.zhFieldName}
+            value={zhValue}
+            onChange={(e) => onZhChange(pair.zhFieldName, e.target.value)}
+            rows={3}
+            placeholder={pair.zhPlaceholder}
+          />
         ) : (
-          <input type="text" name={pair.zhFieldName} value={zhValue} onChange={(e) => onZhChange(pair.zhFieldName, e.target.value)} className={baseClass} placeholder={pair.zhPlaceholder} />
+          <Input
+            id={zhFieldId}
+            type="text"
+            name={pair.zhFieldName}
+            value={zhValue}
+            onChange={(e) => onZhChange(pair.zhFieldName, e.target.value)}
+            placeholder={pair.zhPlaceholder}
+          />
         )}
-        <FieldError errors={errors?.[pair.zhFieldName]} />
-      </div>
-      <div>
-        <label className="text-sm mb-1 flex items-center gap-2">
-          <span>{pair.ruLabel}</span>
-          {!flagValue && <span className="text-xs text-amber-600">🔒 已手改</span>}
-        </label>
+      </FormField>
+
+      <FormField
+        label={
+          <>
+            <span>{pair.ruLabel}</span>
+            {isLocked && (
+              <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
+                <Lock className="size-3" />
+                已手改
+              </span>
+            )}
+          </>
+        }
+        htmlFor={ruFieldId}
+      >
         {pair.multiline ? (
-          <textarea name={pair.ruFieldName} value={ruValue} onChange={(e) => onRuChange(pair.ruFieldName, pair.flagFieldName, e.target.value)} rows={3} className={baseClass} />
+          <Textarea
+            id={ruFieldId}
+            name={pair.ruFieldName}
+            value={ruValue}
+            onChange={(e) => onRuChange(pair.ruFieldName, pair.flagFieldName, e.target.value)}
+            rows={3}
+          />
         ) : (
-          <input type="text" name={pair.ruFieldName} value={ruValue} onChange={(e) => onRuChange(pair.ruFieldName, pair.flagFieldName, e.target.value)} className={baseClass} />
+          <Input
+            id={ruFieldId}
+            type="text"
+            name={pair.ruFieldName}
+            value={ruValue}
+            onChange={(e) => onRuChange(pair.ruFieldName, pair.flagFieldName, e.target.value)}
+          />
         )}
         <input type="hidden" name={pair.flagFieldName} value={flagValue ? 'true' : 'false'} />
-      </div>
+      </FormField>
     </div>
   );
 }
@@ -192,18 +229,13 @@ function BilingualFieldRow({
 
 export function SupplierForm({ initialData }: { initialData?: SupplierFormInitialData }) {
   const isEdit = Boolean(initialData);
-
-  // 提交时调的 action:新建用 createSupplier,编辑用 updateSupplier(id 通过 .bind 预绑)
   const action = isEdit
     ? updateSupplier.bind(null, initialData!.id)
     : createSupplier;
   const [state, formAction] = useActionState(action, INITIAL_FORM_STATE);
-
-  // useState lazy initializer:第一次渲染才计算,避免每次 render 重算
   const [bi, setBi] = useState<BilingualState>(() => buildBilingualFromInitial(initialData));
   const [isTranslating, startTranslating] = useTransition();
   const [translateError, setTranslateError] = useState<string | null>(null);
-
   const errors = state.errors;
 
   const handleZhChange = (key: keyof BilingualState, value: string) => {
@@ -248,85 +280,147 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
   };
 
   return (
-    <form action={formAction} className="space-y-6 max-w-5xl">
+    <form action={formAction} className="space-y-6">
       {state.status === 'error' && state.message && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700">{state.message}</div>
+        <div className="p-3 rounded-md border border-danger-fg/20 bg-danger-bg text-danger-fg text-sm">
+          {state.message}
+        </div>
       )}
       {translateError && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-700">{translateError}</div>
+        <div className="p-3 rounded-md border border-warning-fg/20 bg-warning-bg text-warning-fg text-sm">
+          {translateError}
+        </div>
       )}
 
-      <div className="flex items-center gap-4 p-4 bg-gray-50 border rounded">
-        <button type="button" onClick={handleTranslate} disabled={isTranslating} className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50">
-          {isTranslating ? '翻译中…' : '🌐 自动翻译俄文'}
-        </button>
-        <p className="text-sm text-gray-600">
-          填好中文后点这个按钮,AI 把 7 个俄文字段一齐填好。手改俄文后该字段会上锁(再次翻译不覆盖)。
+      {/* 自动翻译辅助区 */}
+      <div className="flex items-start gap-4 p-4 rounded-md border border-border bg-muted/40">
+        <Button
+          type="button"
+          onClick={handleTranslate}
+          disabled={isTranslating}
+          variant="secondary"
+          size="sm"
+          className="flex-shrink-0"
+        >
+          {isTranslating ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              翻译中…
+            </>
+          ) : (
+            <>
+              <Sparkles className="size-4" />
+              自动翻译俄文
+            </>
+          )}
+        </Button>
+        <p className="text-xs text-muted-foreground leading-relaxed pt-1">
+          填好中文后点这个按钮,AI 会把 7 个俄文字段一齐填好。手改俄文后该字段会上锁(再次翻译不覆盖)。
         </p>
       </div>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">基本信息(中俄对照)</h2>
+      <FormSection title="基本信息(中俄对照)">
         {FIELD_PAIRS.map((pair) => (
-          <BilingualFieldRow key={pair.key} pair={pair} bi={bi} errors={errors} onZhChange={handleZhChange} onRuChange={handleRuChange} />
+          <BilingualFieldRow
+            key={pair.key}
+            pair={pair}
+            bi={bi}
+            errors={errors}
+            onZhChange={handleZhChange}
+            onRuChange={handleRuChange}
+          />
         ))}
-      </section>
+      </FormSection>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">其他信息</h2>
-
-        <div>
-          <label className="block text-sm mb-1">
-            供应商编号 <span className="text-red-500">*</span>
-            {isEdit && <span className="ml-2 text-xs text-gray-500">(编辑模式下不可修改)</span>}
-          </label>
-          <input
+      <FormSection title="其他信息">
+        <FormField
+          label={
+            <>
+              供应商编号
+              {isEdit && (
+                <span className="ml-2 text-xs text-muted-foreground font-normal">
+                  (编辑模式下不可修改)
+                </span>
+              )}
+            </>
+          }
+          htmlFor="code"
+          required
+          error={errors?.code?.[0]}
+        >
+          <Input
+            id="code"
             type="text"
             name="code"
             placeholder="如 GZ-001"
             defaultValue={initialData?.code}
             readOnly={isEdit}
-            className={`w-full px-3 py-2 border rounded ${isEdit ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''}`}
+            className={cn(isEdit && 'bg-muted cursor-not-allowed text-muted-foreground')}
           />
-          <FieldError errors={errors?.code} />
+        </FormField>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField label="纬度" htmlFor="latitude" required error={errors?.latitude?.[0]}>
+            <Input
+              id="latitude"
+              type="number"
+              step="any"
+              name="latitude"
+              placeholder="如 23.1291"
+              defaultValue={initialData?.latitude}
+            />
+          </FormField>
+          <FormField label="经度" htmlFor="longitude" required error={errors?.longitude?.[0]}>
+            <Input
+              id="longitude"
+              type="number"
+              step="any"
+              name="longitude"
+              placeholder="如 113.2644"
+              defaultValue={initialData?.longitude}
+            />
+          </FormField>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm mb-1">纬度 <span className="text-red-500">*</span></label>
-            <input type="number" step="any" name="latitude" placeholder="如 23.1291" defaultValue={initialData?.latitude} className="w-full px-3 py-2 border rounded" />
-            <FieldError errors={errors?.latitude} />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">经度 <span className="text-red-500">*</span></label>
-            <input type="number" step="any" name="longitude" placeholder="如 113.2644" defaultValue={initialData?.longitude} className="w-full px-3 py-2 border rounded" />
-            <FieldError errors={errors?.longitude} />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm mb-1">合作深度</label>
-          <select name="cooperationLevel" defaultValue={initialData?.cooperationLevel ?? 'INITIAL_CONTACT'} className="w-full px-3 py-2 border rounded">
+        <FormField label="合作深度" htmlFor="cooperationLevel">
+          <select
+            id="cooperationLevel"
+            name="cooperationLevel"
+            defaultValue={initialData?.cooperationLevel ?? 'INITIAL_CONTACT'}
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
             {COOPERATION_LEVELS.map((level) => (
-              <option key={level} value={level}>{COOPERATION_LEVEL_LABELS[level]}</option>
+              <option key={level} value={level}>
+                {COOPERATION_LEVEL_LABELS[level]}
+              </option>
             ))}
           </select>
-        </div>
+        </FormField>
 
-        <div>
-          <label className="block text-sm mb-1">认识渠道 <span className="text-red-500">*</span></label>
-          <input type="text" name="discoveredVia" placeholder="如 广交会、朋友介绍、老李推荐" defaultValue={initialData?.discoveredVia} className="w-full px-3 py-2 border rounded" />
-          <FieldError errors={errors?.discoveredVia} />
-        </div>
+        <FormField label="认识渠道" htmlFor="discoveredVia" required error={errors?.discoveredVia?.[0]}>
+          <Input
+            id="discoveredVia"
+            type="text"
+            name="discoveredVia"
+            placeholder="如 广交会、朋友介绍、老李推荐"
+            defaultValue={initialData?.discoveredVia}
+          />
+        </FormField>
 
-        <div>
-          <label className="block text-sm mb-1">官网</label>
-          <input type="text" name="website" placeholder="https://..." defaultValue={initialData?.website ?? ''} className="w-full px-3 py-2 border rounded" />
-          <FieldError errors={errors?.website} />
-        </div>
-      </section>
+        <FormField label="官网" htmlFor="website" error={errors?.website?.[0]}>
+          <Input
+            id="website"
+            type="text"
+            name="website"
+            placeholder="https://..."
+            defaultValue={initialData?.website ?? ''}
+          />
+        </FormField>
+      </FormSection>
 
-      <SubmitButton isEdit={isEdit} />
+      <FormActions>
+        <SubmitButton isEdit={isEdit} />
+      </FormActions>
     </form>
   );
 }
