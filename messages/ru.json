@@ -131,7 +131,12 @@
   "transactionDocsTitle": "Документы заказа",
   "transactionDocsEmpty": "Документы отсутствуют",
   "uploadTransactionDocs": "Загрузить документы",
-  "transactionDocAcceptHint": "Изображение / PDF / Word / Excel, до 30 МБ"
+  "transactionDocAcceptHint": "Изображение / PDF / Word / Excel, до 30 МБ",
+  "paymentScreenshotsTitle": "Платёжные квитанции",
+  "uploadPaymentScreenshot": "Загрузить квитанцию",
+  "paymentScreenshotAcceptHint": "Изображение / PDF, до 10 МБ",
+  "paymentScreenshotsEmpty": "Нет квитанций",
+  "paymentsEmptyForScreenshots": "Сохраните платежи в заказе, чтобы загружать квитанции"
 
 },
   "notes": {

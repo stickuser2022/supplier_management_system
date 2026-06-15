@@ -31,6 +31,8 @@ export const transactionItemSchema = z.object({
 });
 
 export const paymentSchema = z.object({
+  // null = 新增行;number = 已存在,走 UPDATE
+  id: z.union([z.number().int().positive(), z.null()]).optional().nullable(),
   paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD'),
   amount: decimalString,
   currency: z.enum(CURRENCIES),

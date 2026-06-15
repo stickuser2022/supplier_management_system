@@ -21,6 +21,7 @@ import { FormSection } from '@/components/forms/form-section';
 import { FormField } from '@/components/forms/form-field';
 import { FormActions } from '@/components/forms/form-actions';
 
+
 type ItemRow = {
   quoteId: number | null;
   productNameZh: string;
@@ -38,6 +39,7 @@ type ItemRow = {
 };
 
 type PaymentRow = {
+  id: number | null;  // null = 新增,number = 已存在的 Payment
   paidAt: string;
   amount: string;
   currency: (typeof CURRENCIES)[number];
@@ -86,6 +88,7 @@ const emptyItem = (): ItemRow => ({
 });
 
 const emptyPayment = (): PaymentRow => ({
+  id:null,
   paidAt: new Date().toISOString().slice(0, 10),
   amount: '0',
   currency: 'CNY',

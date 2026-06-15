@@ -132,7 +132,12 @@
   "transactionDocsTitle": "订单单据 / 合同 / 发票",
   "transactionDocsEmpty": "暂无订单文档",
   "uploadTransactionDocs": "上传单据",
-  "transactionDocAcceptHint": "图片 / PDF / Word / Excel,最大 30MB"
+  "transactionDocAcceptHint": "图片 / PDF / Word / Excel,最大 30MB",
+  "paymentScreenshotsTitle": "付款凭证",
+  "uploadPaymentScreenshot": "上传付款截图",
+  "paymentScreenshotAcceptHint": "图片 / PDF,最大 10MB",
+  "paymentScreenshotsEmpty": "暂无截图",
+  "paymentsEmptyForScreenshots": "保存订单的付款记录后,可以为每条付款上传凭证"
   
 },
   "notes": {

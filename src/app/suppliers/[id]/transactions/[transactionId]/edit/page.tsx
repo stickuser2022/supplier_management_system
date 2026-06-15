@@ -6,6 +6,7 @@ import { TransactionForm, type TransactionFormInitialData } from '../../_compone
 import { FileUploader } from '../../../_components/file-uploader';
 import { TransactionDocList } from '../../../_components/transaction-doc-list';
 import { DetailSection } from '../../../_components/detail-section';
+import { PaymentScreenshotsSection } from '../../../_components/payment-screenshots-section';
 
 export default async function EditTransactionPage({
   params,
@@ -21,7 +22,25 @@ export default async function EditTransactionPage({
     where: { id: transactionId },
     include: {
       transactionItems: { orderBy: { sortOrder: 'asc' } },
-      payments: { orderBy: { paidAt: 'asc' } },
+      payments: {
+        orderBy: { paidAt: 'asc' },
+        include: {
+          files: {
+            where: { type: 'PAYMENT_SCREENSHOT', isActive: true },
+            select: {
+              id: true,
+              fileName: true,
+              mimeType: true,
+              sizeBytes: true,
+              thumbnailKey: true,
+              titleZh: true,
+              titleRu: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      },
     },
   });
   if (!tx) notFound();
@@ -79,7 +98,9 @@ export default async function EditTransactionPage({
       subtotal: it.subtotal.toString(),
       sortOrder: it.sortOrder,
     })),
+    // 关键改动:把 p.id 带进 initialData
     payments: tx.payments.map((p) => ({
+      id: p.id,
       paidAt: p.paidAt.toISOString().slice(0, 10),
       amount: p.amount.toString(),
       currency: p.currency,
@@ -118,6 +139,16 @@ export default async function EditTransactionPage({
             acceptHint={tFiles('transactionDocAcceptHint')}
           />
           <TransactionDocList supplierId={supplierId} items={transactionDocs} />
+        </DetailSection>
+      </div>
+
+      {/* 付款凭证(每条 Payment 一个独立的截图管理区) */}
+      <div className="mt-8">
+        <DetailSection title={tFiles('paymentScreenshotsTitle')}>
+          <PaymentScreenshotsSection
+            supplierId={supplierId}
+            payments={tx.payments}
+          />
         </DetailSection>
       </div>
     </FormPage>

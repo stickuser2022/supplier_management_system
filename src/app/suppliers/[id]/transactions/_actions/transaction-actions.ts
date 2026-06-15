@@ -92,6 +92,7 @@ export async function createTransaction(
           })),
         });
       }
+      // payments 在 create 场景永远是全新行,直接 createMany 即可(无需 diff)
       if (payments.length > 0) {
         await tx.payment.createMany({
           data: payments.map((p) => ({
@@ -148,6 +149,7 @@ export async function updateTransaction(
 
   try {
     await prisma.$transaction(async (tx) => {
+      // 主表 update
       await tx.transaction.update({
         where: { id: transactionId },
         data: {
@@ -161,9 +163,9 @@ export async function updateTransaction(
           status: main.status,
         },
       });
-      // 先删后插,简单可靠
+
+      // items 继续走"先删后插"
       await tx.transactionItem.deleteMany({ where: { transactionId } });
-      await tx.payment.deleteMany({ where: { transactionId } });
       if (items.length > 0) {
         await tx.transactionItem.createMany({
           data: items.map((item, idx) => ({
@@ -184,20 +186,45 @@ export async function updateTransaction(
           })),
         });
       }
-      if (payments.length > 0) {
-        await tx.payment.createMany({
-          data: payments.map((p) => ({
-            transactionId,
-            paidAt: new Date(p.paidAt),
-            amount: p.amount,
-            currency: p.currency,
-            method: p.method,
-            purposeZh: p.purposeZh,
-            purposeRu: p.purposeRu,
-            purposeRuAutoTranslated: p.purposeRuAutoTranslated,
-            createdById,
-          })),
-        });
+
+      // payments 走 diff 三分类,保留稳定 id,挂的截图不会被误删
+      const existingPayments = await tx.payment.findMany({
+        where: { transactionId },
+        select: { id: true },
+      });
+      const existingIds = new Set(existingPayments.map((p) => p.id));
+
+      // 提交里"声明自己是已存在记录"的 id 集合(且确实在 DB 里)
+      const keepIds = new Set(
+        payments
+          .filter((p) => p.id != null && existingIds.has(p.id))
+          .map((p) => p.id as number),
+      );
+
+      // 1. DELETE: 在 DB 但提交里没保留的 → 物理删,级联清掉截图
+      const toDelete = [...existingIds].filter((id) => !keepIds.has(id));
+      if (toDelete.length > 0) {
+        await tx.payment.deleteMany({ where: { id: { in: toDelete } } });
+      }
+
+      // 2. UPDATE 或 3. CREATE
+      for (const p of payments) {
+        const data = {
+          paidAt: new Date(p.paidAt),
+          amount: p.amount,
+          currency: p.currency,
+          method: p.method,
+          purposeZh: p.purposeZh,
+          purposeRu: p.purposeRu,
+          purposeRuAutoTranslated: p.purposeRuAutoTranslated,
+        };
+        if (p.id != null && existingIds.has(p.id)) {
+          await tx.payment.update({ where: { id: p.id }, data });
+        } else {
+          await tx.payment.create({
+            data: { ...data, transactionId, createdById },
+          });
+        }
       }
     });
   } catch (err) {
@@ -208,7 +235,8 @@ export async function updateTransaction(
   }
 
   revalidatePath(`/suppliers/${existing.supplierId}`);
-  redirect(`/suppliers/${existing.supplierId}`);
+  // 改动:保存后回到同一编辑页,让用户立即管理新建 Payment 的截图
+  redirect(`/suppliers/${existing.supplierId}/transactions/${transactionId}/edit`);
 }
 
 export async function archiveTransaction(id: number) {
