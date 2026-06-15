@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useTranslations } from 'next-intl';
 import { Lock, Sparkles, Loader2 } from 'lucide-react';
 import {
   createContact,
@@ -69,19 +70,15 @@ type FieldPair = {
   required?: boolean;
 };
 
-const FIELD_PAIRS: FieldPair[] = [
-  { key: 'name', zhFieldName: 'nameZh', ruFieldName: 'nameRu', flagFieldName: 'nameRuAutoTranslated', zhLabel: '中文姓名', ruLabel: '俄文姓名', required: true },
-  { key: 'role', zhFieldName: 'roleZh', ruFieldName: 'roleRu', flagFieldName: 'roleRuAutoTranslated', zhLabel: '职位(中文)', ruLabel: '职位(俄文)' },
-];
-
 // ===== 子组件 =====
 
 function SubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus();
+  const tCommon = useTranslations('forms.common');
   return (
     <Button type="submit" disabled={pending}>
       {pending && <Loader2 className="size-4 animate-spin" />}
-      {pending ? '保存中…' : isEdit ? '更新' : '保存'}
+      {pending ? tCommon('submitting') : isEdit ? tCommon('update') : tCommon('submit')}
     </Button>
   );
 }
@@ -105,6 +102,15 @@ export function ContactForm({
   const [translateError, setTranslateError] = useState<string | null>(null);
   const errors = state.errors;
 
+  const t = useTranslations('forms.contact');
+  const tCommon = useTranslations('forms.common');
+
+  // FIELD_PAIRS 移到组件内部:label 走 t(),原本是 module-level 常量改不了
+  const FIELD_PAIRS: FieldPair[] = [
+    { key: 'name', zhFieldName: 'nameZh', ruFieldName: 'nameRu', flagFieldName: 'nameRuAutoTranslated', zhLabel: t('labelNameZh'), ruLabel: t('labelNameRu'), required: true },
+    { key: 'role', zhFieldName: 'roleZh', ruFieldName: 'roleRu', flagFieldName: 'roleRuAutoTranslated', zhLabel: t('labelRoleZh'), ruLabel: t('labelRoleRu') },
+  ];
+
   const handleZhChange = (key: keyof BilingualState, value: string) =>
     setBi((s) => ({ ...s, [key]: value }));
   const handleRuChange = (ruKey: keyof BilingualState, flagKey: keyof BilingualState, value: string) =>
@@ -121,7 +127,7 @@ export function ContactForm({
       .map((p) => ({ field: p.key, text: bi[p.zhFieldName] as string }));
 
     if (requests.length === 0) {
-      setTranslateError('没有可翻译的字段(中文为空 / 已锁定)');
+      setTranslateError(t('noTranslateTargets'));
       return;
     }
 
@@ -170,21 +176,21 @@ export function ContactForm({
           {isTranslating ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              翻译中…
+              {tCommon('translating')}
             </>
           ) : (
             <>
               <Sparkles className="size-4" />
-              自动翻译俄文
+              {t('autoTranslateButton')}
             </>
           )}
         </Button>
         <p className="text-xs text-muted-foreground leading-relaxed pt-1">
-          翻译姓名和职位 2 个字段。手改后该字段会上锁(再次翻译不覆盖)。
+          {t('autoTranslateHint')}
         </p>
       </div>
 
-      <FormSection title="基本信息">
+      <FormSection title={t('sectionBasic')}>
         {FIELD_PAIRS.map((pair) => {
           const zhValue = bi[pair.zhFieldName] as string;
           const ruValue = bi[pair.ruFieldName] as string;
@@ -216,7 +222,7 @@ export function ContactForm({
                     {isLocked && (
                       <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
                         <Lock className="size-3" />
-                        已手改
+                        {tCommon('manualEditLocked')}
                       </span>
                     )}
                   </>
@@ -237,9 +243,9 @@ export function ContactForm({
         })}
       </FormSection>
 
-      <FormSection title="联系方式" description="空着即可不填,多号码用 / 分隔">
+      <FormSection title={t('sectionContact')} description={t('contactHint')}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="手机" htmlFor="phone">
+          <FormField label={t('labelPhone')} htmlFor="phone">
             <Input
               id="phone"
               type="text"
@@ -248,7 +254,7 @@ export function ContactForm({
               placeholder="13800138000"
             />
           </FormField>
-          <FormField label="微信" htmlFor="wechat">
+          <FormField label={t('labelWechat')} htmlFor="wechat">
             <Input
               id="wechat"
               type="text"
@@ -256,7 +262,7 @@ export function ContactForm({
               defaultValue={initialData?.wechat ?? ''}
             />
           </FormField>
-          <FormField label="邮箱" htmlFor="email" error={errors?.email?.[0]}>
+          <FormField label={t('labelEmail')} htmlFor="email" error={errors?.email?.[0]}>
             <Input
               id="email"
               type="email"
@@ -301,9 +307,9 @@ export function ContactForm({
             className="size-4 mt-0.5 rounded border-border accent-primary cursor-pointer"
           />
           <span className="text-sm text-foreground leading-snug">
-            设为主要联系人
+            {t('labelIsPrimary')}
             <span className="block text-xs text-muted-foreground mt-0.5">
-              同一供应商下只能有 1 个,勾选会自动取消其他人的主要标记
+              {t('primaryHint')}
             </span>
           </span>
         </label>

@@ -12,11 +12,15 @@ const baseClasses =
 
 export function NoteActionsCell({
   note,
+  canEdit = true,
 }: {
   note: { id: number; supplierId: number; contentZh: string; isActive: boolean };
+  canEdit?: boolean;
 }) {
   const t = useTranslations('notes.actions');
   const [isPending, startTransition] = useTransition();
+
+  if (!canEdit) return null;
 
   const handleArchive = () => {
     const preview = note.contentZh.length > 20 ? note.contentZh.slice(0, 20) + '…' : note.contentZh;

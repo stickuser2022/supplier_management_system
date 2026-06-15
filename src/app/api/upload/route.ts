@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import sharp from 'sharp';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { getOptionalUserId } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { storage, keyFor, thumbKeyFor } from '@/lib/storage';
 import type { FileType } from '@/generated/prisma/client';
@@ -119,16 +118,11 @@ function revalidateFor(type: FileType, ownerId: number) {
 
 // ─── POST /api/upload ──────────────────────────────────────────
 export async function POST(request: NextRequest) {
-// 1. 取当前用户 id:与 supplier-actions.ts 同模式
-  //    开发期 session 拿不到时,兜底为 admin user id
-  //    阶段 2 完整接入认证后,改为强制要求 session
-  const DEV_FALLBACK_ADMIN_ID = 'P3wbHXCGnCMPy0k6LO4paUqASBYRgRQK';
-  let userId: string;
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    userId = session?.user?.id ?? DEV_FALLBACK_ADMIN_ID;
-  } catch {
-    userId = DEV_FALLBACK_ADMIN_ID;
+  // 1. 取当前用户 id;无 session 直接 401(middleware 已拦截未登录访问,
+  //    走到这里的多半是 session 中途失效,客户端需要重新登录)
+  const userId = await getOptionalUserId();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   // 2. 解析 multipart formData

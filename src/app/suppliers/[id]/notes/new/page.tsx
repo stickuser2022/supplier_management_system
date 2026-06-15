@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { FormPage } from '@/components/forms/form-page';
 import { NoteForm } from '../_components/NoteForm';
@@ -28,11 +29,13 @@ export default async function NewNotePage({
     }),
   ]);
 
+  const t = await getTranslations('formPage');
+
   return (
     <FormPage
-      title={`为「${supplier.nameZh}」添加沟通记录`}
+      title={t('newNote', { name: supplier.nameZh })}
       backHref={`/suppliers/${supplierId}`}
-      backLabel="返回供应商详情"
+      backLabel={t('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"
     >
       <NoteForm

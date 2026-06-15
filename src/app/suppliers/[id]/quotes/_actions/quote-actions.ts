@@ -1,30 +1,18 @@
 'use server';
 
 import { z } from 'zod';
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { requireUserId, requireCurrentUser, isOwner } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { quoteCreateSchema } from '../_validations/quote-schema';
-
-const DEV_FALLBACK_ADMIN_ID = 'P3wbHXCGnCMPy0k6LO4paUqASBYRgRQK';
 
 export type QuoteFormState = {
   status: 'idle' | 'success' | 'error';
   errors?: Record<string, string[] | undefined>;
   message?: string;
 };
-
-async function getCurrentUserId(): Promise<string> {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    return session?.user?.id ?? DEV_FALLBACK_ADMIN_ID;
-  } catch {
-    return DEV_FALLBACK_ADMIN_ID;
-  }
-}
 
 // 从 FormData 提取 tagIds(多值字段,Object.fromEntries 抓不全)
 function extractTagIds(formData: FormData): number[] {
@@ -52,7 +40,7 @@ export async function createQuote(
   }
 
   const tagIds = extractTagIds(formData);
-  const createdById = await getCurrentUserId();
+  const createdById = await requireUserId();
 
   try {
     await prisma.quote.create({
@@ -113,6 +101,12 @@ export async function updateQuote(
   const existing = await prisma.quote.findUnique({ where: { id: quoteId } });
   if (!existing) return { status: 'error', message: '报价不存在' };
 
+  // 权限:只有创建者本人 或 ADMIN 能改
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) {
+    return { status: 'error', message: '只能修改自己创建的报价' };
+  }
+
   try {
     await prisma.$transaction(async (tx) => {
       await tx.quote.update({
@@ -157,7 +151,19 @@ export async function updateQuote(
 }
 
 // ===== 归档 / 恢复 =====
+async function assertQuoteOwnership(quoteId: number) {
+  const existing = await prisma.quote.findUnique({
+    where: { id: quoteId },
+    select: { createdById: true, supplierId: true },
+  });
+  if (!existing) throw new Error('报价不存在');
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) throw new Error('只能操作自己创建的报价');
+  return existing;
+}
+
 export async function archiveQuote(quoteId: number): Promise<void> {
+  await assertQuoteOwnership(quoteId);
   const q = await prisma.quote.update({
     where: { id: quoteId },
     data: { status: 'ARCHIVED' },
@@ -166,6 +172,7 @@ export async function archiveQuote(quoteId: number): Promise<void> {
 }
 
 export async function restoreQuote(quoteId: number): Promise<void> {
+  await assertQuoteOwnership(quoteId);
   const q = await prisma.quote.update({
     where: { id: quoteId },
     data: { status: 'ACTIVE' },

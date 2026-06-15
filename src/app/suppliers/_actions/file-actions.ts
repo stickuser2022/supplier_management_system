@@ -3,16 +3,40 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
+import { requireCurrentUser, isOwner } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { fileTitleSchema } from '../_validations/file-schema';
-import { redirect } from 'next/navigation'; 
+import { redirect } from 'next/navigation';
 import { storage } from '@/lib/storage';
 
+// ─── 文件级权限检查 helper ─────────────────────────────────────
+// 凡是改/归档/删除文件的动作,都先校验当前用户是否有权操作此文件。
+// 规则:文件的 createdById 是上传者;只有上传者本人或 ADMIN 能改。
+async function assertFileOwnership(fileId: number) {
+  const file = await prisma.file.findUnique({
+    where: { id: fileId },
+    select: { createdById: true },
+  });
+  if (!file) return { ok: false as const, error: '文件不存在' };
+  const user = await requireCurrentUser();
+  if (!isOwner(file, user)) return { ok: false as const, error: '只能操作自己上传的文件' };
+  return { ok: true as const };
+}
+
 // ─── 清除 LOGO(原有,保留)────────────────────────────────────
+// 这是 supplier 级动作,检查 supplier 的 createdById
 export async function clearSupplierLogo(
   supplierId: number,
 ): Promise<{ ok?: true; error?: string }> {
   try {
+    const supplier = await prisma.supplier.findUnique({
+      where: { id: supplierId },
+      select: { createdById: true },
+    });
+    if (!supplier) return { error: '供应商不存在' };
+    const user = await requireCurrentUser();
+    if (!isOwner(supplier, user)) return { error: '只能修改自己创建的供应商' };
+
     await prisma.file.updateMany({
       where: {
         supplierId,
@@ -78,10 +102,13 @@ export async function archiveFile(
   fileId: number,
 ): Promise<{ ok?: true; error?: string }> {
   try {
+    const check = await assertFileOwnership(fileId);
+    if (!check.ok) return { error: check.error };
+
     const supplierId = await getFileSupplierId(fileId);
     if (!supplierId) return { error: '文件不存在' };
 
-await prisma.file.update({
+    await prisma.file.update({
       where: { id: fileId },
       data: { isActive: false, isCover: false },
     });
@@ -97,6 +124,9 @@ export async function restoreFile(
   fileId: number,
 ): Promise<{ ok?: true; error?: string }> {
   try {
+    const check = await assertFileOwnership(fileId);
+    if (!check.ok) return { error: check.error };
+
     const supplierId = await getFileSupplierId(fileId);
     if (!supplierId) return { error: '文件不存在' };
 
@@ -137,6 +167,12 @@ export async function updateFileTitle(
   const supplierId = await getFileSupplierId(fileId);
   if (!supplierId) {
     return { status: 'error', message: '文件不存在' };
+  }
+
+  // 权限:只有上传者本人 或 ADMIN 能改文件标题
+  const check = await assertFileOwnership(fileId);
+  if (!check.ok) {
+    return { status: 'error', message: check.error };
   }
 
   try {
@@ -296,6 +332,9 @@ export async function physicallyDeleteFile(
   fileId: number,
 ): Promise<{ ok?: true; error?: string }> {
   try {
+    const check = await assertFileOwnership(fileId);
+    if (!check.ok) return { error: check.error };
+
     const file = await prisma.file.findUnique({
       where: { id: fileId },
       select: {

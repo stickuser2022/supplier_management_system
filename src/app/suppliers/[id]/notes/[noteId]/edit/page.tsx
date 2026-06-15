@@ -42,6 +42,8 @@ export default async function EditNotePage({
     getTranslations('files'),
   ]);
 
+  const tForm = await getTranslations('formPage');
+
   const initialData: NoteFormInitialData = {
     id: note.id,
     contactId: note.contactId,
@@ -54,9 +56,9 @@ export default async function EditNotePage({
 
   return (
     <FormPage
-      title={`编辑沟通记录 #${note.id}`}
+      title={tForm('editNote', { id: note.id })}
       backHref={`/suppliers/${supplierId}`}
-      backLabel="返回供应商详情"
+      backLabel={tForm('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"
     >
       <NoteForm

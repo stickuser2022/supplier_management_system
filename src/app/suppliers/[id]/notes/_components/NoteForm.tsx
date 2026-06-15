@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useTranslations } from 'next-intl';
 import { Lock, Sparkles, Loader2 } from 'lucide-react';
 import {
   createNote,
@@ -33,10 +34,11 @@ const SELECT_CLASS =
 
 function SubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus();
+  const tCommon = useTranslations('forms.common');
   return (
     <Button type="submit" disabled={pending}>
       {pending && <Loader2 className="size-4 animate-spin" />}
-      {pending ? '保存中…' : isEdit ? '更新' : '保存'}
+      {pending ? tCommon('submitting') : isEdit ? tCommon('update') : tCommon('submit')}
     </Button>
   );
 }
@@ -67,6 +69,9 @@ export function NoteForm({
   const [translateError, setTranslateError] = useState<string | null>(null);
   const errors = state.errors;
 
+  const t = useTranslations('forms.note');
+  const tCommon = useTranslations('forms.common');
+
   const handleContentRuChange = (value: string) => {
     setContentRu(value);
     setAutoTranslated(false);
@@ -75,11 +80,11 @@ export function NoteForm({
   const handleTranslate = () => {
     setTranslateError(null);
     if (contentZh.trim().length === 0) {
-      setTranslateError('中文内容为空');
+      setTranslateError(t('errContentEmpty'));
       return;
     }
     if (!autoTranslated) {
-      setTranslateError('俄文已手改(锁定),不会覆盖');
+      setTranslateError(t('errRuLocked'));
       return;
     }
     startTranslating(async () => {
@@ -116,36 +121,36 @@ export function NoteForm({
           className="flex-shrink-0"
         >
           {isTranslating ? (
-            <><Loader2 className="size-4 animate-spin" />翻译中…</>
+            <><Loader2 className="size-4 animate-spin" />{tCommon('translating')}</>
           ) : (
-            <><Sparkles className="size-4" />自动翻译俄文</>
+            <><Sparkles className="size-4" />{t('autoTranslateButton')}</>
           )}
         </Button>
         <p className="text-xs text-muted-foreground leading-relaxed pt-1">
-          填好中文后点这个按钮自动翻译。手改俄文后该字段会上锁(再次翻译不覆盖)。
+          {t('autoTranslateHint')}
         </p>
       </div>
 
-      <FormSection title="记录内容">
+      <FormSection title={t('sectionContent')}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="中文内容" htmlFor="content-zh" required error={errors?.contentZh?.[0]}>
+          <FormField label={t('labelContentZh')} htmlFor="content-zh" required error={errors?.contentZh?.[0]}>
             <Textarea
               id="content-zh"
               name="contentZh"
               value={contentZh}
               onChange={(e) => setContentZh(e.target.value)}
               rows={6}
-              placeholder="如:5/10 微信沟通,客户问起 30cm 玩具熊报价,对方表示要先样品..."
+              placeholder={t('contentZhPlaceholder')}
             />
           </FormField>
           <FormField
             label={
               <>
-                <span>俄文内容</span>
+                <span>{t('labelContentRu')}</span>
                 {!autoTranslated && (
                   <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
                     <Lock className="size-3" />
-                    已手改
+                    {tCommon('manualEditLocked')}
                   </span>
                 )}
               </>
@@ -164,14 +169,14 @@ export function NoteForm({
         </div>
       </FormSection>
 
-      <FormSection title="时间与关联">
+      <FormSection title={t('sectionTimeRelation')}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <FormField
             label={
               <>
-                事件日期
+                {t('labelHappenedAt')}
                 <span className="ml-1 text-xs text-muted-foreground font-normal">
-                  (可填过去补录)
+                  {t('happenedAtSuffix')}
                 </span>
               </>
             }
@@ -186,27 +191,27 @@ export function NoteForm({
               defaultValue={initialData?.happenedAt ?? new Date().toISOString().slice(0, 10)}
             />
           </FormField>
-          <FormField label="关联联系人" htmlFor="contactId">
+          <FormField label={t('labelContactRel')} htmlFor="contactId">
             <select
               id="contactId"
               name="contactId"
               defaultValue={initialData?.contactId?.toString() ?? ''}
               className={SELECT_CLASS}
             >
-              <option value="">— 不指定 —</option>
+              <option value="">{t('selectNone')}</option>
               {availableContacts.map((c) => (
                 <option key={c.id} value={c.id}>{c.nameZh}</option>
               ))}
             </select>
           </FormField>
-          <FormField label="关联报价" htmlFor="quoteId">
+          <FormField label={t('labelQuoteRel')} htmlFor="quoteId">
             <select
               id="quoteId"
               name="quoteId"
               defaultValue={initialData?.quoteId?.toString() ?? ''}
               className={SELECT_CLASS}
             >
-              <option value="">— 不指定 —</option>
+              <option value="">{t('selectNone')}</option>
               {availableQuotes.map((q) => (
                 <option key={q.id} value={q.id}>
                   #{q.id} {q.productNameZh} ({q.quotedAt.toISOString().slice(0, 10)})

@@ -73,6 +73,8 @@ export default async function EditTransactionPage({
     getTranslations('files'),
   ]);
 
+  const tForm = await getTranslations('formPage');
+
   const initialData: TransactionFormInitialData = {
     id: tx.id,
     contactId: tx.contactId,
@@ -113,9 +115,9 @@ export default async function EditTransactionPage({
 
   return (
     <FormPage
-      title={`编辑订单 #${tx.id}`}
+      title={tForm('editTransaction', { id: tx.id })}
       backHref={`/suppliers/${supplierId}`}
-      backLabel="返回供应商详情"
+      backLabel={tForm('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"
     >
       <TransactionForm

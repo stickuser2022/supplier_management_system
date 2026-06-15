@@ -142,7 +142,7 @@ if (!existing) {
       username: ADMIN_USERNAME,
     },
   });
-  // Better Auth 注册的新用户默认 role=VIEWER(schema 默认值),改成 ADMIN
+  // Better Auth 注册的新用户默认 role=EDITOR(schema 默认值),改成 ADMIN
   await prisma.user.update({
     where: { username: ADMIN_USERNAME },
     data: { role: 'ADMIN' },

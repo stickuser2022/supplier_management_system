@@ -1,12 +1,14 @@
+import { getTranslations } from 'next-intl/server';
 import { FormPage } from '@/components/forms/form-page';
 import { SupplierForm } from '../_components/SupplierForm';
 
-export default function NewSupplierPage() {
+export default async function NewSupplierPage() {
+  const t = await getTranslations('formPage');
   return (
     <FormPage
-      title="新建供应商"
+      title={t('newSupplier')}
       backHref="/suppliers"
-      backLabel="返回列表"
+      backLabel={t('backToList')}
       maxWidthClass="max-w-5xl"
     >
       <SupplierForm />

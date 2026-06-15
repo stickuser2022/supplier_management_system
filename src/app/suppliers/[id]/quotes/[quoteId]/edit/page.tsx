@@ -23,6 +23,8 @@ export default async function EditQuotePage({
   });
   if (!quote || quote.supplierId !== supplierId) notFound();
 
+  const tForm = await getTranslations('formPage');
+
   const [availableContacts, availableTags, quoteImages, locale, tFiles] = await Promise.all([
     prisma.contact.findMany({
       where: { supplierId, status: 'ACTIVE' },
@@ -74,9 +76,9 @@ export default async function EditQuotePage({
 
   return (
     <FormPage
-      title={`编辑报价 #${quote.id}`}
+      title={tForm('editQuote', { id: quote.id })}
       backHref={`/suppliers/${supplierId}`}
-      backLabel="返回供应商详情"
+      backLabel={tForm('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"
     >
       <QuoteForm

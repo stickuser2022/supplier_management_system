@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { FormPage } from '@/components/forms/form-page';
 import { TransactionForm } from '../_components/TransactionForm';
@@ -30,11 +31,13 @@ export default async function NewTransactionPage({
   ]);
   if (!supplier) notFound();
 
+  const t = await getTranslations('formPage');
+
   return (
     <FormPage
-      title={`为「${supplier.nameZh}」新建订单`}
+      title={t('newTransaction', { name: supplier.nameZh })}
       backHref={`/suppliers/${supplierId}`}
-      backLabel="返回供应商详情"
+      backLabel={t('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"
     >
       <TransactionForm

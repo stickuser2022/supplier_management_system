@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTranslations, getLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { requireCurrentUser, isOwner } from '@/lib/auth';
 import { pickLocalized } from '@/i18n/pick-localized';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,11 +20,14 @@ export async function QuotesList({ supplierId }: { supplierId: number }) {
   const locale = await getLocale();
   const today = new Date();
 
-  const quotes = await prisma.quote.findMany({
-    where: { supplierId },
-    include: { quoteTags: { include: { tag: true } } },
-    orderBy: { quotedAt: 'desc' },
-  });
+  const [quotes, currentUser] = await Promise.all([
+    prisma.quote.findMany({
+      where: { supplierId },
+      include: { quoteTags: { include: { tag: true } } },
+      orderBy: { quotedAt: 'desc' },
+    }),
+    requireCurrentUser(),
+  ]);
 
   const coverFiles = await prisma.file.findMany({
     where: {
@@ -152,6 +156,7 @@ export async function QuotesList({ supplierId }: { supplierId: number }) {
                           productNameZh: q.productNameZh,
                           status: q.status,
                         }}
+                        canEdit={isOwner(q, currentUser)}
                       />
                     </TableCell>
                   </TableRow>

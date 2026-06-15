@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>青格力供应商系统 — 项目导览</title>
+<style>
+  :root {
+    --c-fg: #1c1c1c;
+    --c-muted: #6b6b6b;
+    --c-bg: #fafafa;
+    --c-card: #ffffff;
+    --c-border: #e4e4e4;
+    --c-primary: #b91c1c;
+    --c-warm: #f97316;
+    --c-soft: #fff5ec;
+    --c-code-bg: #f5f5f5;
+    --c-link: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 70px; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+    color: var(--c-fg);
+    background: var(--c-bg);
+    line-height: 1.7;
+    font-size: 16px;
+  }
+  nav.top {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--c-border);
+    padding: 12px 24px;
+    display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+    font-size: 14px;
+  }
+  nav.top .brand { font-weight: 700; color: var(--c-primary); margin-right: auto; }
+  nav.top a { color: var(--c-muted); text-decoration: none; }
+  nav.top a:hover { color: var(--c-fg); }
+  main { max-width: 920px; margin: 0 auto; padding: 32px 24px 80px; }
+  header.hero {
+    background: linear-gradient(135deg, var(--c-soft), #fff);
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 36px;
+  }
+  header.hero h1 { margin: 0 0 8px; font-size: 26px; }
+  header.hero .sub { color: var(--c-muted); margin: 0; }
+  header.hero ul { color: var(--c-muted); font-size: 14px; margin: 16px 0 0; padding-left: 20px; }
+  section { margin-bottom: 48px; }
+  section h2 {
+    font-size: 22px; margin: 0 0 4px;
+    border-left: 4px solid var(--c-primary);
+    padding-left: 12px;
+  }
+  section h2 .num {
+    color: var(--c-warm);
+    font-size: 14px;
+    font-weight: 500;
+    margin-right: 8px;
+  }
+  section > p.intro { color: var(--c-muted); margin: 8px 0 20px; padding-left: 16px; }
+  h3 { margin-top: 32px; font-size: 17px; color: var(--c-fg); }
+  p { margin: 12px 0; }
+  ul, ol { margin: 12px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; background: var(--c-code-bg); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
+  pre {
+    background: var(--c-code-bg);
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 16px 0;
+  }
+  pre code { background: transparent; padding: 0; }
+  .kw { color: #8b3a8a; }
+  .str { color: #2e7d32; }
+  .com { color: #888; font-style: italic; }
+  .fn { color: #1565c0; }
+  .ty { color: #b85a00; }
+  /* 折叠面板 */
+  details { background: var(--c-card); border: 1px solid var(--c-border); border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
+  details[open] { background: #fcfcfc; }
+  summary { cursor: pointer; font-weight: 600; outline: none; user-select: none; padding: 4px 0; }
+  summary::marker { color: var(--c-warm); }
+  /* 表格 */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: var(--c-soft); border-bottom: 2px solid var(--c-warm); padding: 10px; text-align: left; }
+  td { border-bottom: 1px solid var(--c-border); padding: 10px; vertical-align: top; }
+  td.mono { font-family: monospace; font-size: 12px; color: var(--c-muted); }
+  /* 卡片 */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 16px 0; }
+  .card { background: var(--c-card); border: 1px solid var(--c-border); border-radius: 8px; padding: 14px; }
+  .card .title { font-weight: 600; color: var(--c-primary); font-size: 14px; }
+  .card .desc { color: var(--c-muted); font-size: 13px; margin-top: 4px; }
+  /* 高亮 box */
+  .callout { background: var(--c-soft); border-left: 3px solid var(--c-warm); padding: 12px 16px; border-radius: 4px; margin: 12px 0; font-size: 14px; }
+  .callout.danger { background: #fde8e6; border-color: var(--c-primary); }
+  .callout strong { color: var(--c-primary); }
+  /* SVG 自适应 */
+  .svg-wrap { display: flex; justify-content: center; margin: 20px 0; }
+  .svg-wrap svg { max-width: 100%; height: auto; }
+  /* 心智模型 chip */
+  .chip { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-right: 6px; }
+  .chip.client { background: #e0f2fe; color: #075985; }
+  .chip.server { background: #fef3c7; color: #92400e; }
+  .chip.db { background: #f3e8ff; color: #6b21a8; }
+  footer { color: var(--c-muted); font-size: 13px; text-align: center; margin-top: 60px; padding: 24px 0; border-top: 1px solid var(--c-border); }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <span class="brand">📍 项目导览</span>
+  <a href="#overview">1·全景</a>
+  <a href="#folders">2·文件夹</a>
+  <a href="#data">3·数据模型</a>
+  <a href="#layers">4·抽象层</a>
+  <a href="#lifecycle">5·请求流程</a>
+  <a href="#code">6·关键代码</a>
+  <a href="#deploy">7·部署</a>
+  <a href="#workflow">8·开发循环</a>
+</nav>
+
+<main>
+
+<header class="hero">
+  <h1>青格力供应商管理系统</h1>
+  <p class="sub">一份给"业务负责人 + 编程学习者"看的系统结构图。不深入每一行代码,但你看完之后,任何模块该到哪里找、谁牵动谁,心里清楚。</p>
+  <ul>
+    <li>看到一个 bug,知道大概去哪个文件夹找</li>
+    <li>想加个新字段,知道要改哪几个地方(而不是凭感觉摸)</li>
+    <li>有 AI 帮你写代码时,知道怎么问才问得对</li>
+  </ul>
+</header>
+
+<!-- ============================================ 第 1 章 ============================================ -->
+<section id="overview">
+  <h2><span class="num">第 1 章</span>整体心智模型</h2>
+  <p class="intro">把系统想成 3 层。每一层有它的职责,层之间通过明确的"接口"对话。</p>
+
+  <div class="svg-wrap">
+    <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" style="font-family: sans-serif;">
+      <!-- 浏览器层 -->
+      <rect x="20" y="20" width="680" height="80" rx="8" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5"/>
+      <text x="40" y="48" font-size="16" font-weight="bold" fill="#075985">① 浏览器(客户端)</text>
+      <text x="40" y="72" font-size="13" fill="#075985">青格力 / 俄罗斯家人 / 任何打开 https://qg-suppliermanagement.com 的人</text>
+      <text x="40" y="90" font-size="12" fill="#075985">职责:用户界面、表单交互、地图渲染。React + Tailwind 跑在这里。</text>
+
+      <!-- 服务层 -->
+      <rect x="20" y="140" width="680" height="120" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+      <text x="40" y="168" font-size="16" font-weight="bold" fill="#92400e">② Next.js 服务(笔记本上跑)</text>
+      <text x="40" y="190" font-size="12" fill="#92400e">职责:接收请求 → 校验权限 → 读写数据 → 翻译字符串 → 返回页面</text>
+      <text x="40" y="212" font-size="12" fill="#92400e">• App Router(把 src/app/ 文件夹结构变成 URL)</text>
+      <text x="40" y="228" font-size="12" fill="#92400e">• Server Actions(在服务器端跑的业务函数,前端直接调用)</text>
+      <text x="40" y="244" font-size="12" fill="#92400e">• Middleware(每次请求最先经过,做会话守门)</text>
+
+      <!-- 数据层 -->
+      <rect x="20" y="300" width="680" height="50" rx="8" fill="#f3e8ff" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="40" y="328" font-size="16" font-weight="bold" fill="#6b21a8">③ 数据存储(SQLite + 文件系统)</text>
+
+      <!-- 箭头 -->
+      <path d="M 360 100 L 360 140" stroke="#888" stroke-width="2" marker-end="url(#arrow)"/>
+      <path d="M 360 260 L 360 300" stroke="#888" stroke-width="2" marker-end="url(#arrow)"/>
+      <text x="370" y="125" font-size="11" fill="#555">HTTPS</text>
+      <text x="370" y="285" font-size="11" fill="#555">Prisma ORM</text>
+
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M 0 0 L 8 3 L 0 6 z" fill="#888"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <h3>三层各自的"边界"</h3>
+  <table>
+    <tr><th>层</th><th>跑在哪儿</th><th>关键文件</th><th>能干的事</th></tr>
+    <tr>
+      <td><span class="chip client">客户端</span></td>
+      <td>用户的浏览器</td>
+      <td class="mono">src/app/**/*.tsx<br>(标 'use client')</td>
+      <td>表单状态、按钮交互、地图渲染。<strong>看不到数据库</strong>。</td>
+    </tr>
+    <tr>
+      <td><span class="chip server">服务端</span></td>
+      <td>你的笔记本(NSSM 守着)</td>
+      <td class="mono">src/app/**/*.tsx<br>src/app/**/_actions/*</td>
+      <td>会话校验、业务逻辑、调用 Prisma、调用翻译 API。</td>
+    </tr>
+    <tr>
+      <td><span class="chip db">数据层</span></td>
+      <td>项目根目录</td>
+      <td class="mono">dev.db<br>storage/</td>
+      <td>SQLite 存结构化数据。storage/ 存文件(图片/PDF/视频)。</td>
+    </tr>
+  </table>
+
+  <div class="callout">
+    <strong>关键认知:</strong>客户端组件和服务端组件长得几乎一样(都是 .tsx),区别只在文件顶部有没有 <code>'use client'</code> 这一行。<strong>没有这行 = 服务器组件 = 能直接读数据库</strong>。有这行 = 客户端组件 = 只能用 hook、不能碰 prisma。
+  </div>
+</section>
+
+<!-- ============================================ 第 2 章 ============================================ -->
+<section id="folders">
+  <h2><span class="num">第 2 章</span>文件夹地图</h2>
+  <p class="intro">从项目根开始,谁住哪儿、各自职责。点开折叠看每个文件夹更细。</p>
+
+  <pre><code>supplier_management_system/
+├── prisma/              ← 数据库 schema(<span class="com">"真理之源"</span>)
+├── src/
+│   ├── app/             ← 路由 + 页面(<span class="com">文件夹就是 URL</span>)
+│   ├── components/      ← 跨模块复用的 UI 组件
+│   ├── lib/             ← 基础设施层(<span class="com">db / auth / storage / translate</span>)
+│   ├── i18n/            ← 翻译相关工具
+│   └── generated/       ← Prisma 自动生成的 Client(<span class="com">别手动改</span>)
+├── messages/            ← 中俄双语字符串
+├── public/              ← 静态资源(图片、favicon)
+├── scripts/             ← 运维脚本(<span class="com">备份 / 重置密码 / seed</span>)
+├── storage/             ← 用户上传的文件(<span class="com">画册、报价图、付款截图</span>)
+├── .env                 ← 密钥 / 配置(<span class="str">不进 Git</span>)
+├── CLAUDE.md            ← <span class="ty">项目大脑</span>:决策、踩坑、AI 协作约定
+└── package.json         ← 依赖清单
+</code></pre>
+
+  <details>
+    <summary>📁 src/app/ —— 路由 + 页面 + 业务逻辑(最重要的文件夹)</summary>
+    <p>Next.js App Router 的核心约定:<strong>文件夹路径就是 URL 路径</strong>。</p>
+    <pre><code>src/app/
+├── layout.tsx           ← 包裹所有页面(侧边栏、顶部 header、语言切换)
+├── page.tsx             ← 根路径 /  (自动跳转到 /suppliers)
+├── login/page.tsx       ← /login 登录页
+├── account/password/page.tsx  ← /account/password 改密码页
+├── map/page.tsx         ← /map 地图页
+├── tags/                ← /tags 标签管理(<span class="com">Dialog 模式,不切换页面</span>)
+│   ├── page.tsx
+│   ├── _actions/tag-actions.ts
+│   └── _components/(TagDialog / TagRowActions)
+└── suppliers/
+    ├── page.tsx                          ← /suppliers 供应商列表
+    ├── new/page.tsx                      ← /suppliers/new 新建供应商
+    ├── _actions/supplier-actions.ts      ← Server Actions(<span class="com">下划线开头 = 不暴露成 URL</span>)
+    ├── _components/SupplierForm.tsx      ← 供应商表单(<span class="com">新建/编辑共用</span>)
+    └── [id]/                             ← 动态路由,匹配 /suppliers/123
+        ├── page.tsx                      ← 详情页
+        ├── edit/page.tsx                 ← 编辑页
+        ├── contacts/   ← 联系人相关:新建/编辑/列表/Form/Actions
+        ├── quotes/     ← 报价相关
+        ├── notes/      ← 沟通记录相关
+        └── transactions/ ← 订单相关</code></pre>
+    <div class="callout">
+      <strong>命名约定:</strong>
+      <ul style="margin: 4px 0;">
+        <li><code>_components/</code> 和 <code>_actions/</code> 前面的下划线 = "私有",Next.js 不会把它做成 URL</li>
+        <li><code>[id]/</code> 方括号 = 动态参数,运行时填入实际 ID</li>
+        <li><code>page.tsx</code> = 该路径的页面(必须叫这个名字)</li>
+        <li><code>layout.tsx</code> = 包裹该路径及其子路径的"外壳"</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>📁 src/lib/ —— 基础设施层</summary>
+    <p>底层能力,业务代码透过它们间接接触外部世界。每个抽象都为了"将来好换底座"。</p>
+    <table>
+      <tr><th>文件</th><th>干嘛的</th></tr>
+      <tr><td><code>prisma.ts</code></td><td>Prisma Client 单例,业务代码通过它读写数据库</td></tr>
+      <tr><td><code>auth.ts</code></td><td>better-auth 配置 + 权限 helper(<code>requireUserId / requireCurrentUser / isOwner</code>)</td></tr>
+      <tr><td><code>auth-client.ts</code></td><td>客户端用的认证函数(<code>signIn / signOut / useSession / changePassword</code>)</td></tr>
+      <tr><td><code>storage/</code></td><td>文件存储抽象。现在是本地 fs,将来切 OSS 改一个 adapter</td></tr>
+      <tr><td><code>translate/</code></td><td>翻译服务抽象。现在用 DeepSeek,可切 DeepL / Google</td></tr>
+      <tr><td><code>utils.ts</code></td><td>零碎工具(<code>cn()</code> 拼 className 等)</td></tr>
+    </table>
+  </details>
+
+  <details>
+    <summary>📁 prisma/ —— 数据库 schema</summary>
+    <pre><code>prisma/
+├── schema.prisma        ← <span class="ty">所有表结构和关系的<strong>单一事实来源</strong></span>
+└── migrations/          ← 每次改 schema 后生成的迁移历史(<span class="com">别手动改</span>)</code></pre>
+    <p>改了 <code>schema.prisma</code> 后必须跑这两条命令同步:</p>
+    <pre><code><span class="fn">npx prisma migrate dev --name</span> 给本次变更起个描述名
+<span class="fn">npx prisma generate</span>  <span class="com"># Prisma 7 必须显式跑这条</span></code></pre>
+  </details>
+
+  <details>
+    <summary>📁 messages/ —— 中俄双语字符串</summary>
+    <p>所有界面文字都从这里取,业务代码用 <code>useTranslations()</code> 拿。</p>
+    <ul>
+      <li><code>zh.json</code> —— 中文版,Admin 默认看到</li>
+      <li><code>ru.json</code> —— 俄文版,家人默认看到(根据账号 locale)</li>
+    </ul>
+    <p>切换语言的瞬间整个界面变,不刷新页面。</p>
+  </details>
+
+  <details>
+    <summary>📁 scripts/ —— 运维脚本(清理后剩 5 个)</summary>
+    <table>
+      <tr><th>脚本</th><th>什么时候用</th></tr>
+      <tr><td><code>backup.ps1</code></td><td>每天凌晨 3 点自动跑,把 dev.db 和 storage/ 同步到 Google Drive</td></tr>
+      <tr><td><code>reset-password.ts</code></td><td>忘密码时,Admin 用它强制重置某用户的密码</td></tr>
+      <tr><td><code>seed-viewers.ts</code></td><td>批量创建 EDITOR 账号(家人)。将来加新人改一下里面的清单跑一次</td></tr>
+      <tr><td><code>seed.ts</code></td><td>新机器开发环境初始化,塞一批测试数据</td></tr>
+      <tr><td><code>test-translate.ts</code></td><td>翻译 API 报错时用它快速诊断"是网络问题还是 key 问题"</td></tr>
+    </table>
+  </details>
+
+  <details>
+    <summary>📁 storage/ —— 用户上传的文件(实际数据)</summary>
+    <p>所有上传上来的画册、报价图、付款截图、订单单据都按供应商分目录存这里。</p>
+    <pre><code>storage/
+└── suppliers/
+    └── 1/                          ← 供应商 ID
+        ├── logo/                   ← 公司 Logo
+        ├── brochures/              ← 画册 / 产品目录
+        ├── videos/                 ← 工厂视频
+        └── docs/                   ← 资质 / 营业执照</code></pre>
+    <p>业务代码不直接读这里,通过 <code>src/lib/storage</code> 抽象层 → 将来切 OSS 时业务代码 0 改动。</p>
+  </details>
+</section>
+
+<!-- ============================================ 第 3 章 ============================================ -->
+<section id="data">
+  <h2><span class="num">第 3 章</span>数据模型</h2>
+  <p class="intro">8 个核心实体的关系。理解这张图你就知道任何一条业务记录长什么样。</p>
+
+  <h3>实体关系图</h3>
+  <div class="svg-wrap">
+    <svg viewBox="0 0 760 480" xmlns="http://www.w3.org/2000/svg" style="font-family: sans-serif; font-size: 12px;">
+      <!-- Supplier 居中 -->
+      <rect x="310" y="200" width="140" height="60" rx="6" fill="#b91c1c" stroke="#7f1d1d" stroke-width="2"/>
+      <text x="380" y="225" text-anchor="middle" fill="white" font-weight="bold" font-size="14">Supplier</text>
+      <text x="380" y="245" text-anchor="middle" fill="#fecaca" font-size="11">供应商(核心)</text>
+
+      <!-- 周围的实体 -->
+      <rect x="50" y="60" width="120" height="48" rx="6" fill="#fff" stroke="#888"/>
+      <text x="110" y="82" text-anchor="middle" font-weight="bold">Contact</text>
+      <text x="110" y="98" text-anchor="middle" fill="#666">联系人</text>
+
+      <rect x="220" y="40" width="120" height="48" rx="6" fill="#fff" stroke="#888"/>
+      <text x="280" y="62" text-anchor="middle" font-weight="bold">Quote</text>
+      <text x="280" y="78" text-anchor="middle" fill="#666">报价</text>
+
+      <rect x="420" y="40" width="120" height="48" rx="6" fill="#fff" stroke="#888"/>
+      <text x="480" y="62" text-anchor="middle" font-weight="bold">Note</text>
+      <text x="480" y="78" text-anchor="middle" fill="#666">沟通记录</text>
+
+      <rect x="590" y="60" width="120" height="48" rx="6" fill="#fff" stroke="#888"/>
+      <text x="650" y="82" text-anchor="middle" font-weight="bold">Transaction</text>
+      <text x="650" y="98" text-anchor="middle" fill="#666">订单</text>
+
+      <rect x="600" y="200" width="120" height="48" rx="6" fill="#fff" stroke="#888"/>
+      <text x="660" y="222" text-anchor="middle" font-weight="bold">Payment</text>
+      <text x="660" y="238" text-anchor="middle" fill="#666">付款流水</text>
+
+      <rect x="600" y="320" width="120" height="48" rx="6" fill="#fff" stroke="#888"/>
+      <text x="660" y="342" text-anchor="middle" font-weight="bold">File</text>
+      <text x="660" y="358" text-anchor="middle" fill="#666">文件</text>
+
+      <rect x="310" y="400" width="140" height="48" rx="6" fill="#fff" stroke="#888"/>
+      <text x="380" y="422" text-anchor="middle" font-weight="bold">Tag</text>
+      <text x="380" y="438" text-anchor="middle" fill="#666">标签(多对多)</text>
+
+      <rect x="50" y="320" width="120" height="48" rx="6" fill="#fff" stroke="#888"/>
+      <text x="110" y="342" text-anchor="middle" font-weight="bold">User</text>
+      <text x="110" y="358" text-anchor="middle" fill="#666">用户(<span>登录身份</span>)</text>
+
+      <!-- 关系线 -->
+      <line x1="170" y1="100" x2="320" y2="210" stroke="#888" stroke-width="1.5"/>
+      <line x1="320" y1="200" x2="290" y2="90" stroke="#888" stroke-width="1.5"/>
+      <line x1="430" y1="200" x2="470" y2="90" stroke="#888" stroke-width="1.5"/>
+      <line x1="450" y1="220" x2="590" y2="100" stroke="#888" stroke-width="1.5"/>
+      <line x1="650" y1="108" x2="650" y2="200" stroke="#888" stroke-width="1.5"/>
+      <line x1="660" y1="248" x2="660" y2="320" stroke="#888" stroke-width="1.5"/>
+      <line x1="440" y1="250" x2="600" y2="335" stroke="#888" stroke-width="1.5"/>
+      <line x1="170" y1="340" x2="320" y2="240" stroke="#888" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <line x1="380" y1="260" x2="380" y2="400" stroke="#888" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="200" y="260" font-size="10" fill="#888" font-style="italic">createdBy</text>
+      <text x="395" y="335" font-size="10" fill="#888" font-style="italic">多对多</text>
+    </svg>
+  </div>
+
+  <table>
+    <tr><th>实体</th><th>角色</th><th>跟供应商的关系</th></tr>
+    <tr><td>Supplier</td><td>核心实体,一家公司</td><td>—</td></tr>
+    <tr><td>Contact</td><td>该公司里的人</td><td>1 对多(一家公司多个联系人)</td></tr>
+    <tr><td>Quote</td><td>这家给你的报价</td><td>1 对多(同款产品多次报价)</td></tr>
+    <tr><td>Note</td><td>沟通备忘 / 观察</td><td>1 对多(时间线)</td></tr>
+    <tr><td>Transaction</td><td>真实成交的订单</td><td>1 对多(每单一条)</td></tr>
+    <tr><td>Payment</td><td>订单的付款流水</td><td>挂在 Transaction 下</td></tr>
+    <tr><td>File</td><td>任何文件:Logo / 画册 / 截图 / 单据</td><td>挂在 Supplier / Quote / Payment / Note / Transaction 任一</td></tr>
+    <tr><td>Tag</td><td>品类 / 资质 / 能力标签</td><td>多对多(供应商↔标签 / 报价↔标签)</td></tr>
+    <tr><td>User</td><td>登录身份(Admin / EDITOR)</td><td>所有业务表的 createdBy 都指向 User</td></tr>
+  </table>
+
+  <h3>双语字段三件套</h3>
+  <p>这是整个项目最有特色的设计。<strong>需要双语显示的字段不是一个字段,而是三个绑定的字段。</strong></p>
+  <pre><code><span class="com">// 比如供应商名字</span>
+<span class="kw">model</span> <span class="ty">Supplier</span> {
+  nameZh                 <span class="ty">String</span>     <span class="com">// 中文名(必填,Admin 录入)</span>
+  nameRu                 <span class="ty">String?</span>    <span class="com">// 俄文名(可空,AI 翻译 or Admin 手填)</span>
+  nameRuAutoTranslated   <span class="ty">Boolean</span>    <span class="com">// 标记:这条俄文是 AI 自动翻译的吗?</span>
+  ...
+}</code></pre>
+
+  <div class="callout">
+    <strong>为什么要 <code>_auto_translated</code> 这个 boolean?</strong>
+    <p style="margin: 6px 0 0;">想象一个场景:Admin 录入中文 → AI 翻译俄文存进库 → flag=true(自动翻译) → Admin 觉得 AI 翻译不对,手改俄文 → 这时 flag 变 false(锁定) → <strong>下次 Admin 重新触发翻译,会跳过这个被锁定的字段</strong>(避免 AI 把 Admin 的手改覆盖)。三件套的核心是这个"锁"语义。</p>
+  </div>
+
+  <h3>onDelete 4 种规则</h3>
+  <p>外键删除时的连锁反应有 4 种,设计时不是凭感觉拍,是按"关系性质 + 字段可空性"两个维度决策的。</p>
+  <table>
+    <tr><th>类型</th><th>规则</th><th>意思</th><th>例子</th></tr>
+    <tr><td>附属</td><td>Cascade</td><td>主表删,附属也删</td><td>Supplier 删 → 它的 Contact / Quote / Note 都删</td></tr>
+    <tr><td>审计</td><td>Restrict</td><td>有引用 = 禁止删主体</td><td>User 的 <code>createdBy</code> —— 防止"删用户连带删走他所有数据"</td></tr>
+    <tr><td>共享</td><td>Restrict</td><td>资源被引用就不能删</td><td>Tag —— 防止"删一个 Tag 影响 30 家挂着它的供应商"</td></tr>
+    <tr><td>弱关联</td><td>SetNull</td><td>主体删 → 引用字段置空</td><td>Note.quoteId —— 关联的 Quote 没了,Note 本身还有价值,保留并把外键置空</td></tr>
+  </table>
+</section>
+
+<!-- ============================================ 第 4 章 ============================================ -->
+<section id="layers">
+  <h2><span class="num">第 4 章</span>关键抽象层</h2>
+  <p class="intro">所有"将来可能换"的能力都在 <code>src/lib/</code> 下用抽象层封装,业务代码看不到底层。</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="title">🗄 数据库</div>
+      <div class="desc">业务代码用 <code>prisma.supplier.findMany()</code>。底层是 SQLite,将来切 PostgreSQL 改 <code>schema.prisma</code> 的 datasource 一行就行,业务代码 0 改动。</div>
+    </div>
+    <div class="card">
+      <div class="title">📁 文件存储</div>
+      <div class="desc">业务代码用 <code>storage.put(key, buf)</code>。底层现在写本地 <code>storage/</code> 目录,将来切阿里 OSS 改一个 adapter 文件,业务代码 0 改动。</div>
+    </div>
+    <div class="card">
+      <div class="title">🌐 翻译服务</div>
+      <div class="desc">业务代码用 <code>translateBatch([...])</code>。底层现在 DeepSeek,可切 DeepL / Google,通过环境变量 <code>TRANSLATE_PROVIDER</code> 一行配置切换。</div>
+    </div>
+    <div class="card">
+      <div class="title">🔐 认证</div>
+      <div class="desc">业务代码用 <code>requireCurrentUser()</code>。底层是 better-auth,处理 session / cookie / 密码哈希。换库需要改业务调用点,但目前 better-auth 够用,不动。</div>
+    </div>
+    <div class="card">
+      <div class="title">🌏 i18n</div>
+      <div class="desc">业务代码用 <code>const t = useTranslations('forms.contact')</code>。底层是 next-intl,语言文件在 <code>messages/</code>。</div>
+    </div>
+    <div class="card">
+      <div class="title">👮 权限</div>
+      <div class="desc">业务代码用 <code>isOwner(record, user)</code>。规则:<strong>Admin 兜底所有人,EDITOR 只能动自己创建的</strong>。规则简单,没单独表。</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>抽象层的价值不是"现在",是"将来"。</strong> 现在切换需求几乎没有(本地跑得好好的),但 1 年后真上云时,代码改动量从"几百个文件"压缩到"几个 adapter 文件"。这是工程上的复利。
+  </div>
+</section>
+
+<!-- ============================================ 第 5 章 ============================================ -->
+<section id="lifecycle">
+  <h2><span class="num">第 5 章</span>一次请求的完整生命周期</h2>
+  <p class="intro">追踪一次"用户点击保存,直到数据写入数据库"的全过程。读懂这个 = 读懂整个系统。</p>
+
+  <h3>场景:Aldar(EDITOR)编辑一个联系人,点保存</h3>
+  <div class="svg-wrap">
+    <svg viewBox="0 0 760 600" xmlns="http://www.w3.org/2000/svg" style="font-family: sans-serif; font-size: 12px;">
+      <!-- 阶段块 -->
+      <g>
+        <rect x="40" y="20" width="680" height="60" rx="6" fill="#e0f2fe" stroke="#0284c7"/>
+        <text x="60" y="42" font-weight="bold" fill="#075985">① 浏览器(Aldar 的电脑)</text>
+        <text x="60" y="62" fill="#075985">Aldar 在 ContactForm 改了 "phone" 字段 → 点击「更新」按钮</text>
+      </g>
+      <line x1="380" y1="80" x2="380" y2="100" stroke="#888" stroke-width="2" marker-end="url(#a2)"/>
+
+      <g>
+        <rect x="40" y="100" width="680" height="60" rx="6" fill="#fef3c7" stroke="#d97706"/>
+        <text x="60" y="122" font-weight="bold" fill="#92400e">② 表单提交 (form action)</text>
+        <text x="60" y="142" fill="#92400e">浏览器发起 HTTP POST,带着 FormData 到服务器</text>
+      </g>
+      <line x1="380" y1="160" x2="380" y2="180" stroke="#888" stroke-width="2" marker-end="url(#a2)"/>
+
+      <g>
+        <rect x="40" y="180" width="680" height="60" rx="6" fill="#fef3c7" stroke="#d97706"/>
+        <text x="60" y="202" font-weight="bold" fill="#92400e">③ Middleware(<code>src/middleware.ts</code>)</text>
+        <text x="60" y="222" fill="#92400e">检查 cookie 有没有 session token → 没有 → 弹到 /login;有 → 放行</text>
+      </g>
+      <line x1="380" y1="240" x2="380" y2="260" stroke="#888" stroke-width="2" marker-end="url(#a2)"/>
+
+      <g>
+        <rect x="40" y="260" width="680" height="80" rx="6" fill="#fef3c7" stroke="#d97706"/>
+        <text x="60" y="282" font-weight="bold" fill="#92400e">④ Server Action: updateContact</text>
+        <text x="60" y="302" fill="#92400e">• zod schema 校验 FormData(类型对吗?必填项填了吗?)</text>
+        <text x="60" y="318" fill="#92400e">• requireCurrentUser() 拿当前 user (Aldar)</text>
+        <text x="60" y="334" fill="#92400e">• 查 contact.createdById → 跟 Aldar.id 对比 → isOwner() 判断</text>
+      </g>
+      <line x1="380" y1="340" x2="380" y2="360" stroke="#888" stroke-width="2" marker-end="url(#a2)"/>
+
+      <g>
+        <rect x="40" y="360" width="680" height="80" rx="6" fill="#fde8e6" stroke="#b91c1c"/>
+        <text x="60" y="382" font-weight="bold" fill="#7f1d1d">⑤ 权限分叉</text>
+        <text x="60" y="402" fill="#7f1d1d">• Aldar 是创建者 → 通过,继续</text>
+        <text x="60" y="418" fill="#7f1d1d">• Aldar <strong>不是</strong>创建者 → 返回 { status: 'error', message: '只能修改自己创建的联系人' }</text>
+        <text x="60" y="434" fill="#7f1d1d">前端 form 显示错误条,不会写库</text>
+      </g>
+      <line x1="380" y1="440" x2="380" y2="460" stroke="#888" stroke-width="2" marker-end="url(#a2)"/>
+
+      <g>
+        <rect x="40" y="460" width="680" height="60" rx="6" fill="#f3e8ff" stroke="#7c3aed"/>
+        <text x="60" y="482" font-weight="bold" fill="#6b21a8">⑥ Prisma.contact.update</text>
+        <text x="60" y="502" fill="#6b21a8">SQL UPDATE 写入 SQLite。如果 isPrimary 改了,事务里把同供应商其他主联系人置为 false</text>
+      </g>
+      <line x1="380" y1="520" x2="380" y2="540" stroke="#888" stroke-width="2" marker-end="url(#a2)"/>
+
+      <g>
+        <rect x="40" y="540" width="680" height="50" rx="6" fill="#e0f2fe" stroke="#0284c7"/>
+        <text x="60" y="562" font-weight="bold" fill="#075985">⑦ revalidatePath + redirect</text>
+        <text x="60" y="582" fill="#075985">Next.js 清详情页缓存 → 浏览器跳回供应商详情 → 看到新的电话号码</text>
+      </g>
+
+      <defs>
+        <marker id="a2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M 0 0 L 8 3 L 0 6 z" fill="#888"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <p>这条链路里,<strong>每一步都对应一个文件</strong>:</p>
+  <table>
+    <tr><th>步骤</th><th>对应文件</th></tr>
+    <tr><td>① 表单 UI</td><td><code>src/app/suppliers/[id]/contacts/_components/ContactForm.tsx</code></td></tr>
+    <tr><td>③ Middleware</td><td><code>src/middleware.ts</code></td></tr>
+    <tr><td>④ Server Action</td><td><code>src/app/suppliers/[id]/contacts/_actions/contact-actions.ts</code></td></tr>
+    <tr><td>⑤ 权限 helper</td><td><code>src/lib/auth.ts</code> 里的 <code>isOwner / requireCurrentUser</code></td></tr>
+    <tr><td>⑥ DB 操作</td><td>同 contact-actions.ts</td></tr>
+    <tr><td>⑦ 重新加载</td><td><code>revalidatePath</code> 是 Next.js 内置 API</td></tr>
+  </table>
+</section>
+
+<!-- ============================================ 第 6 章 ============================================ -->
+<section id="code">
+  <h2><span class="num">第 6 章</span>关键代码片段</h2>
+  <p class="intro">不读每一行,但下面 7 段是"读懂它们 = 读懂整个项目的设计哲学"。</p>
+
+  <details open>
+    <summary>① Prisma Schema 里的 Supplier 表(数据模型的"宪法")</summary>
+    <pre><code><span class="kw">model</span> <span class="ty">Supplier</span> {
+  id                     <span class="ty">Int</span>      @id @default(autoincrement())
+  code                   <span class="ty">String</span>   @unique         <span class="com">// 人类可读编号 GZ-001</span>
+
+  <span class="com">// 双语三件套(共 7 组,这里只列 name)</span>
+  nameZh                 <span class="ty">String</span>                    <span class="com">// 中文必填</span>
+  nameRu                 <span class="ty">String?</span>                   <span class="com">// 俄文可空</span>
+  nameRuAutoTranslated   <span class="ty">Boolean</span>  @default(true)   <span class="com">// 翻译锁标记</span>
+
+  <span class="com">// 地理</span>
+  latitude               <span class="ty">Float</span>
+  longitude              <span class="ty">Float</span>
+
+  cooperationLevel       <span class="ty">CooperationLevel</span> @default(INITIAL_CONTACT)
+  isActive               <span class="ty">Boolean</span>  @default(true)   <span class="com">// 软删除标记</span>
+
+  createdById            <span class="ty">String</span>
+  createdBy              <span class="ty">User</span>     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  <span class="com">// 反向关系</span>
+  contacts               <span class="ty">Contact[]</span>
+  quotes                 <span class="ty">Quote[]</span>
+  notes                  <span class="ty">Note[]</span>
+  transactions           <span class="ty">Transaction[]</span>
+  files                  <span class="ty">File[]</span>
+  tags                   <span class="ty">SupplierTag[]</span>
+
+  @@map(<span class="str">"suppliers"</span>)
+}</code></pre>
+    <p>读这段你能看出:① 双语三件套机制 ② 软删除模式(<code>isActive</code> 而不是物理删) ③ 反向关系(<code>contacts: Contact[]</code> 让你 <code>supplier.contacts</code> 直接拿)</p>
+  </details>
+
+  <details>
+    <summary>② 权限 helper(<code>src/lib/auth.ts</code>)</summary>
+    <pre><code><span class="kw">export async function</span> <span class="fn">requireCurrentUser</span>(): <span class="ty">Promise&lt;CurrentUser&gt;</span> {
+  <span class="kw">const</span> id = <span class="kw">await</span> <span class="fn">requireUserId</span>();
+  <span class="kw">const</span> user = <span class="kw">await</span> prisma.user.<span class="fn">findUnique</span>({
+    where: { id },
+    select: { id: <span class="kw">true</span>, role: <span class="kw">true</span> },
+  });
+  <span class="kw">if</span> (!user) <span class="fn">redirect</span>(<span class="str">'/login'</span>);  <span class="com">// session 引用了已删除的用户</span>
+  <span class="kw">return</span> { id: user.id, role: user.role <span class="kw">as</span> <span class="str">'ADMIN'</span> | <span class="str">'EDITOR'</span> };
+}
+
+<span class="kw">export function</span> <span class="fn">isOwner</span>(
+  record: { createdById: <span class="ty">string</span> },
+  user: <span class="ty">CurrentUser</span>,
+): <span class="ty">boolean</span> {
+  <span class="kw">return</span> user.role === <span class="str">'ADMIN'</span> || record.createdById === user.id;
+}</code></pre>
+    <p><strong>整套权限模型就 8 行代码。</strong> ADMIN 永远 true,EDITOR 看自己 createdById 是不是匹配。简单到不需要单独 Permission 表。</p>
+  </details>
+
+  <details>
+    <summary>③ Server Action 的标准结构(<code>updateContact</code>)</summary>
+    <pre><code><span class="str">'use server'</span>;  <span class="com">// 文件顶部声明 = 整个文件是 Server Actions</span>
+
+<span class="kw">export async function</span> <span class="fn">updateContact</span>(
+  contactId: <span class="ty">number</span>,
+  _prevState: <span class="ty">ContactFormState</span>,
+  formData: <span class="ty">FormData</span>,
+): <span class="ty">Promise&lt;ContactFormState&gt;</span> {
+  <span class="com">// ① 用 zod 校验输入</span>
+  <span class="kw">const</span> parsed = contactCreateSchema.<span class="fn">safeParse</span>(<span class="ty">Object</span>.<span class="fn">fromEntries</span>(formData));
+  <span class="kw">if</span> (!parsed.success) <span class="kw">return</span> { status: <span class="str">'error'</span>, errors: ... };
+
+  <span class="com">// ② 查现有记录</span>
+  <span class="kw">const</span> existing = <span class="kw">await</span> prisma.contact.<span class="fn">findUnique</span>({ where: { id: contactId } });
+  <span class="kw">if</span> (!existing) <span class="kw">return</span> { status: <span class="str">'error'</span>, message: <span class="str">'联系人不存在'</span> };
+
+  <span class="com">// ③ 权限检查</span>
+  <span class="kw">const</span> user = <span class="kw">await</span> <span class="fn">requireCurrentUser</span>();
+  <span class="kw">if</span> (!<span class="fn">isOwner</span>(existing, user)) {
+    <span class="kw">return</span> { status: <span class="str">'error'</span>, message: <span class="str">'只能修改自己创建的联系人'</span> };
+  }
+
+  <span class="com">// ④ 实际写库</span>
+  <span class="kw">await</span> prisma.contact.<span class="fn">update</span>({ where: { id: contactId }, data: ... });
+
+  <span class="com">// ⑤ 清缓存 + 跳转</span>
+  <span class="fn">revalidatePath</span>(<span class="str">`/suppliers/${existing.supplierId}`</span>);
+  <span class="fn">redirect</span>(<span class="str">`/suppliers/${existing.supplierId}`</span>);
+}</code></pre>
+    <p>5 步是固定套路:<strong>校验 → 查 → 权限 → 写 → 跳</strong>。所有 update 类 server action 都是这个结构,你看一个就能改其他所有的。</p>
+  </details>
+
+  <details>
+    <summary>④ 双语字段的 UI 渲染(<code>BilingualFieldRow</code> 抽象)</summary>
+    <p>表单里"中文姓名 / 俄文姓名 + 已手改 badge"这种重复结构,封装成一个组件。看怎么实现:</p>
+    <pre><code><span class="kw">function</span> <span class="fn">BilingualFieldRow</span>({ pair, bi, onZhChange, onRuChange, manualEditLockedLabel }) {
+  <span class="kw">const</span> isLocked = !bi[pair.flagFieldName];  <span class="com">// auto_translated=false 即"上锁"</span>
+
+  <span class="kw">return</span> (
+    &lt;<span class="ty">div</span> className=<span class="str">"grid grid-cols-2 gap-4"</span>&gt;
+      &lt;<span class="ty">FormField</span> label={pair.zhLabel}&gt;
+        &lt;<span class="ty">Input</span> name={pair.zhFieldName} ... /&gt;       <span class="com">// 中文输入框</span>
+      &lt;/<span class="ty">FormField</span>&gt;
+
+      &lt;<span class="ty">FormField</span> label={
+        &lt;&gt;
+          &lt;<span class="ty">span</span>&gt;{pair.ruLabel}&lt;/<span class="ty">span</span>&gt;
+          {isLocked &amp;&amp; (
+            &lt;<span class="ty">span</span> className=<span class="str">"text-warning"</span>&gt;
+              🔒 {manualEditLockedLabel}                  <span class="com">// "已手改" badge</span>
+            &lt;/<span class="ty">span</span>&gt;
+          )}
+        &lt;/&gt;
+      }&gt;
+        &lt;<span class="ty">Input</span> name={pair.ruFieldName} onChange={(e) =&gt; {
+          <span class="fn">onRuChange</span>(...);   <span class="com">// 一改就翻 flag = false(锁定)</span>
+        }} /&gt;
+        &lt;<span class="ty">input</span> type=<span class="str">"hidden"</span> name={pair.flagFieldName} value={isLocked ? <span class="str">"false"</span> : <span class="str">"true"</span>} /&gt;
+      &lt;/<span class="ty">FormField</span>&gt;
+    &lt;/<span class="ty">div</span>&gt;
+  );
+}</code></pre>
+    <p>核心 insight:<strong>"已手改"不是用户主动勾的,是用户编辑了俄文那一刻自动触发的</strong>。下次 Admin 点"自动翻译俄文",这个字段会被跳过。</p>
+  </details>
+
+  <details>
+    <summary>⑤ Middleware 守门(<code>src/middleware.ts</code>)</summary>
+    <pre><code><span class="kw">export function</span> <span class="fn">middleware</span>(request: <span class="ty">NextRequest</span>) {
+  <span class="kw">const</span> { pathname } = request.nextUrl;
+
+  <span class="com">// 公开路径直接放行</span>
+  <span class="kw">if</span> (PUBLIC_PATHS.<span class="fn">some</span>((p) =&gt; pathname.<span class="fn">startsWith</span>(p))) {
+    <span class="kw">return</span> <span class="ty">NextResponse</span>.<span class="fn">next</span>();
+  }
+
+  <span class="com">// 检查 cookie 有没有 session</span>
+  <span class="kw">const</span> sessionCookie = <span class="fn">getSessionCookie</span>(request);
+  <span class="kw">if</span> (!sessionCookie) {
+    <span class="kw">return</span> <span class="ty">NextResponse</span>.<span class="fn">redirect</span>(<span class="kw">new</span> <span class="ty">URL</span>(<span class="str">'/login'</span>, request.url));
+  }
+
+  <span class="kw">return</span> <span class="ty">NextResponse</span>.<span class="fn">next</span>();
+}</code></pre>
+    <p>每次浏览器请求 <strong>都会先经过这里</strong>。10 行代码守住所有未登录访问 —— 这就是"洋葱皮"模式的优雅之处。</p>
+  </details>
+
+  <details>
+    <summary>⑥ i18n 切换语言的 Server Action(<code>set-locale</code>)</summary>
+    <pre><code><span class="str">'use server'</span>;
+
+<span class="kw">export async function</span> <span class="fn">setLocale</span>(locale: <span class="str">'zh'</span> | <span class="str">'ru'</span>) {
+  <span class="kw">const</span> cookieStore = <span class="kw">await</span> <span class="fn">cookies</span>();
+  cookieStore.<span class="fn">set</span>(<span class="str">'NEXT_LOCALE'</span>, locale, {
+    path: <span class="str">'/'</span>,
+    maxAge: 60 * 60 * 24 * 365,  <span class="com">// 一年</span>
+  });
+}</code></pre>
+    <p>语言偏好存 cookie,服务器端读 cookie 决定加载 zh.json 还是 ru.json。<strong>状态在 cookie 里,刷新页面不会丢</strong>。</p>
+  </details>
+
+  <details>
+    <summary>⑦ NSSM 服务配置(让 Next.js 永远活着)</summary>
+    <pre><code><span class="com"># 装服务(管理员 PowerShell)</span>
+<span class="fn">nssm install</span> QinggerSupplier
+
+<span class="com"># 在 GUI 里填:</span>
+Path:              D:\Node\node.exe
+Startup directory: D:\supplier_management_system
+Arguments:         node_modules\next\dist\bin\next start -p 3000
+
+<span class="com"># 这条命令等价于"开机自动 npm run start"。</span>
+<span class="com"># 进程崩了 NSSM 立刻拉起,你无感。</span></code></pre>
+    <p>这一段是把"你跑的 <code>npm run start</code>"升级成"Windows 系统服务"。区别:你关电脑也无所谓(下次开机自启);Next.js 半夜内存泄漏崩了,30 秒内自动重启。</p>
+  </details>
+</section>
+
+<!-- ============================================ 第 7 章 ============================================ -->
+<section id="deploy">
+  <h2><span class="num">第 7 章</span>部署架构</h2>
+  <p class="intro">从家人在俄罗斯打开浏览器,到他看到供应商列表,中间发生了什么。</p>
+
+  <div class="svg-wrap">
+    <svg viewBox="0 0 760 480" xmlns="http://www.w3.org/2000/svg" style="font-family: sans-serif; font-size: 12px;">
+      <!-- 俄罗斯 -->
+      <g>
+        <rect x="40" y="40" width="160" height="80" rx="6" fill="#e0f2fe" stroke="#0284c7"/>
+        <text x="120" y="68" text-anchor="middle" font-weight="bold" fill="#075985">家人 Aldar(俄罗斯)</text>
+        <text x="120" y="86" text-anchor="middle" fill="#075985">浏览器输入</text>
+        <text x="120" y="102" text-anchor="middle" fill="#075985" font-family="monospace">qg-suppliermanagement.com</text>
+      </g>
+
+      <line x1="200" y1="80" x2="290" y2="80" stroke="#888" stroke-width="2" marker-end="url(#a3)"/>
+      <text x="245" y="73" text-anchor="middle" font-size="10" fill="#666">DNS</text>
+
+      <!-- Cloudflare -->
+      <g>
+        <rect x="290" y="40" width="180" height="80" rx="6" fill="#fef3c7" stroke="#d97706"/>
+        <text x="380" y="68" text-anchor="middle" font-weight="bold" fill="#92400e">Cloudflare 全球边缘</text>
+        <text x="380" y="86" text-anchor="middle" fill="#92400e">收下请求 + 自动 HTTPS</text>
+        <text x="380" y="102" text-anchor="middle" fill="#92400e">送进 tunnel</text>
+      </g>
+
+      <line x1="470" y1="80" x2="560" y2="80" stroke="#888" stroke-width="2" marker-end="url(#a3)"/>
+      <text x="515" y="73" text-anchor="middle" font-size="10" fill="#666">tunnel</text>
+
+      <!-- 你的笔记本 -->
+      <g>
+        <rect x="560" y="40" width="160" height="80" rx="6" fill="#fde8e6" stroke="#b91c1c"/>
+        <text x="640" y="68" text-anchor="middle" font-weight="bold" fill="#7f1d1d">你的笔记本</text>
+        <text x="640" y="86" text-anchor="middle" fill="#7f1d1d">cloudflared 服务</text>
+        <text x="640" y="102" text-anchor="middle" fill="#7f1d1d">localhost:3000</text>
+      </g>
+
+      <!-- 笔记本内部 -->
+      <g>
+        <rect x="240" y="180" width="480" height="240" rx="8" fill="#fafafa" stroke="#999" stroke-dasharray="4 3"/>
+        <text x="260" y="208" font-weight="bold" fill="#666">笔记本里跑的两个 Windows 服务</text>
+
+        <rect x="280" y="240" width="180" height="160" rx="6" fill="#dbeafe" stroke="#0284c7"/>
+        <text x="370" y="268" text-anchor="middle" font-weight="bold" fill="#075985">QinggerSupplier</text>
+        <text x="370" y="288" text-anchor="middle" fill="#075985" font-size="11">(NSSM 包装的)</text>
+        <text x="370" y="312" text-anchor="middle" fill="#075985">Next.js 服务</text>
+        <text x="370" y="332" text-anchor="middle" fill="#075985">监听 :3000</text>
+        <text x="370" y="362" text-anchor="middle" fill="#075985" font-size="11">崩了 NSSM 自动拉起</text>
+        <text x="370" y="382" text-anchor="middle" fill="#075985" font-size="11">开机自启</text>
+
+        <rect x="500" y="240" width="180" height="160" rx="6" fill="#fef9c3" stroke="#d97706"/>
+        <text x="590" y="268" text-anchor="middle" font-weight="bold" fill="#92400e">cloudflared</text>
+        <text x="590" y="288" text-anchor="middle" fill="#92400e" font-size="11">(系统服务)</text>
+        <text x="590" y="312" text-anchor="middle" fill="#92400e">Tunnel 客户端</text>
+        <text x="590" y="332" text-anchor="middle" fill="#92400e">向 Cloudflare</text>
+        <text x="590" y="350" text-anchor="middle" fill="#92400e">保持长连</text>
+        <text x="590" y="378" text-anchor="middle" fill="#92400e" font-size="11">开机自启</text>
+
+        <line x1="460" y1="320" x2="500" y2="320" stroke="#888" stroke-width="2"/>
+      </g>
+
+      <line x1="640" y1="120" x2="580" y2="180" stroke="#888" stroke-width="1" stroke-dasharray="3 2"/>
+      <line x1="640" y1="120" x2="640" y2="180" stroke="#888" stroke-width="1" stroke-dasharray="3 2"/>
+
+      <!-- 备份 -->
+      <g>
+        <rect x="40" y="240" width="160" height="160" rx="6" fill="#f3e8ff" stroke="#7c3aed"/>
+        <text x="120" y="268" text-anchor="middle" font-weight="bold" fill="#6b21a8">每天 03:00</text>
+        <text x="120" y="288" text-anchor="middle" fill="#6b21a8">backup.ps1</text>
+        <text x="120" y="316" text-anchor="middle" fill="#6b21a8" font-size="11">复制 dev.db</text>
+        <text x="120" y="334" text-anchor="middle" fill="#6b21a8" font-size="11">镜像 storage/</text>
+        <text x="120" y="362" text-anchor="middle" fill="#6b21a8" font-size="11">→ Google Drive</text>
+        <text x="120" y="382" text-anchor="middle" fill="#6b21a8" font-size="11">→ 自动传云</text>
+      </g>
+
+      <defs>
+        <marker id="a3" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M 0 0 L 8 3 L 0 6 z" fill="#888"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <h3>3 个关键服务</h3>
+  <table>
+    <tr><th>服务</th><th>跑啥</th><th>开机自启?</th><th>崩了怎么办</th></tr>
+    <tr><td><code>QinggerSupplier</code></td><td>Next.js 应用</td><td>是</td><td>NSSM 立刻拉起</td></tr>
+    <tr><td><code>cloudflared</code></td><td>Tunnel 客户端</td><td>是</td><td>Windows 服务管理器拉起</td></tr>
+    <tr><td><code>任务计划程序 / QinggerDailyBackup</code></td><td>每天 3:00 跑 backup.ps1</td><td>系统级</td><td>笔记本睡眠就下次开机补跑</td></tr>
+  </table>
+
+  <div class="callout danger">
+    <strong>唯一会让家人访问不了的场景:</strong>你笔记本关机 / 睡眠 / 没网。其他场景(程序崩、内存泄漏、误关终端)系统都自己扛。
+  </div>
+</section>
+
+<!-- ============================================ 第 8 章 ============================================ -->
+<section id="workflow">
+  <h2><span class="num">第 8 章</span>你的开发循环</h2>
+  <p class="intro">将来你想加一个字段、改一个功能、加一个新页面,该按什么节奏走。</p>
+
+  <h3>场景:加一个新字段(比如供应商表加"成立年份" foundedYear)</h3>
+  <p>需要碰的文件,从底到上:</p>
+  <ol>
+    <li><strong>prisma/schema.prisma</strong> —— 加 <code>foundedYear Int?</code></li>
+    <li>跑 <code>npx prisma migrate dev --name add_supplier_founded_year</code></li>
+    <li>跑 <code>npx prisma generate</code></li>
+    <li><strong>src/app/suppliers/_validations/supplier-schema.ts</strong> —— zod schema 加这个字段</li>
+    <li><strong>src/app/suppliers/_actions/supplier-actions.ts</strong> —— create / update 函数里把这字段写库</li>
+    <li><strong>src/app/suppliers/_components/SupplierForm.tsx</strong> —— UI 加输入框</li>
+    <li><strong>messages/zh.json + ru.json</strong> —— <code>forms.supplier.labelFoundedYear</code> 中俄两份</li>
+    <li><strong>src/app/suppliers/[id]/page.tsx</strong>(详情页) —— 显示这个字段</li>
+    <li><strong>CLAUDE.md</strong> —— 在 Supplier 表那段加这个字段的注释</li>
+  </ol>
+
+  <div class="callout">
+    <strong>9 个文件,听着多其实有节奏:</strong>① 数据层(1-3) → ② 校验(4) → ③ 业务逻辑(5) → ④ UI(6) → ⑤ i18n(7) → ⑥ 显示(8) → ⑦ 记录(9)。<strong>每次加新字段都是这个套路,练 2-3 次就肌肉记忆</strong>。
+  </div>
+
+  <h3>场景:加一个新功能(比如导出供应商 CSV)</h3>
+  <ol>
+    <li><strong>设计层先想清楚</strong>(在 CLAUDE.md 里和 AI 对话):导出包含哪些字段?CSV 还是 Excel?中俄文都要?</li>
+    <li><strong>新建一个路由</strong> <code>src/app/suppliers/export/route.ts</code>(API 路由)</li>
+    <li>在路由里查 Prisma → 拼 CSV → 返回 Response</li>
+    <li>在供应商列表页加一个"导出"按钮 → 点击 = 浏览器下载</li>
+    <li>更新 CLAUDE.md 记录这个功能的决策</li>
+  </ol>
+
+  <h3>跟 AI 协作的提问范本</h3>
+  <p>当你想让 AI 帮你做事时,带上"上下文 + 期望"两件套,避免它给你瞎写。</p>
+  <pre><code><span class="com">❌ 差的提问:</span>
+"给供应商加个成立年份"
+
+<span class="com">✅ 好的提问:</span>
+"我要给 Supplier 表加 foundedYear(Int? 可空)字段。
+按 CLAUDE.md 里"加新字段"的 9 步流程帮我推进:
+- 先改 schema.prisma
+- 然后告诉我怎么跑 migrate
+- 接着列出后面 7 个文件要改的具体片段
+不要一次给所有代码,我们一步步来。"</code></pre>
+
+  <p><strong>关键点:</strong></p>
+  <ul>
+    <li>明确字段类型(<code>Int?</code> 还是 <code>Int</code>?可空?默认值?)</li>
+    <li>引用 CLAUDE.md 里的现有约定,避免 AI 自己发明规则</li>
+    <li>限定"一步步来",不要一次性大泥球</li>
+    <li>遇到不懂的术语,问"用普通话解释一下,不要堆术语"</li>
+  </ul>
+
+  <h3>遇到 bug 怎么定位</h3>
+  <table>
+    <tr><th>症状</th><th>第一时间看哪里</th></tr>
+    <tr><td>"打不开网站"</td><td>Get-Service QinggerSupplier 看是不是 Running</td></tr>
+    <tr><td>"打开了但看不到数据"</td><td>F12 → Network 看请求有没有 200;Console 有没有报错</td></tr>
+    <tr><td>"保存按钮点了没反应"</td><td>F12 Console + Network 看 server action 有没有报 400/500</td></tr>
+    <tr><td>"显示中文/俄文混乱"</td><td>切换语言再回来一次,然后检查 messages/zh.json + ru.json 的 key 对不对</td></tr>
+    <tr><td>"翻译按钮不工作"</td><td>跑 <code>npx tsx scripts/test-translate.ts</code> 诊断</td></tr>
+    <tr><td>"密码忘了"</td><td>跑 <code>npx tsx scripts/reset-password.ts &lt;username&gt; &lt;新密码&gt;</code></td></tr>
+  </table>
+</section>
+
+<footer>
+  📍 项目导览 · 2026.6.15 · 配套 CLAUDE.md 阅读效果最佳<br>
+  这份文档是 AI 帮写的,但描述的是<strong>你和它一起做出来的设计</strong>。任何看不懂的地方都可以再问 AI。
+</footer>
+
+</main>
+
+<script>
+  // 锚点导航 active 状态(简单版)
+  const links = document.querySelectorAll('nav.top a');
+  const sections = Array.from(document.querySelectorAll('section[id]'));
+  function updateActive() {
+    const y = window.scrollY + 100;
+    let current = sections[0]?.id;
+    for (const s of sections) {
+      if (s.offsetTop <= y) current = s.id;
+    }
+    links.forEach(a => {
+      a.style.color = a.getAttribute('href') === '#' + current
+        ? 'var(--c-primary)'
+        : 'var(--c-muted)';
+      a.style.fontWeight = a.getAttribute('href') === '#' + current ? '600' : '400';
+    });
+  }
+  window.addEventListener('scroll', updateActive);
+  updateActive();
+</script>
+
+</body>
+</html>

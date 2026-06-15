@@ -1,5 +1,6 @@
 import { getTranslations, getLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { requireCurrentUser, isOwner } from '@/lib/auth';
 import { pickLocalized } from '@/i18n/pick-localized';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -26,10 +27,13 @@ export default async function SuppliersPage({
   const t = await getTranslations('suppliers');
   const locale = await getLocale();
 
-  const suppliers = await prisma.supplier.findMany({
-    where: { isActive: !showArchived },
-    orderBy: { createdAt: 'desc' },
-  });
+  const [suppliers, currentUser] = await Promise.all([
+    prisma.supplier.findMany({
+      where: { isActive: !showArchived },
+      orderBy: { createdAt: 'desc' },
+    }),
+    requireCurrentUser(),
+  ]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -101,6 +105,7 @@ export default async function SuppliersPage({
                 <TableCell className="text-right">
                   <SupplierActionsCell
                     supplier={{ id: s.id, nameZh: s.nameZh, isActive: s.isActive }}
+                    canEdit={isOwner(s, currentUser)}
                   />
                 </TableCell>
               </TableRow>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getTranslations, getLocale } from 'next-intl/server';
 import { Star, Phone, Mail } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
+import { requireCurrentUser, isOwner } from '@/lib/auth';
 import { pickLocalized } from '@/i18n/pick-localized';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,10 +20,13 @@ export async function ContactsList({ supplierId }: { supplierId: number }) {
   const t = await getTranslations('contacts');
   const locale = await getLocale();
 
-  const contacts = await prisma.contact.findMany({
-    where: { supplierId },
-    orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-  });
+  const [contacts, currentUser] = await Promise.all([
+    prisma.contact.findMany({
+      where: { supplierId },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+    }),
+    requireCurrentUser(),
+  ]);
 
   return (
     <DetailSection
@@ -74,6 +78,7 @@ export async function ContactsList({ supplierId }: { supplierId: number }) {
                         status: c.status,
                         isPrimary: c.isPrimary,
                       }}
+                      canEdit={isOwner(c, currentUser)}
                     />
                   </TableCell>
                 </TableRow>

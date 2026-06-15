@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { useSession, signOut } from "@/lib/auth-client";
 import { setLocale } from "@/app/actions/set-locale";
-import { LogOut, ChevronDown, User } from "lucide-react";
+import { LogOut, ChevronDown, User, KeyRound } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,13 @@ export function AppHeader() {
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
             {session.user.email ?? session.user.name}
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/account/password">
+              <KeyRound className="size-4" />
+              {t("changePassword")}
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={handleLogout}

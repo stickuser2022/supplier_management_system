@@ -5,13 +5,18 @@ import dynamic from 'next/dynamic';
 type Supplier = {
   id: number;
   nameZh: string;
+  nameRu: string | null;
   cityZh: string;
+  cityRu: string | null;
   provinceZh: string;
+  provinceRu: string | null;
   latitude: number;
   longitude: number;
   cooperationLevel: string;
 };
-//type Supplier = { ... } —— 给"供应商对象"起个类型名。告诉 TypeScript "这种对象有这些字段,每个字段是什么类型"。好处是后面用 supplier.nameZh 时 IDE 会自动补全,字段名打错立刻红线。
+//type Supplier = { ... } —— 给"供应商对象"起个类型名。告诉 TypeScript "这种对象有这些字段,每个字段是什么类型"。
+//必须与 MapView 里的 Supplier 同形状(包含 nameRu/cityRu/provinceRu 三个可空字段),
+//否则 MapView 接 props 时会因 Supplier shape 不匹配报 TS2769。两处类型口径要统一。
 
 const MapView = dynamic(() => import('./MapView'), {
   ssr: false,

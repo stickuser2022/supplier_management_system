@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useTranslations } from 'next-intl';
 import { Lock, Sparkles, Loader2 } from 'lucide-react';
 import {
   createQuote,
@@ -74,20 +75,16 @@ type FieldPair = {
   required?: boolean;
 };
 
-const FIELD_PAIRS: FieldPair[] = [
-  { key: 'productName', zhFieldName: 'productNameZh', ruFieldName: 'productNameRu', flagFieldName: 'productNameRuAutoTranslated', zhLabel: '产品名(中文)', ruLabel: '产品名(俄文)', required: true },
-  { key: 'productSpec', zhFieldName: 'productSpecZh', ruFieldName: 'productSpecRu', flagFieldName: 'productSpecRuAutoTranslated', zhLabel: '规格(中文)', ruLabel: '规格(俄文)' },
-];
-
 const SELECT_CLASS =
   'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 function SubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus();
+  const tCommon = useTranslations('forms.common');
   return (
     <Button type="submit" disabled={pending}>
       {pending && <Loader2 className="size-4 animate-spin" />}
-      {pending ? '保存中…' : isEdit ? '更新' : '保存'}
+      {pending ? tCommon('submitting') : isEdit ? tCommon('update') : tCommon('submit')}
     </Button>
   );
 }
@@ -115,6 +112,15 @@ export function QuoteForm({
   const [translateError, setTranslateError] = useState<string | null>(null);
   const errors = state.errors;
 
+  const t = useTranslations('forms.quote');
+  const tCommon = useTranslations('forms.common');
+
+  // FIELD_PAIRS 移到组件内,label 走 t()
+  const FIELD_PAIRS: FieldPair[] = [
+    { key: 'productName', zhFieldName: 'productNameZh', ruFieldName: 'productNameRu', flagFieldName: 'productNameRuAutoTranslated', zhLabel: t('labelProductNameZh'), ruLabel: t('labelProductNameRu'), required: true },
+    { key: 'productSpec', zhFieldName: 'productSpecZh', ruFieldName: 'productSpecRu', flagFieldName: 'productSpecRuAutoTranslated', zhLabel: t('labelProductSpecZh'), ruLabel: t('labelProductSpecRu') },
+  ];
+
   const handleZhChange = (key: keyof BilingualState, value: string) =>
     setBi((s) => ({ ...s, [key]: value }));
   const handleRuChange = (ruKey: keyof BilingualState, flagKey: keyof BilingualState, value: string) =>
@@ -131,7 +137,7 @@ export function QuoteForm({
       .map((p) => ({ field: p.key, text: bi[p.zhFieldName] as string }));
 
     if (requests.length === 0) {
-      setTranslateError('没有可翻译的字段(中文为空 / 已锁定)');
+      setTranslateError(t('noTranslateTargets'));
       return;
     }
     startTranslating(async () => {
@@ -176,17 +182,17 @@ export function QuoteForm({
           className="flex-shrink-0"
         >
           {isTranslating ? (
-            <><Loader2 className="size-4 animate-spin" />翻译中…</>
+            <><Loader2 className="size-4 animate-spin" />{tCommon('translating')}</>
           ) : (
-            <><Sparkles className="size-4" />自动翻译俄文</>
+            <><Sparkles className="size-4" />{t('autoTranslateButton')}</>
           )}
         </Button>
         <p className="text-xs text-muted-foreground leading-relaxed pt-1">
-          翻译产品名和规格 2 个字段。手改后该字段会上锁(再次翻译不覆盖)。
+          {t('autoTranslateHint')}
         </p>
       </div>
 
-      <FormSection title="产品信息">
+      <FormSection title={t('sectionProduct')}>
         {FIELD_PAIRS.map((pair) => {
           const zhValue = bi[pair.zhFieldName] as string;
           const ruValue = bi[pair.ruFieldName] as string;
@@ -218,7 +224,7 @@ export function QuoteForm({
                     {isLocked && (
                       <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
                         <Lock className="size-3" />
-                        已手改
+                        {tCommon('manualEditLocked')}
                       </span>
                     )}
                   </>
@@ -239,9 +245,9 @@ export function QuoteForm({
         })}
       </FormSection>
 
-      <FormSection title="价格与数量">
+      <FormSection title={t('sectionPriceQty')}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <FormField label="单价" htmlFor="unitPrice" required error={errors?.unitPrice?.[0]}>
+          <FormField label={t('labelUnitPrice')} htmlFor="unitPrice" required error={errors?.unitPrice?.[0]}>
             <Input
               id="unitPrice"
               type="number"
@@ -250,7 +256,7 @@ export function QuoteForm({
               defaultValue={initialData?.unitPrice ?? ''}
             />
           </FormField>
-          <FormField label="货币" htmlFor="currency">
+          <FormField label={t('labelCurrency')} htmlFor="currency">
             <select
               id="currency"
               name="currency"
@@ -260,26 +266,26 @@ export function QuoteForm({
               {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </FormField>
-          <FormField label="单位(中)" htmlFor="unitZh">
+          <FormField label={t('labelUnitZh')} htmlFor="unitZh">
             <Input
               id="unitZh"
               type="text"
               name="unitZh"
               defaultValue={initialData?.unitZh ?? ''}
-              placeholder="如 件 / 个 / 箱"
+              placeholder={t('unitZhPlaceholder')}
               list="unit-zh-suggestions"
             />
             <datalist id="unit-zh-suggestions">
               <option value="件" /><option value="个" /><option value="箱" /><option value="打" /><option value="米" /><option value="千克" />
             </datalist>
           </FormField>
-          <FormField label="单位(俄)" htmlFor="unitRu">
+          <FormField label={t('labelUnitRu')} htmlFor="unitRu">
             <Input
               id="unitRu"
               type="text"
               name="unitRu"
               defaultValue={initialData?.unitRu ?? ''}
-              placeholder="шт / коробка"
+              placeholder={t('unitRuPlaceholder')}
               list="unit-ru-suggestions"
             />
             <datalist id="unit-ru-suggestions">
@@ -287,14 +293,14 @@ export function QuoteForm({
             </datalist>
           </FormField>
         </div>
-        <FormField label="起订量(MOQ)" htmlFor="moq" error={errors?.moq?.[0]}>
-          <Input id="moq" type="number" name="moq" defaultValue={initialData?.moq ?? ''} placeholder="选填,如 100" />
+        <FormField label={t('labelMoq')} htmlFor="moq" error={errors?.moq?.[0]}>
+          <Input id="moq" type="number" name="moq" defaultValue={initialData?.moq ?? ''} placeholder={t('moqPlaceholder')} />
         </FormField>
       </FormSection>
 
-      <FormSection title="时间">
+      <FormSection title={t('sectionTime')}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <FormField label="报价日期" htmlFor="quotedAt" required error={errors?.quotedAt?.[0]}>
+          <FormField label={t('labelQuotedAt')} htmlFor="quotedAt" required error={errors?.quotedAt?.[0]}>
             <Input
               id="quotedAt"
               type="date"
@@ -302,7 +308,7 @@ export function QuoteForm({
               defaultValue={initialData?.quotedAt ?? new Date().toISOString().slice(0, 10)}
             />
           </FormField>
-          <FormField label="有效期至" htmlFor="validUntil">
+          <FormField label={t('labelValidUntil')} htmlFor="validUntil">
             <Input
               id="validUntil"
               type="date"
@@ -310,49 +316,49 @@ export function QuoteForm({
               defaultValue={initialData?.validUntil ?? ''}
             />
           </FormField>
-          <FormField label="交货天数" htmlFor="leadTimeDays" error={errors?.leadTimeDays?.[0]}>
+          <FormField label={t('labelLeadTimeDays')} htmlFor="leadTimeDays" error={errors?.leadTimeDays?.[0]}>
             <Input
               id="leadTimeDays"
               type="number"
               name="leadTimeDays"
               defaultValue={initialData?.leadTimeDays ?? ''}
-              placeholder="选填,如 30"
+              placeholder={t('leadTimePlaceholder')}
             />
           </FormField>
         </div>
       </FormSection>
 
-      <FormSection title="其他信息">
+      <FormSection title={t('sectionOther')}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="关联联系人" htmlFor="contactId">
+          <FormField label={t('labelContactRel')} htmlFor="contactId">
             <select
               id="contactId"
               name="contactId"
               defaultValue={initialData?.contactId?.toString() ?? ''}
               className={SELECT_CLASS}
             >
-              <option value="">— 不指定 —</option>
+              <option value="">{t('selectNone')}</option>
               {availableContacts.map((c) => (
                 <option key={c.id} value={c.id}>{c.nameZh}</option>
               ))}
             </select>
           </FormField>
-          <FormField label="报价来源" htmlFor="source">
+          <FormField label={t('labelSource')} htmlFor="source">
             <Input
               id="source"
               type="text"
               name="source"
               defaultValue={initialData?.source ?? ''}
-              placeholder="如 微信语音 / 展会现场 / 邮件"
+              placeholder={t('sourcePlaceholder')}
             />
           </FormField>
         </div>
         <FormField
           label={
             <>
-              付款条件
+              {t('labelPaymentTerms')}
               <span className="ml-1 text-xs text-muted-foreground font-normal">
-                (英文国际贸易术语,如 FOB / 30% downpayment / Net 30)
+                {t('paymentTermsSuffix')}
               </span>
             </>
           }
@@ -363,12 +369,12 @@ export function QuoteForm({
             type="text"
             name="paymentTerms"
             defaultValue={initialData?.paymentTerms ?? ''}
-            placeholder="EXW / FOB / 30% downpayment, balance against B/L"
+            placeholder={t('paymentTermsPlaceholder')}
           />
         </FormField>
       </FormSection>
 
-      <FormSection title="品类标签">
+      <FormSection title={t('sectionTags')}>
         <TagMultiSelect
           availableTags={availableTags}
           initialSelectedIds={initialData?.tagIds ?? []}

@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { FormPage } from '@/components/forms/form-page';
 import { SupplierForm, type SupplierFormInitialData } from '../../_components/SupplierForm';
@@ -14,6 +15,8 @@ export default async function EditSupplierPage({
 
   const supplier = await prisma.supplier.findUnique({ where: { id } });
   if (!supplier || !supplier.isActive) notFound();
+
+  const t = await getTranslations('formPage');
 
   const initialData: SupplierFormInitialData = {
     id: supplier.id,
@@ -48,9 +51,9 @@ export default async function EditSupplierPage({
 
   return (
     <FormPage
-      title={`编辑 ${supplier.nameZh}`}
+      title={t('editSupplier', { name: supplier.nameZh })}
       backHref={`/suppliers/${id}`}
-      backLabel="返回详情"
+      backLabel={t('backToDetail')}
       maxWidthClass="max-w-5xl"
     >
       <SupplierForm initialData={initialData} />

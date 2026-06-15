@@ -1,15 +1,12 @@
 'use server';
 
 import { z } from 'zod';
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { requireUserId, requireCurrentUser, isOwner } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { contactCreateSchema } from '../_validations/contact-schema';
-
-const DEV_FALLBACK_ADMIN_ID = 'P3wbHXCGnCMPy0k6LO4paUqASBYRgRQK';
 
 // ===== 表单状态 =====
 
@@ -20,15 +17,6 @@ export type ContactFormState = {
 };
 
 // ===== 共用工具 =====
-
-async function getCurrentUserId(): Promise<string> {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    return session?.user?.id ?? DEV_FALLBACK_ADMIN_ID;
-  } catch {
-    return DEV_FALLBACK_ADMIN_ID;
-  }
-}
 
 function cleanEmpty<T extends Record<string, unknown>>(obj: T): T {
   // 把可选字符串字段的 "" 转 null,数据库存 null 比 "" 干净
@@ -56,7 +44,7 @@ export async function createContact(
     };
   }
 
-  const createdById = await getCurrentUserId();
+  const createdById = await requireUserId();
   const data = cleanEmpty({
     ...parsed.data,
     nameRu: parsed.data.nameRu || null,
@@ -111,12 +99,18 @@ export async function updateContact(
     };
   }
 
-  // 拿 supplierId(更新时不允许改归属)
+  // 拿 supplierId(更新时不允许改归属)+ 顺手做权限检查
   const existing = await prisma.contact.findUnique({ where: { id: contactId } });
   if (!existing) {
     return { status: 'error', message: '联系人不存在' };
   }
   const supplierId = existing.supplierId;
+
+  // 权限:只有创建者本人 或 ADMIN 能改
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) {
+    return { status: 'error', message: '只能修改自己创建的联系人' };
+  }
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -157,7 +151,21 @@ export async function updateContact(
 }
 
 // ===== 归档 / 恢复 / 设为主要 =====
+// archive/restore/setPrimary 都属于编辑动作,只有创建者本人或 ADMIN 能操作
+
+async function assertContactOwnership(contactId: number) {
+  const existing = await prisma.contact.findUnique({
+    where: { id: contactId },
+    select: { createdById: true, supplierId: true },
+  });
+  if (!existing) throw new Error('联系人不存在');
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) throw new Error('只能操作自己创建的联系人');
+  return existing;
+}
+
 export async function archiveContact(contactId: number): Promise<void> {
+  await assertContactOwnership(contactId);
   const c = await prisma.contact.update({
     where: { id: contactId },
     data: { status: 'ARCHIVED' },
@@ -166,6 +174,7 @@ export async function archiveContact(contactId: number): Promise<void> {
 }
 
 export async function restoreContact(contactId: number): Promise<void> {
+  await assertContactOwnership(contactId);
   const c = await prisma.contact.update({
     where: { id: contactId },
     data: { status: 'ACTIVE' },
@@ -174,6 +183,7 @@ export async function restoreContact(contactId: number): Promise<void> {
 }
 
 export async function setPrimaryContact(contactId: number): Promise<void> {
+  await assertContactOwnership(contactId);
   const c = await prisma.contact.findUnique({ where: { id: contactId } });
   if (!c) return;
   await prisma.$transaction([

@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, Map } from "lucide-react";
+import { Users, Map, Tag } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
@@ -19,6 +19,7 @@ import {
 const navItems = [
   { href: "/suppliers", labelKey: "suppliers", icon: Users },
   { href: "/map",       labelKey: "map",       icon: Map },
+  { href: "/tags",      labelKey: "tags",      icon: Tag },
 ];
 
 export function AppSidebar() {

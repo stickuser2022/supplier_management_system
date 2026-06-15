@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getLocale } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { FormPage } from '@/components/forms/form-page';
 import { QuoteForm } from '../_components/QuoteForm';
@@ -30,11 +30,13 @@ export default async function NewQuotePage({
     getLocale(),
   ]);
 
+  const t = await getTranslations('formPage');
+
   return (
     <FormPage
-      title={`为「${supplier.nameZh}」新建报价`}
+      title={t('newQuote', { name: supplier.nameZh })}
       backHref={`/suppliers/${supplierId}`}
-      backLabel="返回供应商详情"
+      backLabel={t('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"
     >
       <QuoteForm

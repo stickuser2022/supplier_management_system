@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useTranslations } from 'next-intl';
 import { Lock, Sparkles, Loader2 } from 'lucide-react';
 import {
   createSupplier,
@@ -20,14 +21,8 @@ import { FormActions } from '@/components/forms/form-actions';
 import { cn } from '@/lib/utils';
 
 // ===== 类型与常量(未变动)=====
-
-const COOPERATION_LEVEL_LABELS: Record<typeof COOPERATION_LEVELS[number], string> = {
-  INITIAL_CONTACT: '初步接触',
-  TRIAL_ORDER: '试单阶段',
-  REGULAR: '常规合作',
-  STRATEGIC: '战略合作',
-  INACTIVE: '已暂停',
-};
+// 合作深度的中文 label 移到 i18n(messages.cooperationLevel)。
+// 旧版的本地常量删除,组件内用 useTranslations('cooperationLevel') 取
 
 export type SupplierFormInitialData = {
   id: number;
@@ -121,36 +116,30 @@ type FieldPair = {
   zhPlaceholder?: string;
 };
 
-const FIELD_PAIRS: FieldPair[] = [
-  { key: 'name', zhFieldName: 'nameZh', ruFieldName: 'nameRu', flagFieldName: 'nameRuAutoTranslated', zhLabel: '中文全名', ruLabel: '俄文全名', required: true },
-  { key: 'shortName', zhFieldName: 'shortNameZh', ruFieldName: 'shortNameRu', flagFieldName: 'shortNameRuAutoTranslated', zhLabel: '中文简称', ruLabel: '俄文简称' },
-  { key: 'province', zhFieldName: 'provinceZh', ruFieldName: 'provinceRu', flagFieldName: 'provinceRuAutoTranslated', zhLabel: '省份', ruLabel: '俄文省份', required: true, zhPlaceholder: '如 广东省' },
-  { key: 'city', zhFieldName: 'cityZh', ruFieldName: 'cityRu', flagFieldName: 'cityRuAutoTranslated', zhLabel: '城市', ruLabel: '俄文城市', required: true, zhPlaceholder: '如 广州市' },
-  { key: 'district', zhFieldName: 'districtZh', ruFieldName: 'districtRu', flagFieldName: 'districtRuAutoTranslated', zhLabel: '区/县', ruLabel: '俄文区/县' },
-  { key: 'address', zhFieldName: 'addressZh', ruFieldName: 'addressRu', flagFieldName: 'addressRuAutoTranslated', zhLabel: '详细地址', ruLabel: '俄文地址' },
-  { key: 'description', zhFieldName: 'descriptionZh', ruFieldName: 'descriptionRu', flagFieldName: 'descriptionRuAutoTranslated', zhLabel: '备注 / 描述', ruLabel: '俄文备注 / 描述', multiline: true },
-];
+// FIELD_PAIRS 移到组件内,label 走 t()
 
 // ===== 子组件 =====
 
 function SubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus();
+  const tCommon = useTranslations('forms.common');
   return (
     <Button type="submit" disabled={pending}>
       {pending && <Loader2 className="size-4 animate-spin" />}
-      {pending ? '保存中…' : isEdit ? '更新' : '保存'}
+      {pending ? tCommon('submitting') : isEdit ? tCommon('update') : tCommon('submit')}
     </Button>
   );
 }
 
 function BilingualFieldRow({
-  pair, bi, errors, onZhChange, onRuChange,
+  pair, bi, errors, onZhChange, onRuChange, manualEditLockedLabel,
 }: {
   pair: FieldPair;
   bi: BilingualState;
   errors?: Record<string, string[] | undefined>;
   onZhChange: (key: keyof BilingualState, value: string) => void;
   onRuChange: (ruKey: keyof BilingualState, flagKey: keyof BilingualState, value: string) => void;
+  manualEditLockedLabel: string;
 }) {
   const zhValue = bi[pair.zhFieldName] as string;
   const ruValue = bi[pair.ruFieldName] as string;
@@ -195,7 +184,7 @@ function BilingualFieldRow({
             {isLocked && (
               <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
                 <Lock className="size-3" />
-                已手改
+                {manualEditLockedLabel}
               </span>
             )}
           </>
@@ -238,6 +227,21 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
   const [translateError, setTranslateError] = useState<string | null>(null);
   const errors = state.errors;
 
+  const t = useTranslations('forms.supplier');
+  const tCommon = useTranslations('forms.common');
+  const tLevel = useTranslations('cooperationLevel');
+
+  // FIELD_PAIRS 移到组件内,label 走 t()
+  const FIELD_PAIRS: FieldPair[] = [
+    { key: 'name', zhFieldName: 'nameZh', ruFieldName: 'nameRu', flagFieldName: 'nameRuAutoTranslated', zhLabel: t('labelNameZh'), ruLabel: t('labelNameRu'), required: true },
+    { key: 'shortName', zhFieldName: 'shortNameZh', ruFieldName: 'shortNameRu', flagFieldName: 'shortNameRuAutoTranslated', zhLabel: t('labelShortNameZh'), ruLabel: t('labelShortNameRu') },
+    { key: 'province', zhFieldName: 'provinceZh', ruFieldName: 'provinceRu', flagFieldName: 'provinceRuAutoTranslated', zhLabel: t('labelProvinceZh'), ruLabel: t('labelProvinceRu'), required: true, zhPlaceholder: t('provincePlaceholder') },
+    { key: 'city', zhFieldName: 'cityZh', ruFieldName: 'cityRu', flagFieldName: 'cityRuAutoTranslated', zhLabel: t('labelCityZh'), ruLabel: t('labelCityRu'), required: true, zhPlaceholder: t('cityPlaceholder') },
+    { key: 'district', zhFieldName: 'districtZh', ruFieldName: 'districtRu', flagFieldName: 'districtRuAutoTranslated', zhLabel: t('labelDistrictZh'), ruLabel: t('labelDistrictRu') },
+    { key: 'address', zhFieldName: 'addressZh', ruFieldName: 'addressRu', flagFieldName: 'addressRuAutoTranslated', zhLabel: t('labelAddressZh'), ruLabel: t('labelAddressRu') },
+    { key: 'description', zhFieldName: 'descriptionZh', ruFieldName: 'descriptionRu', flagFieldName: 'descriptionRuAutoTranslated', zhLabel: t('labelDescriptionZh'), ruLabel: t('labelDescriptionRu'), multiline: true },
+  ];
+
   const handleZhChange = (key: keyof BilingualState, value: string) => {
     setBi((s) => ({ ...s, [key]: value }));
   };
@@ -256,7 +260,7 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
       .map((p) => ({ field: p.key, text: bi[p.zhFieldName] as string }));
 
     if (requests.length === 0) {
-      setTranslateError('没有可翻译的字段(中文为空 / 已锁定)');
+      setTranslateError(t('noTranslateTargets'));
       return;
     }
 
@@ -305,21 +309,21 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
           {isTranslating ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              翻译中…
+              {tCommon('translating')}
             </>
           ) : (
             <>
               <Sparkles className="size-4" />
-              自动翻译俄文
+              {t('autoTranslateButton')}
             </>
           )}
         </Button>
         <p className="text-xs text-muted-foreground leading-relaxed pt-1">
-          填好中文后点这个按钮,AI 会把 7 个俄文字段一齐填好。手改俄文后该字段会上锁(再次翻译不覆盖)。
+          {t('autoTranslateHint')}
         </p>
       </div>
 
-      <FormSection title="基本信息(中俄对照)">
+      <FormSection title={t('sectionBilingual')}>
         {FIELD_PAIRS.map((pair) => (
           <BilingualFieldRow
             key={pair.key}
@@ -328,18 +332,19 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
             errors={errors}
             onZhChange={handleZhChange}
             onRuChange={handleRuChange}
+            manualEditLockedLabel={tCommon('manualEditLocked')}
           />
         ))}
       </FormSection>
 
-      <FormSection title="其他信息">
+      <FormSection title={t('sectionOther')}>
         <FormField
           label={
             <>
-              供应商编号
+              {t('labelCode')}
               {isEdit && (
                 <span className="ml-2 text-xs text-muted-foreground font-normal">
-                  (编辑模式下不可修改)
+                  {t('codeReadOnlySuffix')}
                 </span>
               )}
             </>
@@ -352,7 +357,7 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
             id="code"
             type="text"
             name="code"
-            placeholder="如 GZ-001"
+            placeholder={t('codePlaceholder')}
             defaultValue={initialData?.code}
             readOnly={isEdit}
             className={cn(isEdit && 'bg-muted cursor-not-allowed text-muted-foreground')}
@@ -360,29 +365,29 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
         </FormField>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="纬度" htmlFor="latitude" required error={errors?.latitude?.[0]}>
+          <FormField label={t('labelLatitude')} htmlFor="latitude" required error={errors?.latitude?.[0]}>
             <Input
               id="latitude"
               type="number"
               step="any"
               name="latitude"
-              placeholder="如 23.1291"
+              placeholder={t('latitudePlaceholder')}
               defaultValue={initialData?.latitude}
             />
           </FormField>
-          <FormField label="经度" htmlFor="longitude" required error={errors?.longitude?.[0]}>
+          <FormField label={t('labelLongitude')} htmlFor="longitude" required error={errors?.longitude?.[0]}>
             <Input
               id="longitude"
               type="number"
               step="any"
               name="longitude"
-              placeholder="如 113.2644"
+              placeholder={t('longitudePlaceholder')}
               defaultValue={initialData?.longitude}
             />
           </FormField>
         </div>
 
-        <FormField label="合作深度" htmlFor="cooperationLevel">
+        <FormField label={t('labelCooperationLevel')} htmlFor="cooperationLevel">
           <select
             id="cooperationLevel"
             name="cooperationLevel"
@@ -391,28 +396,28 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
           >
             {COOPERATION_LEVELS.map((level) => (
               <option key={level} value={level}>
-                {COOPERATION_LEVEL_LABELS[level]}
+                {tLevel(level)}
               </option>
             ))}
           </select>
         </FormField>
 
-        <FormField label="认识渠道" htmlFor="discoveredVia" required error={errors?.discoveredVia?.[0]}>
+        <FormField label={t('labelDiscoveredVia')} htmlFor="discoveredVia" required error={errors?.discoveredVia?.[0]}>
           <Input
             id="discoveredVia"
             type="text"
             name="discoveredVia"
-            placeholder="如 广交会、朋友介绍、老李推荐"
+            placeholder={t('discoveredViaPlaceholder')}
             defaultValue={initialData?.discoveredVia}
           />
         </FormField>
 
-        <FormField label="官网" htmlFor="website" error={errors?.website?.[0]}>
+        <FormField label={t('labelWebsite')} htmlFor="website" error={errors?.website?.[0]}>
           <Input
             id="website"
             type="text"
             name="website"
-            placeholder="https://..."
+            placeholder={t('websitePlaceholder')}
             defaultValue={initialData?.website ?? ''}
           />
         </FormField>

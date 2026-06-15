@@ -1,24 +1,12 @@
 'use server';
 
 import { z } from 'zod';
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { requireUserId, requireCurrentUser, isOwner } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { transactionCreateSchema } from '../_validations/transaction-schema';
-
-const DEV_FALLBACK_ADMIN_ID = 'P3wbHXCGnCMPy0k6LO4paUqASBYRgRQK';
-
-async function getUserId(): Promise<string> {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    return session?.user?.id ?? DEV_FALLBACK_ADMIN_ID;
-  } catch {
-    return DEV_FALLBACK_ADMIN_ID;
-  }
-}
 
 export type TransactionFormState = {
   status: 'idle' | 'success' | 'error';
@@ -53,7 +41,7 @@ export async function createTransaction(
     };
   }
 
-  const createdById = await getUserId();
+  const createdById = await requireUserId();
   const { items, payments, ...main } = parsed.data;
 
   try {
@@ -136,15 +124,21 @@ export async function updateTransaction(
     };
   }
 
-  const createdById = await getUserId();
+  const createdById = await requireUserId();
   const { items, payments, ...main } = parsed.data;
 
   const existing = await prisma.transaction.findUnique({
     where: { id: transactionId },
-    select: { supplierId: true },
+    select: { supplierId: true, createdById: true },
   });
   if (!existing) {
     return { status: 'error', message: '订单不存在' };
+  }
+
+  // 权限:只有创建者本人 或 ADMIN 能改
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) {
+    return { status: 'error', message: '只能修改自己创建的订单' };
   }
 
   try {
@@ -239,12 +233,19 @@ export async function updateTransaction(
   redirect(`/suppliers/${existing.supplierId}/transactions/${transactionId}/edit`);
 }
 
-export async function archiveTransaction(id: number) {
-  const t = await prisma.transaction.findUnique({
+async function assertTransactionOwnership(id: number) {
+  const existing = await prisma.transaction.findUnique({
     where: { id },
-    select: { supplierId: true },
+    select: { createdById: true, supplierId: true },
   });
-  if (!t) return;
+  if (!existing) throw new Error('订单不存在');
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) throw new Error('只能操作自己创建的订单');
+  return existing;
+}
+
+export async function archiveTransaction(id: number) {
+  const t = await assertTransactionOwnership(id);
   await prisma.transaction.update({
     where: { id },
     data: { isActive: false },
@@ -253,10 +254,7 @@ export async function archiveTransaction(id: number) {
 }
 
 export async function restoreTransaction(id: number) {
-  const t = await prisma.transaction.findUnique({
-    where: { id },
-    select: { supplierId: true },
-  });
+  const t = await assertTransactionOwnership(id);
   if (!t) return;
   await prisma.transaction.update({
     where: { id },

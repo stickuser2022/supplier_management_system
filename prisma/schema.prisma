@@ -12,9 +12,14 @@ datasource db {
   provider = "sqlite"
 }
 
+// 角色枚举:
+// - ADMIN  系统主人,可以编辑任何人创建的数据(青格力)
+// - EDITOR 普通编辑者,可以新建任何东西、可以编辑/删除自己创建的,但改不动别人的(家人)
+// 2026.6.15 改名:原 VIEWER 含义("只读")已过时,现在每个登录用户都可以新建数据,
+// 所以改成更贴合实际语义的 EDITOR。原来的 VIEWER 数据通过迁移脚本批量改成 EDITOR。
 enum Role {
   ADMIN
-  VIEWER
+  EDITOR
 }
 
 enum Locale {
@@ -25,7 +30,7 @@ enum Locale {
 model User {
   id              String   @id @default(cuid())
   username        String   @unique
-  role            Role     @default(VIEWER)
+  role            Role     @default(EDITOR)
   locale          Locale?   
   isActive        Boolean  @default(true) @map("is_active") //映射数据库名称
   createdAt       DateTime @default(now()) @map("created_at") //映射数据库名称

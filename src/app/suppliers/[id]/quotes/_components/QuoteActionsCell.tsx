@@ -12,11 +12,15 @@ const baseClasses =
 
 export function QuoteActionsCell({
   quote,
+  canEdit = true,
 }: {
   quote: { id: number; supplierId: number; productNameZh: string; status: 'ACTIVE' | 'ARCHIVED' };
+  canEdit?: boolean;
 }) {
   const t = useTranslations('quotes.actions');
   const [isPending, startTransition] = useTransition();
+
+  if (!canEdit) return null;
 
   const handleArchive = () => {
     if (!confirm(t('confirmArchive', { name: quote.productNameZh }))) return;

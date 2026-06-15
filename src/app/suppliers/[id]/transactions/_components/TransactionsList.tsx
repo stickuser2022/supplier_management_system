@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTranslations, getLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { requireCurrentUser, isOwner } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -22,14 +23,17 @@ export async function TransactionsList({
   const t = await getTranslations('transactions');
   const locale = await getLocale();
 
-  const transactions = await prisma.transaction.findMany({
-    where: { supplierId },
-    include: {
-      transactionItems: true,
-      payments: true,
-    },
-    orderBy: { orderedAt: 'desc' },
-  });
+  const [transactions, currentUser] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { supplierId },
+      include: {
+        transactionItems: true,
+        payments: true,
+      },
+      orderBy: { orderedAt: 'desc' },
+    }),
+    requireCurrentUser(),
+  ]);
 
   return (
     <DetailSection
@@ -87,6 +91,7 @@ export async function TransactionsList({
                           supplierId: tx.supplierId,
                           isActive: tx.isActive,
                         }}
+                        canEdit={isOwner(tx, currentUser)}
                       />
                     </TableCell>
                   </TableRow>

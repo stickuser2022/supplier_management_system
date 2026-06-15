@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getTranslations, getLocale } from 'next-intl/server';
 import { Calendar, User, DollarSign } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
+import { requireCurrentUser, isOwner } from '@/lib/auth';
 import { pickLocalized } from '@/i18n/pick-localized';
 import { Button } from '@/components/ui/button';
 import { DetailSection } from '../../_components/detail-section';
@@ -11,11 +12,14 @@ export async function NotesList({ supplierId }: { supplierId: number }) {
   const t = await getTranslations('notes');
   const locale = await getLocale();
 
-  const notes = await prisma.note.findMany({
-    where: { supplierId },
-    include: { contact: true, quote: true },
-    orderBy: { happenedAt: 'desc' },
-  });
+  const [notes, currentUser] = await Promise.all([
+    prisma.note.findMany({
+      where: { supplierId },
+      include: { contact: true, quote: true },
+      orderBy: { happenedAt: 'desc' },
+    }),
+    requireCurrentUser(),
+  ]);
 
   return (
     <DetailSection
@@ -51,6 +55,7 @@ export async function NotesList({ supplierId }: { supplierId: number }) {
                     contentZh: n.contentZh,
                     isActive: n.isActive,
                   }}
+                  canEdit={isOwner(n, currentUser)}
                 />
               </div>
               <p className="text-sm text-foreground whitespace-pre-wrap mb-3 leading-relaxed">

@@ -1,17 +1,12 @@
 'use server';
 
 import { z } from 'zod';
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { requireUserId, requireCurrentUser, isOwner } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { supplierCreateSchema } from '../_validations/supplier-schema';
-
-
-// 开发期兜底:better-auth session 拿不到时,用已存在的 admin user id
-const DEV_FALLBACK_ADMIN_ID = 'P3wbHXCGnCMPy0k6LO4paUqASBYRgRQK';
 
 // ===== 创建供应商相关 =====
 
@@ -37,14 +32,8 @@ export async function createSupplier(
     };
   }
 
-  // 取当前登录用户 id;无 session 用 admin 兜底
-  let createdById: string;
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    createdById = session?.user?.id ?? DEV_FALLBACK_ADMIN_ID;
-  } catch {
-    createdById = DEV_FALLBACK_ADMIN_ID;
-  }
+  // 取当前登录用户 id;无 session 时 requireUserId 会 redirect 到 /login
+  const createdById = await requireUserId();
 
   // 俄文字段空字符串转 null,数据库存 null 比 "" 更干净
   const data = {
@@ -151,6 +140,19 @@ export async function updateSupplier(
     };
   }
 
+  // 权限检查:只有创建者本人 或 ADMIN 能改
+  const existing = await prisma.supplier.findUnique({
+    where: { id },
+    select: { createdById: true },
+  });
+  if (!existing) {
+    return { status: 'error', message: '供应商不存在' };
+  }
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) {
+    return { status: 'error', message: '只能修改自己创建的供应商' };
+  }
+
   try {
     await prisma.supplier.update({
       where: { id },
@@ -197,7 +199,16 @@ export async function updateSupplier(
 }
 
 // 停用供应商(软删除):isActive = false
+// 非创建者(且非 ADMIN)调用会抛错,前端会被 Next.js error boundary 接住
 export async function archiveSupplier(id: number): Promise<void> {
+  const existing = await prisma.supplier.findUnique({
+    where: { id },
+    select: { createdById: true },
+  });
+  if (!existing) throw new Error('供应商不存在');
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) throw new Error('只能停用自己创建的供应商');
+
   await prisma.supplier.update({
     where: { id },
     data: { isActive: false },
@@ -207,6 +218,14 @@ export async function archiveSupplier(id: number): Promise<void> {
 
 // 恢复供应商:isActive = true
 export async function restoreSupplier(id: number): Promise<void> {
+  const existing = await prisma.supplier.findUnique({
+    where: { id },
+    select: { createdById: true },
+  });
+  if (!existing) throw new Error('供应商不存在');
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) throw new Error('只能恢复自己创建的供应商');
+
   await prisma.supplier.update({
     where: { id },
     data: { isActive: true },

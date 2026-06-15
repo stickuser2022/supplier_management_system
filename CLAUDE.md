@@ -1107,10 +1107,204 @@ RU    俄文
 ### 待办
 
 1. ~~付款截图管理~~ ✅
-2. **阶段 2 认证 UI 收尾**(独立大块):登录/登出全链路验证 + 移除所有 DEV_FALLBACK_ADMIN_ID 兜底
+2. ~~阶段 2 认证 UI 收尾~~ ✅
 3. **阶段 7 部署**:迁 PostgreSQL + OSS,清理"开发期 OK 但生产风险"的决策
 
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进阶段 2 认证 UI 收尾」**
+直接说:**「进阶段 7 部署」**
+
+---
+
+## 2026.6.14 项目进度日志(阶段 2 认证 UI 收尾)
+
+### 当前阶段:把"开发期兜底"全部铲掉,让认证成为真正的硬约束
+
+阶段 2 中期为了不阻塞业务开发,所有 server action 和 upload API 都内置了一段"session 拿不到就用 admin user id"的兜底逻辑(`DEV_FALLBACK_ADMIN_ID` 常量)。逻辑上等同于"任何人不登录也能往数据库写东西",在本地 Admin 一个人用的阶段无碍,但上云或多 Viewer 介入前必须铲掉。本里程碑把这层兜底全部移除,用 helper 统一收口。
+
+### 关键架构决策
+
+- **两套 helper 而非一套**:server action / RSC 用 `requireUserId()`(无 session 直接 `redirect('/login')`),API route 用 `getOptionalUserId()`(返回 null,调用方自己组 401)。**为什么不能合二为一**:`redirect()` 在 API route 里不工作 —— Next.js 的 redirect 是给页面/server action 路径的特殊错误机制,API 必须用 HTTP 状态码沟通。强行统一会让其中一边语义错位
+- **helper 放在 `src/lib/auth.ts`,而非新文件**:auth 相关的所有公开 API 集中在一个模块,业务代码 `import { requireUserId } from '@/lib/auth'` 一行收尾。新文件反而增加心智负担
+- **`requireUserId()` 调用方不能包 try/catch**:`redirect()` 走 NEXT_REDIRECT 特殊错误,被 try/catch 吞掉就跳不动。所有调用点都改成裸调用(不在 try 块内),与 Prisma 错误捕获 try/catch 分开放
+- **middleware 已经守住未登录访问**:`requireUserId()` 在 server action 里真正命中的场景极少(中途 session 失效 / cookie 被清),但作为定义在数据写入边界的兜底,值得有
+
+### 已完成
+
+- ✅ `src/lib/auth.ts`:新增 `requireUserId()` + `getOptionalUserId()` 两套 helper,附完整注释说明 try/catch 禁忌
+- ✅ `src/app/api/upload/route.ts`:`POST` 入口换用 `getOptionalUserId() → 401` 模式,删除 `DEV_FALLBACK_ADMIN_ID` 常量与 try/catch 兜底
+- ✅ `src/app/suppliers/_actions/supplier-actions.ts`:`createSupplier` 用 `requireUserId()`,删除 try/catch 兜底与常量
+- ✅ `src/app/suppliers/[id]/contacts/_actions/contact-actions.ts`:删 `getCurrentUserId` 本地 helper,直接 `requireUserId()`
+- ✅ `src/app/suppliers/[id]/notes/_actions/note-actions.ts`:同上
+- ✅ `src/app/suppliers/[id]/quotes/_actions/quote-actions.ts`:同上
+- ✅ `src/app/suppliers/[id]/transactions/_actions/transaction-actions.ts`:删 `getUserId` 本地 helper,直接 `requireUserId()`
+- ✅ 全仓库 `grep DEV_FALLBACK_ADMIN_ID` 返回 0 命中(除本文档自身的历史叙述)
+- ✅ `tsc --noEmit` 在 7 个改动文件上无新增报错
+- ✅ 顺手清掉 3 个 pre-existing TS 报错:
+    - `scripts/verify-prisma.ts` / `scripts/test-constraints.ts`:User 创建时 `passwordHash` 字段已被 better-auth 接管(挪到 Account 表),从 prisma.user.create / upsert 里删掉,补上必填的 `email`。脚本只验 Prisma 通路与外键约束,不验登录流程,直接 prisma 写库够用——真要"能登录的账号"得走 better-auth signUp API
+    - `src/app/map/MapPageClient.tsx`:本地 `type Supplier` 缺 `nameRu / cityRu / provinceRu` 三个可空字段,导致传给 `MapView` 时 shape 不匹配报 TS2769。补齐这三个字段,并在注释里点明"两处类型口径必须统一"
+
+### 待办
+
+1. ~~登录/登出全链路手工验证~~ ✅(2026.6.15 浏览器跑通)
+2. ~~阶段 7 部署~~ ✅(下方"2026.6.15 阶段 7"日志)
+
+---
+
+## 2026.6.15 项目进度日志(阶段 7:本地 + tunnel 部署)
+
+### 当前阶段:让海外家人能用,但不上云
+
+俄罗斯家人(3 位 Viewer)要登录看供应商数据。完整上云的话(PostgreSQL + OSS + 服务器)成本大、迁移工作量大、当下 schema 还会变,不划算。选择**本地部署 + Cloudflare Tunnel 中间态**:服务跑在 Admin 笔记本上,tunnel 把它暴露到公网,家人通过域名访问。等 1-2 个月业务跑顺、schema 稳定再考虑真上云。
+
+### 关键架构决策
+
+- **域名注册商选 Cloudflare Registrar**:`qg-suppliermanagement.com`(¥80/年)。直接在 Cloudflare 买的好处是 NS 已经在 Cloudflare 名下,不需要去阿里云/腾讯云改解析(国内域名调 NS 指 Cloudflare 会失去备案,坑大)。前置条件:国际信用卡 / Visa / Mastercard,不支持支付宝
+- **Tunnel 而非云服务器**:Cloudflare Tunnel 让家人**不用装 WARP/任何 VPN 客户端**,直接点链接就能访问。中俄跨境用 Cloudflare 边缘网络比 Tailscale 这种 VPN 性质方案稳定得多 —— 俄罗斯老人不可能教会装 VPN
+- **Tunnel 用 Token 模式建,不走 `cloudflared tunnel login`**:经典 CLI login 需要从国内访问 `login.cloudflareaccess.org`,GFW 高频 RST 切连接拿不到 cert.pem。换成走 Zero Trust 控制台(`one.dash.cloudflare.com`)→ 复制 `cloudflared service install <TOKEN>` → 装成服务,完全绕过被墙的 login 域名
+- **公网入口配置走 "Published application routes" 而不是 "Hostname routes (Beta)"**:Cloudflare 2025.9 改版后把"公网域名绑 tunnel"功能迁到了 Published application routes;Hostname routes (Beta) 是给装了 WARP 客户端的人用的私网路由 —— UI 上不仔细看会选错(我自己就连错了三次)
+- **`trustedOrigins` 同时保留 localhost + 公网域名**:开发期我还要在本机跑 `npm run dev` / `npm run start` 测试,localhost 必须留;家人通过 tunnel 进来时 Origin 是公网域名,也得加。两个一起在数组里 better-auth 会都识别,加新 origin 不要删旧的
+- **`auth-client` 不写死 baseURL,用相对路径**:`createAuthClient({ plugins: [...] })`,不传 baseURL = 默认走当前页面 origin。这是 tunnel 模式能跑通的关键 —— 服务真实跑在 localhost:3000,但浏览器看到的 origin 是公网域名,只有"相对路径"两边都对。写死 NEXT_PUBLIC_BETTER_AUTH_URL 就会出岔
+- **NSSM 包 `npm run start` 成 Windows 服务,而不是任务计划程序**:服务的核心价值是**崩了自动重启** + **跟登录会话解耦**。任务计划程序只有"开机起一次",崩了不管;NSSM 是专门为"长跑后台服务"设计的。家人凌晨访问时 Next.js 内存泄漏崩了 → NSSM 立即拉起 → 家人完全感觉不到
+- **Viewer 账号建立走 seed 脚本**(`scripts/seed-viewers.ts`)+ `hashPassword`(from `better-auth/crypto`),而不是 better-auth signUp API。理由:signUp API 需要服务跑着、调 HTTP、有 trustedOrigin 等一堆前置;直接写 DB 简单粗暴一次写完。账号信息和初始密码记在脚本顶部,以后家人换人也容易
+- **改密码功能不强制首次必须改,只在用户菜单里加个入口**:非技术用户场景(俄罗斯老人)做"强制首次改密码"流程会让他们慌、关页、打电话。给个**自助入口**(/account/password)就够了,他们想改就改,不改也安全(只要 URL + 密码自己不外传)。技术上做 force 需要 1.5-2 小时,做 voluntary 30 分钟,体验差距巨大反向
+
+### 关键坑(踩过的)
+
+- **better-auth username 插件强制 lowercase lookup**:`node_modules/better-auth/dist/plugins/username/index.mjs` 里写死 `username.toLowerCase()`。所以 username 字段**必须存小写**(供查找),原始大小写存到 `displayUsername`(供显示)。我第一版 seed 把 `Aldar` 直接写进 username,登录时 better-auth 转 `aldar` 查不到,报"User not found"。修法:`username: v.username.toLowerCase()` + `displayUsername: v.username`
+- **winget 装的工具,PATH 当场不刷新**:cloudflared 和 nssm 都踩了一遍。winget 装完会提示"重启 shell 以使用新值",**但实测重开 shell 都不一定生效**。最稳的兜底:找 exe 实际路径,用 `& "full\path\to\exe.exe" 命令` 直接调,跳过 PATH
+- **System32 写入要管理员权限,但 Copy-Item 失败后 Write-Host 不会停**:错误地以为"复制到 System32 让全局可用"是简单方案,结果非管理员 PowerShell 跑 Copy 抛 Access denied,但脚本后续 `Write-Host "已复制"` 照常执行,造成"显示成功但实际失败"的假象。教训:**非管理员场景下不要依赖 System32**,要么提示用户开管理员,要么干脆用全路径调
+- **Cloudflare 控制台 UI 改版多次,经典文档过时**:2025.9 把 Public Hostname tab 改名搬位,旧博客全失效。导航三次走错(Hostname routes Beta、CIDR routes、最后才是 Published application routes)。**遇到 Cloudflare 类问题,直接 WebSearch 最新文档,别凭印象指**
+- **PowerShell `<>` 是重定向运算符,不是占位符**:给用户写命令模板时,**用 `< >` 包裹占位符会被 PowerShell 当语法错误**(`The '<' operator is reserved for future use.`)。教训:命令模板里占位符要用别的标识(例如反引号、或者直接说"把 xxx 替换为 yyy"),不要用尖括号
+
+### 已完成
+
+- ✅ 域名 `qg-suppliermanagement.com` 在 Cloudflare Registrar 买好
+- ✅ `npm run build && npm run start` 生产模式本地跑通,核心 workflow 验过
+- ✅ Cloudflare Tunnel `supplier-mgmt` 装成 Windows 服务,Token 模式,绕过被墙的 login 域名
+- ✅ Published application routes 配 `qg-suppliermanagement.com → http://localhost:3000`,DNS 自动 CNAME 到 `<UUID>.cfargotunnel.com`,Cloudflare 自动签 HTTPS 证书
+- ✅ `src/lib/auth.ts` 的 trustedOrigins 加 `https://qg-suppliermanagement.com`,保留 localhost
+- ✅ `src/lib/auth-client.ts` 去掉 baseURL 硬编码,走当前页面 origin(相对路径)
+- ✅ `scripts/seed-viewers.ts`:批量创建 Aldar / Artem / Yigil 三个 VIEWER 账号,密码 `<Name>2026` 模式,小写 username + 原始 displayUsername 双轨存储
+- ✅ `scripts/reset-password.ts`:一次性密码重置工具(Admin 用,绕过审计,只在忘密码时用)
+- ✅ `/account/password` 页面:登录用户自助改密(走 `authClient.changePassword`,中俄双语)
+- ✅ `AppHeader` 用户菜单加「修改密码」入口(在退出之上)
+- ✅ `messages/zh.json` + `messages/ru.json` 新增 `navbar.changePassword` + `changePassword.*` 完整 17 个 key 中俄对照
+- ✅ NSSM 包 Next.js 为 Windows 服务 `QinggerSupplier`(Path: `D:\Node\node.exe`,Args: `node_modules\next\dist\bin\next start -p 3000`,Startup dir: `D:\supplier_management_system`),开机自启 + 崩了自动重启
+- ✅ 跨网 4G 验证:手机关 wifi 访问 `https://qg-suppliermanagement.com`,登录 + 浏览 + 改密码均通
+
+### 现状:本地部署 + 公网入口的稳态
+
+- **服务架构**:Admin 笔记本本机跑 NSSM 包的 Next.js 服务(localhost:3000) + Cloudflare Tunnel 服务(cloudflared)→ Cloudflare 边缘 → `https://qg-suppliermanagement.com`
+- **数据**:SQLite `dev.db` 在项目根目录;`storage/` 在项目根目录;每天凌晨 3 点备份脚本同步到 Google Drive
+- **认证**:better-auth + 用户名密码;Admin 1 个 + Viewer 3 个;Viewer 只读
+- **可用性约束**:**笔记本关机/睡眠 = 家人访问不了**。NSSM 让进程级故障自动恢复,但解决不了硬件不在线问题。这是本阶段刻意接受的折中,等真有 24/7 需求再上云
+
+### 待办
+
+1. **(可选)重启电脑验证 NSSM + cloudflared 都能自启动** —— 5 分钟成本,换长期安心
+2. **真正阶段 7(上云)推迟到业务跑顺后再启动** —— 触发条件:schema 1 个月不再改 / 家人活跃度上升 / 或 Admin 出差需要 24/7 可访问。届时迁 PostgreSQL + OSS + 阿里云或腾讯云服务器,本地代码改动极小(adapter 层做了抽象)
+
+---
+
+## 2026.6.15(下午晚段)项目进度日志(权限模型重构 + 全 form i18n)
+
+### 当前阶段:让家人可以编辑数据,且界面真正双语
+
+家人刚拿到账号试用时,发现两个问题:
+
+1. **VIEWER 角色实际不实用**:家人不光要看,也要能加自己的备注、新认识的联系人。但旧设计把他们锁成纯只读,矛盾
+2. **edit 页只有顶部 backLabel + title 在俄文,form 主体全是中文**:刚上线 i18n 时只清了 page.tsx 顶部那批,form 组件内部硬编码没动 —— 家人看到一个俄文标题 + 几十个中文字段名,很跳戏
+
+本里程碑这两件事同时推:角色模型重构(让 VIEWER 升级成 EDITOR,业务代码加 owner-only 检查)+ 5 个 form 全部 i18n。
+
+### 关键架构决策
+
+#### 权限模型
+
+- **VIEWER 角色重命名为 EDITOR,语义重定义**:不再是"只读",而是"能新建任何东西、能改自己创建的、改不动别人的"。ADMIN(青格力)保持兜底,可以改所有人的数据。**为什么改名而不是新加角色**:原来的 VIEWER 含义已经过时,继续叫 VIEWER 但实际能写,会让代码读者困惑。改成 EDITOR 一目了然
+- **不上独立的 Permission 表**:权限规则只有"是不是自己创建的"和"是不是 ADMIN"两条,放业务表上直接读 `record.createdById` 比拉一张 Permission 表查询便宜得多。代码层加 `isOwner(record, user)` 同步 helper 就够,200 行内搞定整套系统
+- **`requireCurrentUser` vs `requireUserId` 分两个 helper**:requireUserId 只取 session 里的 id(便宜),requireCurrentUser 多查一次 User 表拿 role(贵一些但只有受权限保护的 action 才用)。两个分开,业务代码按需挑
+- **server action 错误处理:update 类返回 errorState,archive/restore 类 throw Error**:update 类已经返回 FormState 了,自然加一个 error 分支;archive/restore 是 void 返回,改成返回 object 会破坏所有 caller,直接 throw 让 Next.js error boundary 接住更省事
+- **File 操作的所有权用上传者(file.createdById),而不是关联实体的 owner**:你上传的文件你自己能管;别人的 quote 上挂的图片由上传者负责。**这套规则有个边角:setQuoteImageCover / moveQuoteImage 也走 file ownership**,意味着别人上传的图能影响别人的 quote 显示顺序,目前接受,真出问题再收紧
+- **UI 层 hide,而不是 disable**:`canEdit=false` 时整个 ActionsCell return null,操作列直接空。原因:disable 加 tooltip "你不能改"会让非技术家人误以为系统坏了,直接隐藏更平静。代价是他们不知道"为什么我没按钮"——业务规则简单,口头说一句就够,不值得 UI 复杂化
+
+#### 全 form i18n
+
+- **i18n key 集中在 `forms.<entity>` 命名空间**:每个 form 一个子命名空间(forms.contact / forms.note / forms.quote / forms.supplier),共享的"保存 / 翻译中 / 已手改"等放 `forms.common`。**为什么不复用 contacts / quotes / notes 顶级命名空间**:那些是详情/列表用的 label(比如表头"姓名"),form 用的 label 可能更长更具体("中文姓名" / "俄文姓名"),复用容易冲突
+- **module-level `FIELD_PAIRS` 常量改成组件内变量**:原来 const FIELD_PAIRS 写死中文 label,改 i18n 必须搬进 component body 才能用 `t()`。代价是每次 render 重建这个数组(7 个对象,可忽略不计);收益是 label 跟语言环境绑定,切语言立即生效
+- **`已手改` 这个公用 badge 通过 prop 透传给 BilingualFieldRow**:原本写死在 SupplierForm 的子组件里,改 i18n 时不想让子组件也 import useTranslations(它不需要别的 t),所以让父组件取好字符串通过 prop 传进来。这是"组件内 i18n 化的最小侵入"模式
+- **TransactionForm 早就用了 useTranslations**:第一波 4.5 阶段就接了 `transactions` 命名空间,这次只是核对 ru.json 翻译齐全。其他 4 个 form 之所以漏了,因为最早期写 i18n 还没规范化,新写的有规范了
+
+### 关键坑(踩过的)
+
+- **Prisma generate 不会自己跑**:schema enum 改 VIEWER → EDITOR 后,生成的 client 里 enum 还有旧值,业务代码读到 role='EDITOR' 类型不匹配。必须 `npx prisma generate` 强制重建 client。Prisma 7 不再自动跑 generate,这条踩坑成本最高
+- **SQLite + Prisma enum 是"软约束"**:Prisma migrate dev 看到 enum 值变化,可能不会生成实际 DDL(因为 SQLite 不强约束 enum)。但 client 类型变了,业务代码读到旧 role='VIEWER' 行的字符串值 → 类型不在新 enum 里 → 运行时类型报错。**必须用脚本把存量 VIEWER 数据 UPDATE 成 EDITOR** 才能完整迁移。`scripts/migrate-role-viewer-to-editor.ts` 就是干这个的,用 $executeRaw 绕过 Prisma 类型检查直接改字符串值
+- **沙箱挂载又 lag 了**:多次出现 `wc -l` / `cat` 看到的文件是几天前的旧版,Read 工具看的才是真实状态。判断标准:Modify 时间戳早于本次会话就是 stale。绕开方法:相信 Read,bash 验证只在最关键点用
+- **NSSM 服务管理要管理员权限**:`nssm start/stop/restart` 都要管理员 PowerShell;`nssm install` 也是;**只有 `nssm version` / `nssm status` 可以非管理员**。这条限制是 Windows 服务管理的硬性规定,绕不过
+
+### 已完成
+
+#### Schema + 数据
+- ✅ `prisma/schema.prisma`:enum Role 从 `ADMIN / VIEWER` 改成 `ADMIN / EDITOR`;User.role 默认值跟着改;附完整注释解释语义
+- ✅ `scripts/migrate-role-viewer-to-editor.ts`(新):一次性数据迁移,$executeRaw 绕过类型检查 UPDATE 存量
+- ✅ `scripts/seed-viewers.ts` + `scripts/seed.ts`:role 值改成 EDITOR,注释更新
+
+#### 权限 helper
+- ✅ `src/lib/auth.ts` 新增:
+    - `CurrentUser` 类型:`{ id: string; role: 'ADMIN' | 'EDITOR' }`
+    - `requireCurrentUser()`:取当前用户 + role,无 session 走 redirect
+    - `isOwner(record, user)` 同步 helper:ADMIN || record.createdById === user.id
+
+#### server action 接入(全部 update/archive/restore)
+- ✅ `supplier-actions.ts`:updateSupplier 加权限检查,archive/restoreSupplier 各做 owner 检查 throw
+- ✅ `contact-actions.ts`:updateContact 加权限检查,抽出 `assertContactOwnership` 给 archive/restore/setPrimary 共用
+- ✅ `note-actions.ts`:updateNote + `assertNoteOwnership` 同模式
+- ✅ `quote-actions.ts`:updateQuote + `assertQuoteOwnership`
+- ✅ `transaction-actions.ts`:updateTransaction + `assertTransactionOwnership`
+- ✅ `file-actions.ts`:抽出 `assertFileOwnership` 给 archiveFile / restoreFile / updateFileTitle / physicallyDeleteFile;`clearSupplierLogo` 走 supplier-level ownership
+
+#### UI 显隐
+- ✅ 5 个 ActionsCell 加 `canEdit?: boolean` prop,false 时 return null:
+    - `SupplierActionsCell` / `ContactActionsCell` / `QuoteActionsCell` / `NoteActionsCell` / `TransactionActionsCell`
+- ✅ 2 个消费方页面(`suppliers/page.tsx` 列表 + 4 个 List 组件)取 currentUser、逐行算 isOwner、把 canEdit 透传给 ActionsCell
+
+#### Form i18n(5 个 form 全部)
+- ✅ `messages/zh.json` + `messages/ru.json` 新增完整命名空间:
+    - `forms.common`(5 keys 共用)
+    - `forms.contact`(16 keys)
+    - `forms.note`(13 keys)
+    - `forms.quote`(28 keys)
+    - `forms.supplier`(30 keys)
+    - `formPage`(13 keys,顶部 backLabel + title 用)
+    总计新增约 100+ key 中俄对照
+- ✅ `ContactForm.tsx`:FIELD_PAIRS 移入组件;接 `useTranslations('forms.contact')` + `useTranslations('forms.common')`;所有硬编码替换
+- ✅ `NoteForm.tsx`:同模式
+- ✅ `QuoteForm.tsx`:同模式
+- ✅ `SupplierForm.tsx`:同模式 + `BilingualFieldRow` 通过 prop 接收 `manualEditLockedLabel`(避免子组件也要 import useTranslations);删除 `COOPERATION_LEVEL_LABELS` 本地常量,改成读 `useTranslations('cooperationLevel')`
+- ✅ `TransactionForm.tsx`:之前就已经 i18n 化(走 `transactions` 命名空间),本轮只是核对 ru.json 翻译齐全
+
+#### 10 个 page.tsx 顶部 i18n(本轮第一波就做了)
+- ✅ `suppliers/new` + `suppliers/[id]/edit`
+- ✅ `contacts/new` + `contacts/[contactId]/edit`
+- ✅ `notes/new` + `notes/[noteId]/edit`
+- ✅ `quotes/new` + `quotes/[quoteId]/edit`
+- ✅ `transactions/new` + `transactions/[transactionId]/edit`
+
+### 现状:家人可以真正参与
+
+- **角色**:Admin 1 个(青格力) + EDITOR 3 个(Aldar / Artem / Yigil)
+- **权限**:Admin 看全部、改全部;EDITOR 看全部,改自己创建的
+- **界面**:中俄双语完整覆盖到 form 字段级,家人切俄文不会再看到混编中文
+- **服务自启动**:NSSM + cloudflared 都是 Windows 服务,开机自动起来,不需要任何手动操作
+
+### 待办
+
+1. **真让家人开始用** —— 系统对 Admin 来说能用了,但俄罗斯家人没真实测过中俄跨境的登录体验、改密码流程、看页面流畅度。建议发 URL 给一个家人先试
+2. **备份策略 review**:多用户写入了,凌晨 3 点 Copy-Item dev.db 撞写入冲突的概率比单 Admin 时高。可能要升级到 SQLite online backup API
+3. **重启电脑做一次完整自启动验证** —— 之前没真的关机重启过,虽然 Get-Service 看着两个服务都 Running
+
+### 下一轮对话开始时的入口
+
+直接说:**「家人开始用了」** / **「升级备份」** / **「重启验证」** / 或具体业务功能

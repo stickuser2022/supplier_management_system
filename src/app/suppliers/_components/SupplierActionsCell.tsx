@@ -12,11 +12,15 @@ const baseClasses =
 
 export function SupplierActionsCell({
   supplier,
+  canEdit = true,
 }: {
   supplier: { id: number; nameZh: string; isActive: boolean };
+  canEdit?: boolean;
 }) {
   const t = useTranslations('suppliers.actions');
   const [isPending, startTransition] = useTransition();
+
+  if (!canEdit) return null;
 
   const handleArchive = () => {
     if (!confirm(t('confirmArchive', { name: supplier.nameZh }))) return;

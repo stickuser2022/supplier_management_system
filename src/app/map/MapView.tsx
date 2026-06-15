@@ -3,8 +3,32 @@
 import { useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import 'leaflet/dist/leaflet.css';
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import L from 'leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import { pickLocalized } from '@/i18n/pick-localized';
+
+// 用 DivIcon 自定义小圆点 —— leaflet.markercluster 只聚合 L.Marker
+// 不聚合 L.CircleMarker,所以原来的 CircleMarker 改成 Marker + DivIcon。
+// 视觉上还是个彩色小圆点,但能进聚合队列
+function makeDotIcon(color: string): L.DivIcon {
+  return L.divIcon({
+    className: 'supplier-dot',
+    html: `<div style="
+      width: 10px;
+      height: 10px;
+      background: ${color};
+      border: 2px solid ${color};
+      border-radius: 50%;
+      opacity: 0.85;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
+    "></div>`,
+    iconSize: [10, 10],
+    iconAnchor: [5, 5],
+  });
+}
 
 
 type Supplier = {
@@ -61,37 +85,38 @@ export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
           url={`https://mt1.google.com/vt/lyrs=m&hl=${tileHl}&x={x}&y={y}&z={z}`}
           attribution="&copy; Google"
         />
-        {filteredSuppliers.map((supplier) => {
-          const color = LEVEL_COLORS[supplier.cooperationLevel] ?? LEVEL_COLORS.INITIAL_CONTACT;
-          return (
-            <CircleMarker
-              key={supplier.id}
-              center={[supplier.latitude, supplier.longitude]}
-              radius={8}
-              pathOptions={{
-                color,
-                fillColor: color,
-                fillOpacity: 0.8,
-                weight: 2,
-              }}
-            >
-              <Popup>
-                <div className="text-sm">
-                  <div className="font-semibold">
-                    {pickLocalized(supplier.nameZh, supplier.nameRu, locale)}
+        <MarkerClusterGroup
+          chunkedLoading
+          showCoverageOnHover={false}
+          spiderfyOnMaxZoom={true}
+          maxClusterRadius={50}
+        >
+          {filteredSuppliers.map((supplier) => {
+            const color = LEVEL_COLORS[supplier.cooperationLevel] ?? LEVEL_COLORS.INITIAL_CONTACT;
+            return (
+              <Marker
+                key={supplier.id}
+                position={[supplier.latitude, supplier.longitude]}
+                icon={makeDotIcon(color)}
+              >
+                <Popup>
+                  <div className="text-sm">
+                    <div className="font-semibold">
+                      {pickLocalized(supplier.nameZh, supplier.nameRu, locale)}
+                    </div>
+                    <div className="text-gray-600">
+                      {pickLocalized(supplier.provinceZh, supplier.provinceRu, locale)} ·{' '}
+                      {pickLocalized(supplier.cityZh, supplier.cityRu, locale)}
+                    </div>
+                    <div className="text-gray-500 text-xs mt-1">
+                      {tLevel(supplier.cooperationLevel)}
+                    </div>
                   </div>
-                  <div className="text-gray-600">
-                    {pickLocalized(supplier.provinceZh, supplier.provinceRu, locale)} ·{' '}
-                    {pickLocalized(supplier.cityZh, supplier.cityRu, locale)}
-                  </div>
-                  <div className="text-gray-500 text-xs mt-1">
-                    {tLevel(supplier.cooperationLevel)}
-                  </div>
-                </div>
-              </Popup>
-            </CircleMarker>
-          );
-        })}
+                </Popup>
+              </Marker>
+            );
+          })}
+        </MarkerClusterGroup>
       </MapContainer>
 
       <div className="absolute top-4 right-4 z-1000 bg-white/95 rounded-lg shadow-md p-3 text-sm min-w-40">

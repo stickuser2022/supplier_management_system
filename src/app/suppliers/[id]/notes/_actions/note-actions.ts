@@ -1,30 +1,18 @@
 'use server';
 
 import { z } from 'zod';
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { requireUserId, requireCurrentUser, isOwner } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { noteCreateSchema } from '../_validations/note-schema';
-
-const DEV_FALLBACK_ADMIN_ID = 'P3wbHXCGnCMPy0k6LO4paUqASBYRgRQK';
 
 export type NoteFormState = {
   status: 'idle' | 'success' | 'error';
   errors?: Record<string, string[] | undefined>;
   message?: string;
 };
-
-async function getCurrentUserId(): Promise<string> {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    return session?.user?.id ?? DEV_FALLBACK_ADMIN_ID;
-  } catch {
-    return DEV_FALLBACK_ADMIN_ID;
-  }
-}
 
 // ===== 创建沟通记录 =====
 export async function createNote(
@@ -43,7 +31,7 @@ export async function createNote(
     };
   }
 
-  const createdById = await getCurrentUserId();
+  const createdById = await requireUserId();
 
   try {
     await prisma.note.create({
@@ -89,6 +77,12 @@ export async function updateNote(
   const existing = await prisma.note.findUnique({ where: { id: noteId } });
   if (!existing) return { status: 'error', message: '记录不存在' };
 
+  // 权限:只有创建者本人 或 ADMIN 能改
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) {
+    return { status: 'error', message: '只能修改自己创建的沟通记录' };
+  }
+
   try {
     await prisma.note.update({
       where: { id: noteId },
@@ -113,7 +107,21 @@ export async function updateNote(
 }
 
 // ===== 归档 / 恢复(走 isActive)=====
+// 只有创建者本人 或 ADMIN 能操作
+
+async function assertNoteOwnership(noteId: number) {
+  const existing = await prisma.note.findUnique({
+    where: { id: noteId },
+    select: { createdById: true, supplierId: true },
+  });
+  if (!existing) throw new Error('沟通记录不存在');
+  const user = await requireCurrentUser();
+  if (!isOwner(existing, user)) throw new Error('只能操作自己创建的沟通记录');
+  return existing;
+}
+
 export async function archiveNote(noteId: number): Promise<void> {
+  await assertNoteOwnership(noteId);
   const n = await prisma.note.update({
     where: { id: noteId },
     data: { isActive: false },
@@ -122,6 +130,7 @@ export async function archiveNote(noteId: number): Promise<void> {
 }
 
 export async function restoreNote(noteId: number): Promise<void> {
+  await assertNoteOwnership(noteId);
   const n = await prisma.note.update({
     where: { id: noteId },
     data: { isActive: true },

@@ -12,11 +12,15 @@ const baseClasses =
 
 export function TransactionActionsCell({
   transaction,
+  canEdit = true,
 }: {
   transaction: { id: number; supplierId: number; isActive: boolean };
+  canEdit?: boolean;
 }) {
   const t = useTranslations('transactions.actions');
   const [isPending, startTransition] = useTransition();
+
+  if (!canEdit) return null;
 
   const handleArchive = () => {
     if (!confirm(t('confirmArchive'))) return;

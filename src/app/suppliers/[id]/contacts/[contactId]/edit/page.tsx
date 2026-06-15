@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { FormPage } from '@/components/forms/form-page';
 import { ContactForm, type ContactFormInitialData } from '../../_components/ContactForm';
@@ -12,6 +13,8 @@ export default async function EditContactPage({
   const supplierId = parseInt(idStr, 10);
   const contactId = parseInt(contactIdStr, 10);
   if (isNaN(supplierId) || isNaN(contactId)) notFound();
+
+  const t = await getTranslations('formPage');
 
   const contact = await prisma.contact.findUnique({ where: { id: contactId } });
   if (!contact || contact.supplierId !== supplierId) notFound();
@@ -38,9 +41,9 @@ export default async function EditContactPage({
 
   return (
     <FormPage
-      title={`编辑「${contact.nameZh}」`}
+      title={t('editContact', { name: contact.nameZh })}
       backHref={`/suppliers/${supplierId}`}
-      backLabel="返回供应商详情"
+      backLabel={t('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"
     >
       <ContactForm supplierId={supplierId} initialData={initialData} />

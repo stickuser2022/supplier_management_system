@@ -12,6 +12,7 @@ const baseClasses =
 
 export function ContactActionsCell({
   contact,
+  canEdit = true,
 }: {
   contact: {
     id: number;
@@ -20,9 +21,13 @@ export function ContactActionsCell({
     status: 'ACTIVE' | 'ARCHIVED';
     isPrimary: boolean;
   };
+  canEdit?: boolean;
 }) {
   const t = useTranslations('contacts.actions');
   const [isPending, startTransition] = useTransition();
+
+  // 非创建者(且非 ADMIN)不显示任何操作按钮 —— 数据只读
+  if (!canEdit) return null;
 
   const handleArchive = () => {
     if (!confirm(t('confirmArchive', { name: contact.nameZh }))) return;
