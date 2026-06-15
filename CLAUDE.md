@@ -38,6 +38,57 @@
 - **翻译服务:** 通过抽象层接入,当前使用 DeepL,可热切换至 DeepSeek 等其他提供商
 - **部署形态:** 短期跑在 Admin 笔记本上,中长期迁移至国内云服务器
 
+
+## 数据备份策略(本地部署期)
+
+短期内系统跑在 Admin 笔记本上,数据风险只有"硬盘坏 / 误删 / 笔记本丢"这几种场景。备份策略对应解法:每天自动把核心数据复制到云盘同步目录,云盘自动传上云。
+
+### 备份范围
+
+只备份 2 样,其他都不需要:
+- `dev.db` — SQLite 数据库,所有业务数据
+- `storage/` — 文件存储根目录,所有上传的画册、视频、截图、文档
+
+代码不备份(GitHub 有);node_modules 不备份(npm install 可重建);.next 不备份(运行时缓存)。
+
+### 工具栈
+
+- **脚本**:`scripts/backup.ps1`(PowerShell)
+- **调度**:Windows 任务计划程序,任务名 `QinggerDailyBackup`,每天凌晨 3:00 自动跑
+- **云盘**:Google Drive for Desktop(本地同步路径 `G:\我的云端硬盘\supplier_management_backup\`)
+- **保留窗口**:最近 7 天,自动清理更老的
+
+### 关键设计决策
+
+- **简单 Copy-Item 而非 SQLite online backup**:单 Admin 写入并发极低,凌晨 3 点几乎不会撞到正在写入的瞬间。即使某次快照偶尔捕获到不一致状态,前一天的快照仍可用,7 天滚动窗口让这种风险接近零。等真上生产再考虑 online backup API
+- **`StartWhenAvailable` 电源容错**:任务计划带 `-StartWhenAvailable -DontStopIfGoingOnBatteries -AllowStartIfOnBatteries`,凌晨 3 点笔记本如果在睡眠/关机,下次开机后自动补跑一次,不丢备份
+- **`DestinationRoot` 参数化**:不锁死特定云盘。今天 Google Drive,明天换阿里云盘只改任务计划里那一个路径参数,脚本逻辑不动
+- **本地保留 7 天而非全部**:云盘同步是双向的,本地 7 天 = 云盘也 7 天。本地无限堆积会让云盘空间不可控
+
+### 恢复流程(笔记本坏掉时)
+
+```
+1. 新机器装 Node 22 + Git + Google Drive 客户端
+2. git clone 项目
+3. 登录 Google Drive,等同步把 supplier_management_backup\ 拉下来
+4. 从最新日期目录复制 dev.db 回项目根
+5. 从最新日期目录镜像 storage\ 回项目根
+6. npm install && npx prisma generate
+7. npm run dev
+8. 数据全回来,约 30 分钟内可恢复正常
+```
+
+### 健康度验证(每月一次)
+
+- 打开 `G:\我的云端硬盘\supplier_management_backup\backup.log`,确认最近几天都有 `=== 备份完成 ===` 日志
+- 打开当天快照目录,目测 dev.db 大小和 storage/ 文件数合理(不是 0、不是异常缩水)
+
+### 升级方向(等真有需要再做)
+
+- 上云后:服务器侧加 PostgreSQL 自动备份(pg_dump cron)+ OSS 自带的多版本存储
+- 跨机房冷备:每月一份压缩快照拷到外接 U 盘,锁抽屉里
+- 自动告警:备份失败发个微信/邮件提醒(目前只靠 backup.log 被动检查)
+
 ## AI 协作约定
 
 本章节是给所有 AI 协作者(Claude、GPT、Gemini 等)的工作准则。每次开新对话,把整份 CLAUDE.md 粘给 AI 时,这些约定保证协作风格稳定、输出格式正确。
@@ -125,6 +176,8 @@ supplier_management_system/
 │
 ├── prisma/                   ← (待创建) Prisma schema 和迁移文件
 │   └── schema.prisma         ← 数据库模型定义
+├── scripts/                  ← 运维脚本(备份、维护任务等)
+│   └── backup.ps1            ← 每日备份脚本,Task Scheduler 调度
 │
 ├── messages/                 ← (待创建) i18n 翻译文件
 │   ├── zh.json
@@ -1016,73 +1069,48 @@ RU    俄文
 
 ---
 
-## 2026.6.11 项目进度日志(阶段 6a 完成 - UI 美化打地基)
+## 2026.6.15(后)项目进度日志(数据备份策略落地)
 
-### 当前阶段:阶段 6 启动,Phase 6a 4 个里程碑全落地
+### 当前阶段:本地部署期的数据安全兜底
 
-阶段 6 目标是 UI 美化,准备给海外家人正式使用。Phase 6a 是"打地基"——风格调性、组件库、布局、字体四件事一次到位,**视觉地基铺完,Phase 6b 才进入逐页打磨**。
-
-### 风格定调:Notion 柔和现代
-
-对比了 Notion / Vercel / shadcn / 暖色 CRM 等参考样式后,选定 Notion 风。具体落地:
-
-- 略暖灰白底 `#fbfbfa`
-- Notion 褐黑正文 `#37352f`(不是纯黑)
-- 低饱和度状态色(战略合作淡绿、常规淡蓝、试单淡黄、暂停淡红、初步接触中性灰)
-- 2-4px 圆角(几乎直角,只切锐利感)
-- 留白克制、几乎无装饰
-- 强调蓝 `#2383e2` 仅用于主操作按钮和链接
-
+阶段 6 收工后,意识到笔记本本地跑数据有丢失风险。在不上云的前提下加了一层自动备份兜底,30 分钟设置完成。
 ### 关键架构决策
 
-- **Token 双层结构(`:root` + `@theme inline`)**:实际值放 `:root`,Tailwind 工具类映射放 `@theme inline`。这是 shadcn 默认结构,**也是将来加深色模式的基础**——只需在 `.dark { ... }` 里覆盖 `:root` 那层值,`@theme` 那层不动,Tailwind 类名永不改
-- **Token 命名对齐 shadcn 标准**(6a.1 → 6a.2 改了一次命名):放弃自创的 `--surface` / `--surface-hover` / `--accent`(蓝),全部换成 shadcn 的 `--card` / `--muted` / `--primary` / `--secondary` / `--accent`(中性灰)等。颜色值不变,**好处是以后从 shadcn 文档复制任何组件代码过来,零改名直接能用**
-- **`--primary` 是品牌蓝、shadcn 的 `--accent` 是中性灰**:这是 shadcn 反直觉的命名,记下不再混淆。我们项目的"主要操作色"叫 `--primary`(`#2383e2` 蓝),`--accent` 是 hover / 高亮等中性灰场景
-- **5 档合作深度 → 4 档语义色 + 1 档中性**:战略合作 → success(淡绿)、常规 → info(淡蓝)、试单 → warning(淡黄)、暂停 → danger(淡红)、初步接触 → muted(中性灰)。语义色用项目自定义的 `--success-bg/fg` / `--info-bg/fg` / `--warning-bg/fg` / `--danger-bg/fg` 双字段,跟 shadcn `--destructive` 互不冲突
-- **从顶栏改为左侧栏**:5+ section 顶栏会挤;Notion 也是侧栏;shadcn Sidebar 自带移动端抽屉,响应式免费
-- **字体三段栈**:Geist(拉丁 + 俄文)→ Noto SC(汉字)→ 系统字体兜底。浏览器按字符自动匹配,一行 font-family 处理三种文字
-- **shadcn 安装配置**:base color = Stone(最接近 Notion 暖灰)、component library = Radix(5 年成熟度)、preset = Nova(自带 Lucide + Geist,对齐已有决策)
+- **Payment id 稳定化**(核心难题):原本 update 走"先删后插",每次保存 Payment.id 都变,任何挂在它身上的截图都会因 Cascade FK 变成孤儿。改成 3-way diff:
+  - **DELETE**:DB 里存在但提交里没保留的 id → 物理删除(级联清掉截图,符合"删付款连带删凭证"的直觉)
+  - **UPDATE**:提交里带 id 且 DB 里有 → 原地更新数据,id 保留,截图不动
+  - **CREATE**:提交里 id=null 的新行 → 插入新记录,createdById 设为当前用户
+  - Items 维持先删后插不动(无外部 FK 引用 Item,无副作用)
+- **redirect 目标改成同一编辑页**:Update 完成后回到 edit URL 而非 supplier detail,让用户立即给新建的 Payment 上传截图。"保存后离开"workflow 多一次点击(走顶部 back link),换来"保存后管理截图"workflow 从不可能到 1 步。Notion / Linear 都是这种保存后不跳走的模式
+- **截图区与表单区职责分离**:表单上面是「付款流水」编辑区(state-based,数据变更走主 save 提交);表单下面是「付款凭证」管理区(DB-coupled,文件上传走独立 API,即时生效)。两者并列、不互相影响,与 TRANSACTION_DOC 一致的"表单 + 附件并列"模式
+- **结构类型注解避开 Prisma Decimal import 折腾**:`amount: { toString: () => string }` 替代 `amount: Decimal`,绕开 Prisma 7 generator 输出路径的不确定性(`@/generated/prisma/runtime/library` 不存在,`@prisma/client/runtime/library` 也可能因 generator 配置不可用)。TS 鸭子类型只要 shape 对得上就 ok
+-  **简单 Copy-Item 而非 SQLite 在线备份**:单用户写入并发低,7 天滚动快照足够覆盖偶发不一致风险
+- **DestinationRoot 参数化**:换云盘只改任务计划一个参数,不锁死 Google Drive
+- **不进 git 任何敏感路径**:backup.ps1 自身只是脚本(进 git),备份产物(dev.db、storage/)永远不进 git
 
 ### 已完成
 
-**6a.1 设计 token:**
-- ✅ 全套 token 落 `src/app/globals.css`:背景/卡片/边框/3 级文字/accent/4 组语义色对
-- ✅ 圆角整套压到 Notion 风(2/4/6/8px)
-- ✅ 修复默认 globals.css 中 body font-family 写死 Arial 覆盖 Geist 的 bug
-- ✅ 删除默认 `prefers-color-scheme: dark`(本阶段不做深色模式,保留 token 结构供以后加)
+- ✅ `transaction-schema.ts`:`paymentSchema` 加 `id: number | null | undefined`(允许 3 种语义)
+- ✅ `TransactionForm.tsx`:`PaymentRow` 类型加 `id`;`emptyPayment()` 返回 `id: null`;表单 JSX 无变化(id 通过 JSON.stringify 自动透传)
+- ✅ `transaction-actions.ts`:`updateTransaction` 的 payments 处理重写为 3-way diff;`createTransaction` 保持原样(创建时所有 Payment 必新)
+- ✅ `payment-screenshots-list.tsx`(新):单 Payment 名下的截图列表组件,沿用 NoteAttachmentList 同套路(image thumbnail + FileText 图标 + FileItemActions)
+- ✅ `payment-screenshots-section.tsx`(新):server component,接收 payments[] with files,每条付款渲染一个独立卡片(摘要头 + FileUploader + 截图列表)
+- ✅ `transaction/[transactionId]/edit/page.tsx`:Prisma 查询加 `payments.include.files` 子查询,FormPage 底部新增「付款凭证」DetailSection
+- ✅ i18n:`files` 命名空间下补 5 个 key(paymentScreenshotsTitle / uploadPaymentScreenshot / paymentScreenshotAcceptHint / paymentScreenshotsEmpty / paymentsEmptyForScreenshots)
+- ### 已完成
 
-**6a.2 shadcn/ui 引入:**
-- ✅ `npx shadcn init`,base color = Stone,component library = Radix,preset = Nova
-- ✅ globals.css token 命名换轨:`--surface` → `--card`,`--surface-hover` → `--muted`,`--accent`(蓝)→ `--primary`,颜色值零变更
-- ✅ 装首批 14 个组件:button / input / label / textarea / card / badge / dialog / dropdown-menu / sonner / skeleton / separator / tabs / select / sidebar
+- ✅ `scripts/backup.ps1`:PowerShell 脚本,做 3 件事——复制 dev.db / robocopy 镜像 storage/ / 清理 7 天前旧快照
+- ✅ Windows 任务计划 `QinggerDailyBackup`:每天 3:00 自动跑,笔记本睡眠时下次开机补跑
+- ✅ Google Drive for Desktop 同步:本地快照写到 `G:\我的云端硬盘\supplier_management_backup\`,云盘自动传云
+- ✅ CLAUDE.md 新增「数据备份策略」章节,记录全套方案、恢复流程、健康验证
 
-**6a.3 布局壳:**
-- ✅ 改造根 layout.tsx:`SidebarProvider` + `AppSidebar` + `SidebarInset`(顶部小工具栏 + main)
-- ✅ 新增 `components/layout/app-sidebar.tsx`:供应商/地图 2 项导航(后续加 标签管理/用户管理/设置),当前路由自动高亮
-- ✅ 新增 `components/layout/app-header.tsx`:汉堡按钮 + locale 切换(中 / Py 两按钮)+ 用户菜单(DropdownMenu)+ 退出
-- ✅ AppSidebar / AppHeader 都做 `/login` 路径 + 未认证状态跳过渲染,行为与原 Navbar 一致
-- ✅ 移动端响应式由 shadcn Sidebar 在 768px 断点自动切换为抽屉,无需手写
-- ✅ 删除老 `src/components/Navbar.tsx`,功能 100% 迁移完成
+### 待办
 
-**6a.4 字体 + 排版:**
-- ✅ next/font 加载 Noto Sans SC(weight 400/500/700)
-- ✅ Geist 加 `cyrillic` subset,正式支持俄文渲染
-- ✅ globals.css body font-family 三段栈:`var(--font-sans), var(--font-noto-sc), 'PingFang SC', 'Microsoft YaHei', sans-serif`
-- ✅ 排版字号沿用 Tailwind v4 默认,不预设自定义 scale(等真正用页面时再细调)
+1. ~~付款截图管理~~ ✅
+2. **阶段 2 认证 UI 收尾**(独立大块):登录/登出全链路验证 + 移除所有 DEV_FALLBACK_ADMIN_ID 兜底
+3. **阶段 7 部署**:迁 PostgreSQL + OSS,清理"开发期 OK 但生产风险"的决策
 
-### 待办(Phase 6b 起步,逐页打磨)
-
-1. ~~Phase 6a 全部~~ ✅
-2. **Phase 6b 逐页打磨**(下一里程碑):
-   - 6b.1 项目级 `<StatusBadge>` 组件:封装 5 档合作深度 + 4 档语义色,统一全站徽章样式
-   - 6b.2 供应商列表页改造:用 shadcn Table / Tabs + 项目 token,可考虑卡片墙 vs 表格双视图
-   - 6b.3 供应商详情页改造:信息分组重排 + 时间线视图重做
-   - 6b.4 各类表单统一(Supplier/Contact/Quote/Transaction/Note 录入页)
-   - 6b.5 空态 / loading 态 / 错误态全站统一
-   - 6b.6 i18n 文案审查(Phase 6a 期间可能引入了未翻译的英文字)
-3. **登录页打磨**(独立小块,可插入 6b 任何位置):目前界面朴素,Notion 风改造一下
-4. **测试卡片清理**:Phase 6b.1 开始前把 `src/app/page.tsx` 还原为正常首页
 
 ### 下一轮对话开始时的入口
 
-直接说:**「进 Phase 6b.1,建 StatusBadge 组件」**
+直接说:**「进阶段 2 认证 UI 收尾」**
