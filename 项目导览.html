@@ -411,8 +411,10 @@
 
   <div class="callout">
     <strong>为什么要 <code>_auto_translated</code> 这个 boolean?</strong>
-    <p style="margin: 6px 0 0;">想象一个场景:Admin 录入中文 → AI 翻译俄文存进库 → flag=true(自动翻译) → Admin 觉得 AI 翻译不对,手改俄文 → 这时 flag 变 false(锁定) → <strong>下次 Admin 重新触发翻译,会跳过这个被锁定的字段</strong>(避免 AI 把 Admin 的手改覆盖)。三件套的核心是这个"锁"语义。</p>
+    <p style="margin: 6px 0 0;">最初设计:Admin 手改俄文 → flag=false(锁定)→ 下次翻译跳过这个字段(避免覆盖人工修正)。<strong>2026.6.16 移除了这个"锁"机制</strong>:实际用着反而麻烦,改完后想重翻全部,得逐个清锁。现在每次翻译都覆盖现有俄文,简单一致。<code>_auto_translated</code> 字段仍在 schema 里(向后兼容,不删数据),只是 UI 不再感知,业务层永远写 true。</p>
   </div>
+
+  <p>Supplier 表上有 <strong>8 组双语字段</strong>:nameZh+nameRu / shortName / province / city / district / address / description / <strong>mainProducts</strong>(2026.6.16 新增,"主营产品",支持搜索)。每组 3 个字段。</p>
 
   <h3>onDelete 4 种规则</h3>
   <p>外键删除时的连锁反应有 4 种,设计时不是凭感觉拍,是按"关系性质 + 字段可空性"两个维度决策的。</p>

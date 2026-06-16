@@ -154,6 +154,8 @@ model Supplier {
   cooperationLevel            CooperationLevel @default(INITIAL_CONTACT) @map("cooperation_level")
   descriptionZh               String?          @map("description_zh")
   descriptionRu               String?          @map("description_ru")
+  mainProductsZh              String?          @map("main_products_zh") //主营产品(中文)
+  mainProductsRu              String?          @map("main_products_ru") //主营产品(俄文)
   discoveredVia               String           @map("discovered_via") //发现途径
   website                     String?          @map("website") //官网
   nameRuAutoTranslated        Boolean          @default(true) @map("name_ru_auto_translated") //名称是否自动翻译成俄语
@@ -163,6 +165,7 @@ model Supplier {
   districtRuAutoTranslated    Boolean          @default(true) @map("district_ru_auto_translated") //区域是否自动翻译成俄语
   addressRuAutoTranslated     Boolean          @default(true) @map("address_ru_auto_translated") //地址是否自动翻译成俄语
   descriptionRuAutoTranslated Boolean          @default(true) @map("description_ru_auto_translated") //描述是否自动翻译成俄语
+  mainProductsRuAutoTranslated Boolean         @default(true) @map("main_products_ru_auto_translated") //主营产品是否自动翻译成俄语
   createdAt                   DateTime         @default(now()) @map("created_at")
   updatedAt                   DateTime         @updatedAt @map("updated_at")
   createdById                 String           @map("created_by_id")

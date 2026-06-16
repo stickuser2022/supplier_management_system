@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useTranslations } from 'next-intl';
-import { Lock, Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import {
   createQuote,
   updateQuote,
@@ -123,17 +123,14 @@ export function QuoteForm({
 
   const handleZhChange = (key: keyof BilingualState, value: string) =>
     setBi((s) => ({ ...s, [key]: value }));
-  const handleRuChange = (ruKey: keyof BilingualState, flagKey: keyof BilingualState, value: string) =>
-    setBi((s) => ({ ...s, [ruKey]: value, [flagKey]: false }));
+  // 已去除"已手改"机制:用户改俄文不再翻 flag,重翻会覆盖
+  const handleRuChange = (ruKey: keyof BilingualState, _flagKey: keyof BilingualState, value: string) =>
+    setBi((s) => ({ ...s, [ruKey]: value }));
 
   const handleTranslate = () => {
     setTranslateError(null);
     const requests = FIELD_PAIRS
-      .filter((p) => {
-        const zh = (bi[p.zhFieldName] as string).trim();
-        const locked = !(bi[p.flagFieldName] as boolean);
-        return zh.length > 0 && !locked;
-      })
+      .filter((p) => (bi[p.zhFieldName] as string).trim().length > 0)
       .map((p) => ({ field: p.key, text: bi[p.zhFieldName] as string }));
 
     if (requests.length === 0) {
@@ -197,7 +194,6 @@ export function QuoteForm({
           const zhValue = bi[pair.zhFieldName] as string;
           const ruValue = bi[pair.ruFieldName] as string;
           const flagValue = bi[pair.flagFieldName] as boolean;
-          const isLocked = !flagValue;
           const zhFieldId = `${pair.key}-zh`;
           const ruFieldId = `${pair.key}-ru`;
 
@@ -217,20 +213,7 @@ export function QuoteForm({
                   onChange={(e) => handleZhChange(pair.zhFieldName, e.target.value)}
                 />
               </FormField>
-              <FormField
-                label={
-                  <>
-                    <span>{pair.ruLabel}</span>
-                    {isLocked && (
-                      <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
-                        <Lock className="size-3" />
-                        {tCommon('manualEditLocked')}
-                      </span>
-                    )}
-                  </>
-                }
-                htmlFor={ruFieldId}
-              >
+              <FormField label={pair.ruLabel} htmlFor={ruFieldId}>
                 <Input
                   id={ruFieldId}
                   type="text"

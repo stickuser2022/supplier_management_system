@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { FormPage } from '@/components/forms/form-page';
 import { SupplierForm, type SupplierFormInitialData } from '../../_components/SupplierForm';
@@ -13,10 +13,21 @@ export default async function EditSupplierPage({
   const id = parseInt(idStr, 10);
   if (isNaN(id)) notFound();
 
-  const supplier = await prisma.supplier.findUnique({ where: { id } });
+  const supplier = await prisma.supplier.findUnique({
+    where: { id },
+    include: { supplierTags: { select: { tagId: true } } },
+  });
   if (!supplier || !supplier.isActive) notFound();
 
-  const t = await getTranslations('formPage');
+  const [t, locale, availableTags] = await Promise.all([
+    getTranslations('formPage'),
+    getLocale(),
+    prisma.tag.findMany({
+      where: { isActive: true },
+      select: { id: true, nameZh: true, nameRu: true },
+      orderBy: [{ category: 'asc' }, { nameZh: 'asc' }],
+    }),
+  ]);
 
   const initialData: SupplierFormInitialData = {
     id: supplier.id,
@@ -42,6 +53,9 @@ export default async function EditSupplierPage({
     descriptionZh: supplier.descriptionZh,
     descriptionRu: supplier.descriptionRu,
     descriptionRuAutoTranslated: supplier.descriptionRuAutoTranslated,
+    mainProductsZh: supplier.mainProductsZh,
+    mainProductsRu: supplier.mainProductsRu,
+    mainProductsRuAutoTranslated: supplier.mainProductsRuAutoTranslated,
     latitude: supplier.latitude,
     longitude: supplier.longitude,
     cooperationLevel: supplier.cooperationLevel,
@@ -56,7 +70,12 @@ export default async function EditSupplierPage({
       backLabel={t('backToDetail')}
       maxWidthClass="max-w-5xl"
     >
-      <SupplierForm initialData={initialData} />
+      <SupplierForm
+        initialData={initialData}
+        availableTags={availableTags}
+        initialTagIds={supplier.supplierTags.map((st) => st.tagId)}
+        locale={locale}
+      />
     </FormPage>
   );
 }

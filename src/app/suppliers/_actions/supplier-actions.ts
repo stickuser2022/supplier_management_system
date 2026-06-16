@@ -16,6 +16,13 @@ export type SupplierFormState = {
   message?: string;
 };
 
+// 从 FormData 提取 tagIds(多值字段,Object.fromEntries 抓不全)
+function extractTagIds(formData: FormData): number[] {
+  return formData
+    .getAll('tagIds')
+    .map((v) => parseInt(String(v), 10))
+    .filter((n) => !isNaN(n) && n > 0);
+}
 
 export async function createSupplier(
   _prevState: SupplierFormState,
@@ -34,6 +41,7 @@ export async function createSupplier(
 
   // 取当前登录用户 id;无 session 时 requireUserId 会 redirect 到 /login
   const createdById = await requireUserId();
+  const tagIds = extractTagIds(formData);
 
   // 俄文字段空字符串转 null,数据库存 null 比 "" 更干净
   const data = {
@@ -45,7 +53,13 @@ export async function createSupplier(
     districtRu: parsed.data.districtRu || null,
     addressRu: parsed.data.addressRu || null,
     descriptionRu: parsed.data.descriptionRu || null,
+    mainProductsZh: parsed.data.mainProductsZh || null,
+    mainProductsRu: parsed.data.mainProductsRu || null,
     createdById,
+    supplierTags:
+      tagIds.length > 0
+        ? { create: tagIds.map((tagId) => ({ tagId })) }
+        : undefined,
   };
 
   try {
@@ -75,7 +89,7 @@ export async function createSupplier(
 
 // ===== 翻译相关 =====
 
-// 7 个可翻译的字段名(简称,不含 Zh/Ru 后缀)
+// 8 个可翻译的字段名(简称,不含 Zh/Ru 后缀)
 export type SupplierTranslateField =
   | 'name'
   | 'shortName'
@@ -83,7 +97,8 @@ export type SupplierTranslateField =
   | 'city'
   | 'district'
   | 'address'
-  | 'description';
+  | 'description'
+  | 'mainProducts';
 
 export type TranslateSupplierFieldsResult =
   | {
@@ -153,38 +168,52 @@ export async function updateSupplier(
     return { status: 'error', message: '只能修改自己创建的供应商' };
   }
 
+  const tagIds = extractTagIds(formData);
+
   try {
-    await prisma.supplier.update({
-      where: { id },
-      data: {
-        // 显式列出可改字段,刻意不包括 code 和 createdById
-        nameZh: parsed.data.nameZh,
-        nameRu: parsed.data.nameRu || null,
-        nameRuAutoTranslated: parsed.data.nameRuAutoTranslated,
-        shortNameZh: parsed.data.shortNameZh || null,
-        shortNameRu: parsed.data.shortNameRu || null,
-        shortNameRuAutoTranslated: parsed.data.shortNameRuAutoTranslated,
-        provinceZh: parsed.data.provinceZh,
-        provinceRu: parsed.data.provinceRu || null,
-        provinceRuAutoTranslated: parsed.data.provinceRuAutoTranslated,
-        cityZh: parsed.data.cityZh,
-        cityRu: parsed.data.cityRu || null,
-        cityRuAutoTranslated: parsed.data.cityRuAutoTranslated,
-        districtZh: parsed.data.districtZh || null,
-        districtRu: parsed.data.districtRu || null,
-        districtRuAutoTranslated: parsed.data.districtRuAutoTranslated,
-        addressZh: parsed.data.addressZh || null,
-        addressRu: parsed.data.addressRu || null,
-        addressRuAutoTranslated: parsed.data.addressRuAutoTranslated,
-        descriptionZh: parsed.data.descriptionZh || null,
-        descriptionRu: parsed.data.descriptionRu || null,
-        descriptionRuAutoTranslated: parsed.data.descriptionRuAutoTranslated,
-        latitude: parsed.data.latitude,
-        longitude: parsed.data.longitude,
-        cooperationLevel: parsed.data.cooperationLevel,
-        discoveredVia: parsed.data.discoveredVia,
-        website: parsed.data.website || null,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.supplier.update({
+        where: { id },
+        data: {
+          // 显式列出可改字段,刻意不包括 code 和 createdById
+          nameZh: parsed.data.nameZh,
+          nameRu: parsed.data.nameRu || null,
+          nameRuAutoTranslated: parsed.data.nameRuAutoTranslated,
+          shortNameZh: parsed.data.shortNameZh || null,
+          shortNameRu: parsed.data.shortNameRu || null,
+          shortNameRuAutoTranslated: parsed.data.shortNameRuAutoTranslated,
+          provinceZh: parsed.data.provinceZh,
+          provinceRu: parsed.data.provinceRu || null,
+          provinceRuAutoTranslated: parsed.data.provinceRuAutoTranslated,
+          cityZh: parsed.data.cityZh,
+          cityRu: parsed.data.cityRu || null,
+          cityRuAutoTranslated: parsed.data.cityRuAutoTranslated,
+          districtZh: parsed.data.districtZh || null,
+          districtRu: parsed.data.districtRu || null,
+          districtRuAutoTranslated: parsed.data.districtRuAutoTranslated,
+          addressZh: parsed.data.addressZh || null,
+          addressRu: parsed.data.addressRu || null,
+          addressRuAutoTranslated: parsed.data.addressRuAutoTranslated,
+          descriptionZh: parsed.data.descriptionZh || null,
+          descriptionRu: parsed.data.descriptionRu || null,
+          descriptionRuAutoTranslated: parsed.data.descriptionRuAutoTranslated,
+          mainProductsZh: parsed.data.mainProductsZh || null,
+          mainProductsRu: parsed.data.mainProductsRu || null,
+          mainProductsRuAutoTranslated: parsed.data.mainProductsRuAutoTranslated,
+          latitude: parsed.data.latitude,
+          longitude: parsed.data.longitude,
+          cooperationLevel: parsed.data.cooperationLevel,
+          discoveredVia: parsed.data.discoveredVia,
+          website: parsed.data.website || null,
+        },
+      });
+      // 重置 tag 关联:删除所有旧的,创建新的(同 quote 的模式)
+      await tx.supplierTag.deleteMany({ where: { supplierId: id } });
+      if (tagIds.length > 0) {
+        await tx.supplierTag.createMany({
+          data: tagIds.map((tagId) => ({ supplierId: id, tagId })),
+        });
+      }
     });
   } catch (err) {
     return {

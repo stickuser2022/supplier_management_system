@@ -27,7 +27,14 @@ export default async function SupplierDetailPage({
   const id = parseInt(idStr, 10);
   if (isNaN(id)) notFound();
 
-  const supplier = await prisma.supplier.findUnique({ where: { id } });
+  const supplier = await prisma.supplier.findUnique({
+    where: { id },
+    include: {
+      supplierTags: {
+        include: { tag: true },
+      },
+    },
+  });
   if (!supplier) notFound();
 
   // 并行查 4 类文件,代替原来的串行 4 次 await,首屏更快
@@ -56,7 +63,7 @@ export default async function SupplierDetailPage({
     prisma.file.findMany({
       where: { supplierId: id, type: 'SUPPLIER_VIDEO', isActive: true },
       select: {
-        id: true, fileName: true, thumbnailKey: true,
+        id: true, fileName: true, thumbnailKey: true, mimeType: true,
         titleZh: true, titleRu: true, sizeBytes: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -92,6 +99,24 @@ export default async function SupplierDetailPage({
             <p className="mt-1 font-mono text-sm text-muted-foreground">
               {supplier.code}
             </p>
+            {supplier.supplierTags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {supplier.supplierTags.map((st) => (
+                  <span
+                    key={st.tagId}
+                    className="inline-flex items-center gap-1.5 pl-2 pr-2.5 py-0.5 rounded-md border border-border bg-card text-xs"
+                  >
+                    <span
+                      className="size-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: st.tag.color ?? '#9ca3af' }}
+                    />
+                    <span className="text-foreground">
+                      {pickLocalized(st.tag.nameZh, st.tag.nameRu, locale)}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex-shrink-0">
@@ -172,6 +197,14 @@ export default async function SupplierDetailPage({
             </DetailField>
           )}
 
+          {supplier.mainProductsZh && (
+            <DetailField label={t('fields.mainProducts')}>
+              <span className="whitespace-pre-wrap">
+                {pickLocalized(supplier.mainProductsZh, supplier.mainProductsRu, locale)}
+              </span>
+            </DetailField>
+          )}
+
           <DetailField label={t('fields.createdAt')}>
             <span className="text-muted-foreground">
               {supplier.createdAt.toLocaleDateString(locale)}
@@ -203,7 +236,7 @@ export default async function SupplierDetailPage({
         <FileUploader
           ownerId={id}
           type="SUPPLIER_VIDEO"
-          accept="video/mp4,video/quicktime,video/webm,video/x-matroska"
+          accept="video/mp4,video/quicktime,video/webm,video/x-matroska,image/png,image/jpeg,image/webp,image/gif"
           maxBytes={200 * 1024 * 1024}
           label={tFiles('uploadVideos')}
           acceptHint={tFiles('videoAcceptHint')}

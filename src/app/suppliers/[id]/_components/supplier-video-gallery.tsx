@@ -1,13 +1,14 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Play, Video } from 'lucide-react';
+import { Play, Video, ImageIcon } from 'lucide-react';
 import { FileItemActions } from './file-item-actions';
 
 type VideoItem = {
   id: number;
   fileName: string;
   thumbnailKey: string | null;
+  mimeType: string;
   titleZh: string | null;
   titleRu: string | null;
   sizeBytes: number;
@@ -30,12 +31,13 @@ export function SupplierVideoGallery({
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">
       {items.map((item) => {
         const title = item.titleZh || item.fileName;
+        const isVideo = item.mimeType.startsWith('video/');
         return (
           <div
             key={item.id}
             className="border border-border rounded-md overflow-hidden bg-card flex flex-col"
           >
-            
+
             <a  href={`/api/files/${item.id}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -49,13 +51,17 @@ export function SupplierVideoGallery({
                   className="size-full object-cover"
                 />
               ) : (
-                <Video className="size-12 text-muted-foreground" />
+                isVideo
+                  ? <Video className="size-12 text-muted-foreground" />
+                  : <ImageIcon className="size-12 text-muted-foreground" />
               )}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-foreground/70 group-hover:bg-foreground/90 rounded-full size-12 flex items-center justify-center transition-colors">
-                  <Play className="size-5 text-background fill-background" />
+              {isVideo && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-foreground/70 group-hover:bg-foreground/90 rounded-full size-12 flex items-center justify-center transition-colors">
+                    <Play className="size-5 text-background fill-background" />
+                  </div>
                 </div>
-              </div>
+              )}
             </a>
             <div className="p-2.5 border-t border-border">
               <div className="text-sm font-medium text-foreground truncate" title={title}>

@@ -3,7 +3,7 @@
 import { useState, useActionState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Plus, Trash2, Sparkles, Lock, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Loader2 } from 'lucide-react';
 import {
   createTransaction,
   updateTransaction,
@@ -135,9 +135,7 @@ export function TransactionForm({
   );
   const [notesZh, setNotesZh] = useState(initialData?.notesZh || '');
   const [notesRu, setNotesRu] = useState(initialData?.notesRu || '');
-  const [notesRuAutoTranslated, setNotesRuAutoTranslated] = useState(
-    initialData?.notesRuAutoTranslated ?? true,
-  );
+  // 已去除"已手改"锁定机制,flag 默认 true 不再变化
   const [status, setStatus] = useState<(typeof TRANSACTION_STATUSES)[number]>(
     initialData?.status || 'IN_PROGRESS',
   );
@@ -162,7 +160,6 @@ export function TransactionForm({
     const res = await translateTransactionText(notesZh);
     if (res.ok) {
       setNotesRu(res.translated);
-      setNotesRuAutoTranslated(true);
     } else {
       alert(res.error);
     }
@@ -251,15 +248,7 @@ export function TransactionForm({
         <FormField
           label={
             <span className="inline-flex items-center justify-between w-full">
-              <span className="inline-flex items-center gap-1">
-                <span>{t('fields.notesRu')}</span>
-                {!notesRuAutoTranslated && notesRu && (
-                  <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
-                    <Lock className="size-3" />
-                    {t('lockedRu')}
-                  </span>
-                )}
-              </span>
+              <span>{t('fields.notesRu')}</span>
               <button
                 type="button"
                 onClick={handleTranslateNotes}
@@ -281,13 +270,10 @@ export function TransactionForm({
             id="notesRu"
             name="notesRu"
             value={notesRu}
-            onChange={(e) => {
-              setNotesRu(e.target.value);
-              setNotesRuAutoTranslated(false);
-            }}
+            onChange={(e) => setNotesRu(e.target.value)}
             rows={2}
           />
-          <input type="hidden" name="notesRuAutoTranslated" value={String(notesRuAutoTranslated)} />
+          <input type="hidden" name="notesRuAutoTranslated" value="true" />
         </FormField>
       </FormSection>
 

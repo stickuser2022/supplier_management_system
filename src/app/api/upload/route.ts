@@ -55,7 +55,7 @@ const TYPE_RULES: Record<FileType, { maxBytes: number; allowedMime: RegExp }> = 
   SUPPLIER_LOGO:      { maxBytes:   5 * 1024 * 1024, allowedMime: /^image\/(png|jpeg|webp|gif)$/ },
   SUPPLIER_BROCHURE:  { maxBytes:  30 * 1024 * 1024, allowedMime: /^(image\/(png|jpeg|webp|gif)|application\/pdf)$/ },
   SUPPLIER_DOC:       { maxBytes:  30 * 1024 * 1024, allowedMime: /^(image\/(png|jpeg|webp|gif)|application\/(pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet))$/ },
-  SUPPLIER_VIDEO:     { maxBytes: 200 * 1024 * 1024, allowedMime: /^video\// },
+  SUPPLIER_VIDEO:     { maxBytes: 200 * 1024 * 1024, allowedMime: /^(video\/|image\/(png|jpeg|webp|gif))/ },
   QUOTE_IMAGE:        { maxBytes:  10 * 1024 * 1024, allowedMime: /^image\// },
   PAYMENT_SCREENSHOT: { maxBytes:   5 * 1024 * 1024, allowedMime: /^image\// },
   NOTE_ATTACHMENT:    { maxBytes:  30 * 1024 * 1024, allowedMime: /./ },

@@ -13,27 +13,110 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { SupplierActionsCell } from './_components/SupplierActionsCell';
+import { SupplierSearchAndFilter } from './_components/SupplierSearchAndFilter';
 import { CooperationLevelBadge } from '@/components/suppliers/cooperation-level-badge';
+import { COOPERATION_LEVELS } from './_validations/supplier-schema';
 import { cn } from '@/lib/utils';
+import type { Prisma } from '@/generated/prisma/client';
 
 export default async function SuppliersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ archived?: string }>;
+  searchParams: Promise<{
+    archived?: string;
+    q?: string;
+    tags?: string;
+    level?: string;
+  }>;
 }) {
   const params = await searchParams;
   const showArchived = params.archived === '1';
+  const q = (params.q ?? '').trim();
+  const tagIds = (params.tags ?? '')
+    .split(',')
+    .map((s) => parseInt(s, 10))
+    .filter((n) => !isNaN(n) && n > 0);
+  const levelParam =
+    params.level && (COOPERATION_LEVELS as readonly string[]).includes(params.level)
+      ? (params.level as (typeof COOPERATION_LEVELS)[number])
+      : null;
 
   const t = await getTranslations('suppliers');
   const locale = await getLocale();
 
-  const [suppliers, currentUser] = await Promise.all([
+  // 组合 where 条件
+  const whereAnd: Prisma.SupplierWhereInput[] = [];
+  if (q) {
+    whereAnd.push({
+      OR: [
+        { code: { contains: q } },
+        { nameZh: { contains: q } },
+        { nameRu: { contains: q } },
+        { shortNameZh: { contains: q } },
+        { shortNameRu: { contains: q } },
+        { provinceZh: { contains: q } },
+        { provinceRu: { contains: q } },
+        { cityZh: { contains: q } },
+        { cityRu: { contains: q } },
+        { districtZh: { contains: q } },
+        { districtRu: { contains: q } },
+        { addressZh: { contains: q } },
+        { addressRu: { contains: q } },
+        { mainProductsZh: { contains: q } },
+        { mainProductsRu: { contains: q } },
+        { descriptionZh: { contains: q } },
+        { descriptionRu: { contains: q } },
+        { discoveredVia: { contains: q } },
+        // 通过 Quote 关联查产品名
+        { quotes: { some: { productNameZh: { contains: q } } } },
+        { quotes: { some: { productNameRu: { contains: q } } } },
+      ],
+    });
+  }
+  // 标签 AND 语义:每个 tag 都必须命中。命中定义 = 供应商自己挂了 OR 旗下有 Quote 挂了
+  for (const tagId of tagIds) {
+    whereAnd.push({
+      OR: [
+        { supplierTags: { some: { tagId } } },
+        { quotes: { some: { quoteTags: { some: { tagId } } } } },
+      ],
+    });
+  }
+  if (levelParam) {
+    whereAnd.push({ cooperationLevel: levelParam });
+  }
+
+  const where: Prisma.SupplierWhereInput = {
+    isActive: !showArchived,
+    ...(whereAnd.length > 0 ? { AND: whereAnd } : {}),
+  };
+
+  const [suppliers, currentUser, allTags] = await Promise.all([
     prisma.supplier.findMany({
-      where: { isActive: !showArchived },
+      where,
       orderBy: { createdAt: 'desc' },
     }),
     requireCurrentUser(),
+    prisma.tag.findMany({
+      where: { isActive: true },
+      orderBy: [{ category: 'asc' }, { nameZh: 'asc' }],
+      select: { id: true, category: true, nameZh: true, nameRu: true, color: true },
+    }),
   ]);
+
+  // 一次性查 logo,按 supplierId 索引(避免 N+1)
+  const logoFiles = await prisma.file.findMany({
+    where: {
+      supplierId: { in: suppliers.map((s) => s.id) },
+      type: 'SUPPLIER_LOGO',
+      isActive: true,
+    },
+    select: { id: true, supplierId: true },
+  });
+  const logoMap = new Map<number, number>();
+  for (const f of logoFiles) {
+    if (f.supplierId) logoMap.set(f.supplierId, f.id);
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -51,6 +134,15 @@ export default async function SuppliersPage({
           </Button>
         )}
       </div>
+
+      {/* 搜索 + 筛选 */}
+      <SupplierSearchAndFilter
+        initialQ={q}
+        initialTagIds={tagIds}
+        initialLevel={levelParam}
+        allTags={allTags}
+        locale={locale}
+      />
 
       {/* Tab 切换 */}
       <div className="border-b border-border mb-6">
@@ -78,6 +170,15 @@ export default async function SuppliersPage({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {suppliers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                  {q || tagIds.length > 0 || levelParam
+                    ? t('search.noResults')
+                    : t('emptyList')}
+                </TableCell>
+              </TableRow>
+            )}
             {suppliers.map((s) => (
               <TableRow key={s.id}>
                 <TableCell className="font-mono text-xs text-muted-foreground">
@@ -86,8 +187,20 @@ export default async function SuppliersPage({
                 <TableCell>
                   <Link
                     href={`/suppliers/${s.id}`}
-                    className="font-medium text-foreground hover:text-primary hover:underline"
+                    className="inline-flex items-center gap-2 font-medium text-foreground hover:text-primary hover:underline"
                   >
+                    {logoMap.has(s.id) ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={`/api/files/${logoMap.get(s.id)}?thumb=1`}
+                        alt=""
+                        className="size-7 rounded object-cover border border-border flex-shrink-0"
+                      />
+                    ) : (
+                      <span className="size-7 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">
+                        {(s.nameZh ?? '?').slice(0, 1)}
+                      </span>
+                    )}
                     {pickLocalized(s.nameZh, s.nameRu, locale)}
                   </Link>
                 </TableCell>

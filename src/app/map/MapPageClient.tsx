@@ -1,6 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { SupplierSearchAndFilter } from '../suppliers/_components/SupplierSearchAndFilter';
+import type { COOPERATION_LEVELS } from '../suppliers/_validations/supplier-schema';
 
 type Supplier = {
   id: number;
@@ -10,13 +12,42 @@ type Supplier = {
   cityRu: string | null;
   provinceZh: string;
   provinceRu: string | null;
+  addressZh: string | null;
+  addressRu: string | null;
+  mainProductsZh: string | null;
+  mainProductsRu: string | null;
   latitude: number;
   longitude: number;
   cooperationLevel: string;
+  supplierTags: {
+    tagId: number;
+    tag: { id: number; nameZh: string; nameRu: string; color: string | null };
+  }[];
+  logoFileId: number | null;
+  primaryContact: {
+    nameZh: string;
+    nameRu: string | null;
+    phone: string | null;
+    wechat: string | null;
+    email: string | null;
+    whatsapp: string | null;
+    telegram: string | null;
+    qq: string | null;
+  } | null;
+  _count: {
+    quotes: number;
+    transactions: number;
+    contacts: number;
+  };
 };
-//type Supplier = { ... } —— 给"供应商对象"起个类型名。告诉 TypeScript "这种对象有这些字段,每个字段是什么类型"。
-//必须与 MapView 里的 Supplier 同形状(包含 nameRu/cityRu/provinceRu 三个可空字段),
-//否则 MapView 接 props 时会因 Supplier shape 不匹配报 TS2769。两处类型口径要统一。
+
+type TagOption = {
+  id: number;
+  category: 'PRODUCT' | 'EXPORT' | 'CERT' | 'CAPACITY' | 'CUSTOM';
+  nameZh: string;
+  nameRu: string;
+  color: string | null;
+};
 
 const MapView = dynamic(() => import('./MapView'), {
   ssr: false,
@@ -27,7 +58,38 @@ const MapView = dynamic(() => import('./MapView'), {
   ),
 });
 
-export default function MapPageClient({ suppliers }: { suppliers: Supplier[] }) {
-  return <MapView suppliers={suppliers} />;
+export default function MapPageClient({
+  suppliers,
+  allTags,
+  locale,
+  initialQ,
+  initialTagIds,
+  initialLevel,
+}: {
+  suppliers: Supplier[];
+  allTags: TagOption[];
+  locale: string;
+  initialQ: string;
+  initialTagIds: number[];
+  initialLevel: (typeof COOPERATION_LEVELS)[number] | null;
+}) {
+  return (
+    <div className="flex flex-col h-screen">
+      {/* 搜索 + 筛选条 */}
+      <div className="px-4 py-3 border-b border-border bg-card flex-shrink-0">
+        <SupplierSearchAndFilter
+          initialQ={initialQ}
+          initialTagIds={initialTagIds}
+          initialLevel={initialLevel}
+          allTags={allTags}
+          locale={locale}
+        />
+      </div>
+
+      {/* 地图占满剩余高度 */}
+      <div className="flex-1 min-h-0">
+        <MapView suppliers={suppliers} />
+      </div>
+    </div>
+  );
 }
-//{ suppliers }: { suppliers: Supplier[] } —— 这一行同时做了两件事:解构出 suppliers 变量 + 标注它是 Supplier 数组。冒号左边是 JS 解构语法,右边是 TS 类型。

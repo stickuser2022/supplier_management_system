@@ -15,8 +15,6 @@ export type TagFormState = {
   message?: string;
 };
 
-const INITIAL_STATE: TagFormState = { status: 'idle' };
-
 // ===== 创建 =====
 // EDITOR 和 ADMIN 都能创建标签(标签是项目级共享资源)
 export async function createTag(
@@ -164,4 +162,3 @@ export async function translateTagName(
   }
 }
 
-export { INITIAL_STATE as INITIAL_TAG_FORM_STATE };

@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useTranslations } from 'next-intl';
-import { Lock, Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import {
   createContact,
   updateContact,
@@ -113,17 +113,14 @@ export function ContactForm({
 
   const handleZhChange = (key: keyof BilingualState, value: string) =>
     setBi((s) => ({ ...s, [key]: value }));
-  const handleRuChange = (ruKey: keyof BilingualState, flagKey: keyof BilingualState, value: string) =>
-    setBi((s) => ({ ...s, [ruKey]: value, [flagKey]: false }));
+  // 已去除"已手改"机制:用户改俄文不再翻 flag,因此重翻会覆盖现有俄文(用户预期)
+  const handleRuChange = (ruKey: keyof BilingualState, _flagKey: keyof BilingualState, value: string) =>
+    setBi((s) => ({ ...s, [ruKey]: value }));
 
   const handleTranslate = () => {
     setTranslateError(null);
     const requests = FIELD_PAIRS
-      .filter((p) => {
-        const zhValue = (bi[p.zhFieldName] as string).trim();
-        const isLocked = !(bi[p.flagFieldName] as boolean);
-        return zhValue.length > 0 && !isLocked;
-      })
+      .filter((p) => (bi[p.zhFieldName] as string).trim().length > 0)
       .map((p) => ({ field: p.key, text: bi[p.zhFieldName] as string }));
 
     if (requests.length === 0) {
@@ -195,7 +192,6 @@ export function ContactForm({
           const zhValue = bi[pair.zhFieldName] as string;
           const ruValue = bi[pair.ruFieldName] as string;
           const flagValue = bi[pair.flagFieldName] as boolean;
-          const isLocked = !flagValue;
           const zhFieldId = `${pair.key}-zh`;
           const ruFieldId = `${pair.key}-ru`;
 
@@ -216,17 +212,7 @@ export function ContactForm({
                 />
               </FormField>
               <FormField
-                label={
-                  <>
-                    <span>{pair.ruLabel}</span>
-                    {isLocked && (
-                      <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
-                        <Lock className="size-3" />
-                        {tCommon('manualEditLocked')}
-                      </span>
-                    )}
-                  </>
-                }
+                label={pair.ruLabel}
                 htmlFor={ruFieldId}
               >
                 <Input

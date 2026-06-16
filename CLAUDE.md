@@ -1308,3 +1308,122 @@ RU    俄文
 ### 下一轮对话开始时的入口
 
 直接说:**「家人开始用了」** / **「升级备份」** / **「重启验证」** / 或具体业务功能
+
+---
+
+## 2026.6.16 项目进度日志(列表/地图功能完整化 + 业务字段补全)
+
+### 当前阶段:把"工具勉强能用"打磨成"工具好用"
+
+家人开始用之前,系统其实只有"创建-查看-编辑"基础 CRUD,没有真正的"找东西"能力。一旦录入 50+ 家供应商,光靠肉眼翻列表是不行的。这一轮重点是**搜索 + 筛选 + 视觉信号**,以及补齐几个被遗忘的业务字段。
+
+### 关键架构决策
+
+#### 搜索的实现策略:URL 即状态,服务端过滤
+
+- **URL query params 是单一状态源**(`?q=玩具&tags=1,5&level=STRATEGIC`),不在 React state 里复制一份。优点:浏览器后退 / 收藏 / 分享 URL 全自动好使,刷新页面状态不丢,可以从 `/suppliers?q=玩具` 直接改成 `/map?q=玩具` 跳到地图看同一筛选结果
+- **服务端组件读 searchParams 构建 Prisma where**,客户端搜索框只做"防抖 + URL 更新",不做任何过滤逻辑。这套架构让"列表页"和"地图页"完全可以复用同一个 `SupplierSearchAndFilter` 客户端组件 + 同一套 where 逻辑(只是 select 字段不同)
+- **关键词搜索跨 ~20 个字段**(含 Quote.productNameZh/Ru),这是"找做玩具熊的工厂"场景的核心 —— **不只搜 Supplier 自身字段,还搜 Quote 关联的产品名**。子查询 `quotes: { some: { productNameZh: { contains: q } } }` 让一条 SQL 完成跨表 OR
+- **标签筛选支持双源命中**:供应商自己挂了 OR 旗下任何报价挂了,都算命中。`{ OR: [{ supplierTags: { some: { tagId } } }, { quotes: { some: { quoteTags: { some: { tagId } } } } }] }`。理由:用户语义是"找做玩具的工厂",报价挂了玩具标签同样说明这家做玩具
+- **多标签 AND 而非 OR**:勾"玩具" + "EAC"想要的是同时有这俩特征的工厂,不是其中一个有就行。每个 tagId 一条 AND 子句,而不是放进一个 OR
+
+#### 俄语搜索的天然边界(已知问题,不修)
+
+子串 LIKE 搜索遇到斯拉夫语言的"格变化"会显得不直观:
+- `игрушки`(主格)只命中主格写法的字段
+- `игрушек`(属格)只命中属格写法
+- 但 `игруш` 命中所有以 игруш 开头的形态(因为是前缀子串)
+
+**实用解法是用户教学**:placeholder 直接写"使用词根,比如 игруш 而不是 игрушки"。技术解法(俄语 stemming)代价太大,投资回报率低。中文无此问题,因为中文没有形态变化。
+
+#### 地图智能缩放:flyTo / flyToBounds
+
+- **dotSize 4 档随 zoom 切换**(10/14/18/24 px),拉近自动放大,拉远自动收缩。click target 跟着大,小屏不再难点
+- **筛选后自动适配镜头**:1 个结果 `flyTo` + zoom 12;多个结果 `flyToBounds` + maxZoom 11 + 60px padding;0 结果或没筛选时**不动镜头**(避免用户没操作时被强制 reset)
+- **依赖 `idsKey` 而非 `suppliers` 数组**做 effect 依赖比对,避免引用变化导致不必要的重新定位
+
+#### 移除"已手改"翻译锁(产品决策)
+
+之前的设计:Admin 手改俄文 → flag 翻 false(锁定)→ 下次翻译跳过这个字段。意图是"保护人工修正不被 AI 覆盖"。**实际使用中反而麻烦** —— 用户改完后想重翻全部,得先逐个清锁。一致性体验高于保护性。
+
+**最终行为**:每次点翻译按钮都翻译所有非空中文字段,覆盖现有俄文。schema 的 `xxxRuAutoTranslated` 字段保留(future-proof,以后想恢复机制不用迁移)但 UI 永远写 true,业务层不再读。
+
+#### 'use server' 文件的导出规则(踩坑)
+
+`tag-actions.ts` 里 export 了一个非函数常量 `INITIAL_STATE`(对象类型),`npm run dev` 容忍,`npm run build` 直接拒绝并整个文件不可用,所有引用这个文件的 action 都会运行时崩溃(包括无关的 createTag、updateTag)。
+
+**规则**:`'use server'` 文件**只允许 export async function**。类型 export 可以(TS 擦除)。常量、类、普通函数都不能 export。
+
+#### 地图的客户端 level state 改成 URL state
+
+旧版地图右上图例点击维护 `selectedLevel` 客户端 state。**新版改成读 URL `?level=` 参数,点击图例 chip 用 `router.replace` 改 URL**。好处:跟列表页 / 搜索栏的 level 下拉**共享同一个状态源**,三处永远一致,不会出现"列表筛了 STRATEGIC,地图却显示全部"这种割裂。
+
+### 已完成
+
+#### 业务字段补全
+- ✅ Supplier 加 `mainProductsZh / mainProductsRu / mainProductsRuAutoTranslated` 三件套字段(prisma migration `add_main_products_field`)
+- ✅ 详情页"其他信息"区显示主营产品
+- ✅ 地图弹窗显示主营产品
+- ✅ SupplierForm 第 8 个双语对(multiline)
+- ✅ Supplier 加 `TagMultiSelect`(覆盖所有 5 个 category:产品/出口/认证/生产/自定义),create/update server action 处理 tagIds 重置(先删后建事务)
+- ✅ 供应商详情页头部显示 tag chips
+- ✅ 地图弹窗显示 tag chips
+- ✅ 列表行加 logo 缩略图(无 logo 显示首字母占位)
+- ✅ 地图弹窗信息增强:logo / 主营产品 / 联系人/报价/订单计数 / 主联系人姓名 + 全部联系方式 / tag chips
+
+#### 视频→视频/图片
+- ✅ `SUPPLIER_VIDEO` 类型的 allowedMime 从 `^video\/` 扩展到 `^(video\/|image\/(png|jpeg|webp|gif))`
+- ✅ SupplierVideoGallery 按 mimeType 区分:视频盖播放按钮,图片纯展示
+- ✅ i18n 文案"视频" → "视频与图片"
+
+#### 搜索 + 筛选(/suppliers + /map 双页面)
+- ✅ `SupplierSearchAndFilter` 客户端组件:防抖 500ms 搜索 / 标签多选 chips / 合作深度下拉 / 一键清空
+- ✅ `usePathname()` 让组件路径无关,两页面共用
+- ✅ 服务端 Prisma where 跨字段 OR 搜索 + tag AND 筛选 + level 单选
+- ✅ 0 命中提示
+- ✅ 俄文 placeholder 提示用词根
+- ✅ URL 状态完整(后退/收藏/分享均工作)
+
+#### 地图智能化
+- ✅ marker 大小 4 档随 zoom 切换(10/14/18/24 px)
+- ✅ 单点结果 → `map.flyTo(...)` 0.8s 动画 + zoom 12
+- ✅ 多点结果 → `map.flyToBounds(...)` 0.8s 动画 + maxZoom 11 + 60px padding
+- ✅ 无筛选 / 0 结果 → 镜头不动
+- ✅ 图例 chip 点击同步 URL(三处状态源统一)
+- ✅ 图例 chip 顺手加 hover 高亮
+
+#### 标签管理页(已在前一轮 /tags 完成,这轮顺手做了)
+- ✅ 移除"系统预置标签不可改"约束(权限走 ownership 通用规则)
+- ✅ 修了 `tag-actions.ts` 的 `'use server'` 不允许导出对象的崩溃 bug
+
+#### "已手改"清退
+- ✅ 5 个 form(Contact / Note / Quote / Supplier / Transaction)全部去掉 `Lock + 已手改` badge UI
+- ✅ `handleRuChange` 不再翻 flag,`handleTranslate` 不再 filter 已锁字段
+- ✅ Hint 文案改为"每次翻译都会覆盖现有俄文"
+- ✅ schema 保留 `xxxRuAutoTranslated` 字段(向后兼容,UI 永远写 true)
+
+#### 项目导览 HTML
+- ✅ 新建 `项目导览.html` 单文件教学文档:8 章节,SVG 图,折叠面板,锚点导航
+- ✅ 覆盖:心智模型 / 文件夹地图 / 数据模型 / 抽象层 / 请求生命周期 / 关键代码片段 / 部署架构 / 开发循环
+
+#### 清理
+- ✅ 删了 4 个过期一次性脚本(`migrate-role-viewer-to-editor` / `test-constraints` / `verify-prisma` / `backfill-translations`)
+- ✅ 修正 `.env example` → `.env.example`(原本有空格,Next.js 不会加载)
+
+### 现状:工具到达"日常顺手用"阶段
+
+- **核心 workflow 全覆盖**:创建 / 编辑 / 搜索 / 筛选 / 地图浏览 / 标签管理 / 上传文件 / 翻译 / 多用户权限 / 备份
+- **跨语言体验对等**:中俄双语切换无缝,所有 form / 详情 / 弹窗 / 提示都对应
+- **服务自启动 + 自动恢复**:NSSM + cloudflared 守着,你关电脑不影响家人
+- **搜索从 0 到 1**:能按产品 / 标签 / 地区 / 合作深度找供应商,而不是凭记忆翻列表
+
+### 待办
+
+1. **(选做)列表页视觉丰富化**:用户提过"现在表格有点乏味",讨论过 3 个方向(A 加标签列 / B 重排单元格 / C 双视图切换),暂未实施。等真感觉用着烦时再加
+2. **CLAUDE.md 篇幅控制**:本文档已经 1100+ 行,继续往下涨。下一轮考虑把"已完成"老历史归档到 `CLAUDE.archive.md`,主文档只保留"决策 / 现状 / 待办"
+3. **真让家人开始用**(继承上一轮):没真实测过中俄跨境登录体验、改密码流程,需要发 URL 让家人试一次
+4. **重启电脑验证自启动**(继承上一轮)
+
+### 下一轮对话开始时的入口
+
+直接说:**「列表丰富化」** / **「家人开始用了」** / **「重启验证」** / 或具体业务功能

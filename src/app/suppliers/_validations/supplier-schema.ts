@@ -37,11 +37,12 @@ export const supplierCreateSchema = z.object({
   districtZh: z.string().trim().optional(),
   addressZh: z.string().trim().optional(),
   descriptionZh: z.string().trim().optional(),
+  mainProductsZh: z.string().trim().optional(),
   website: z
     .union([z.url("网址格式不正确(需带 http:// 或 https://)"), z.literal("")])
     .optional(),
 
-  // === 选填俄文字段(7 个,可空,可由 AI 填或人工填)===
+  // === 选填俄文字段(8 个,可空,可由 AI 填或人工填)===
   nameRu: z.string().trim().optional(),
   shortNameRu: z.string().trim().optional(),
   provinceRu: z.string().trim().optional(),
@@ -49,8 +50,9 @@ export const supplierCreateSchema = z.object({
   districtRu: z.string().trim().optional(),
   addressRu: z.string().trim().optional(),
   descriptionRu: z.string().trim().optional(),
+  mainProductsRu: z.string().trim().optional(),
 
-  // === 翻译标记(7 个,boolean,从 hidden input 字符串转过来)===
+  // === 翻译标记(8 个,boolean,从 hidden input 字符串转过来)===
   nameRuAutoTranslated: stringToBool,
   shortNameRuAutoTranslated: stringToBool,
   provinceRuAutoTranslated: stringToBool,
@@ -58,6 +60,7 @@ export const supplierCreateSchema = z.object({
   districtRuAutoTranslated: stringToBool,
   addressRuAutoTranslated: stringToBool,
   descriptionRuAutoTranslated: stringToBool,
+  mainProductsRuAutoTranslated: stringToBool,
 
   // === 枚举(带默认值)===
   cooperationLevel: z.enum(COOPERATION_LEVELS).default("INITIAL_CONTACT"),

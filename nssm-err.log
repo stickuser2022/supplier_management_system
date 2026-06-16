@@ -1,0 +1,9 @@
+⨯ Error: A "use server" file can only export async functions, found object.
+Read more: https://nextjs.org/docs/messages/invalid-use-server-value
+    at d (D:\supplier_management_system\.next\server\chunks\ssr\[root-of-the-server]__0ub-w_w._.js:1:11562)
+    at module evaluation (D:\supplier_management_system\.next\server\chunks\ssr\[root-of-the-server]__0o-9i42._.js:1:2762)
+    at instantiateModule (D:\supplier_management_system\.next\server\chunks\ssr\[turbopack]_runtime.js:853:9)
+    at getOrInstantiateModuleFromParent (D:\supplier_management_system\.next\server\chunks\ssr\[turbopack]_runtime.js:877:12)
+    at Context.commonJsRequire [as r] (D:\supplier_management_system\.next\server\chunks\ssr\[turbopack]_runtime.js:302:12) {
+  digest: '50783252@E352'
+}

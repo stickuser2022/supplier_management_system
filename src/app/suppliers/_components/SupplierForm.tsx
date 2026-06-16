@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useTranslations } from 'next-intl';
-import { Lock, Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import {
   createSupplier,
   updateSupplier,
@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FormSection } from '@/components/forms/form-section';
 import { FormField } from '@/components/forms/form-field';
 import { FormActions } from '@/components/forms/form-actions';
+import { TagMultiSelect } from '../[id]/quotes/_components/TagMultiSelect';
 import { cn } from '@/lib/utils';
 
 // ===== 类型与常量(未变动)=====
@@ -48,6 +49,9 @@ export type SupplierFormInitialData = {
   descriptionZh: string | null;
   descriptionRu: string | null;
   descriptionRuAutoTranslated: boolean;
+  mainProductsZh: string | null;
+  mainProductsRu: string | null;
+  mainProductsRuAutoTranslated: boolean;
   latitude: number;
   longitude: number;
   cooperationLevel: typeof COOPERATION_LEVELS[number];
@@ -63,6 +67,7 @@ type BilingualState = {
   districtZh: string; districtRu: string; districtRuAutoTranslated: boolean;
   addressZh: string; addressRu: string; addressRuAutoTranslated: boolean;
   descriptionZh: string; descriptionRu: string; descriptionRuAutoTranslated: boolean;
+  mainProductsZh: string; mainProductsRu: string; mainProductsRuAutoTranslated: boolean;
 };
 
 const EMPTY_BILINGUAL: BilingualState = {
@@ -73,6 +78,7 @@ const EMPTY_BILINGUAL: BilingualState = {
   districtZh: '', districtRu: '', districtRuAutoTranslated: true,
   addressZh: '', addressRu: '', addressRuAutoTranslated: true,
   descriptionZh: '', descriptionRu: '', descriptionRuAutoTranslated: true,
+  mainProductsZh: '', mainProductsRu: '', mainProductsRuAutoTranslated: true,
 };
 
 function buildBilingualFromInitial(d?: SupplierFormInitialData): BilingualState {
@@ -99,6 +105,9 @@ function buildBilingualFromInitial(d?: SupplierFormInitialData): BilingualState 
     descriptionZh: d.descriptionZh ?? '',
     descriptionRu: d.descriptionRu ?? '',
     descriptionRuAutoTranslated: d.descriptionRuAutoTranslated,
+    mainProductsZh: d.mainProductsZh ?? '',
+    mainProductsRu: d.mainProductsRu ?? '',
+    mainProductsRuAutoTranslated: d.mainProductsRuAutoTranslated,
   };
 }
 
@@ -132,19 +141,17 @@ function SubmitButton({ isEdit }: { isEdit: boolean }) {
 }
 
 function BilingualFieldRow({
-  pair, bi, errors, onZhChange, onRuChange, manualEditLockedLabel,
+  pair, bi, errors, onZhChange, onRuChange,
 }: {
   pair: FieldPair;
   bi: BilingualState;
   errors?: Record<string, string[] | undefined>;
   onZhChange: (key: keyof BilingualState, value: string) => void;
   onRuChange: (ruKey: keyof BilingualState, flagKey: keyof BilingualState, value: string) => void;
-  manualEditLockedLabel: string;
 }) {
   const zhValue = bi[pair.zhFieldName] as string;
   const ruValue = bi[pair.ruFieldName] as string;
   const flagValue = bi[pair.flagFieldName] as boolean;
-  const isLocked = !flagValue;
   const zhFieldId = `${pair.key}-zh`;
   const ruFieldId = `${pair.key}-ru`;
 
@@ -177,20 +184,7 @@ function BilingualFieldRow({
         )}
       </FormField>
 
-      <FormField
-        label={
-          <>
-            <span>{pair.ruLabel}</span>
-            {isLocked && (
-              <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
-                <Lock className="size-3" />
-                {manualEditLockedLabel}
-              </span>
-            )}
-          </>
-        }
-        htmlFor={ruFieldId}
-      >
+      <FormField label={pair.ruLabel} htmlFor={ruFieldId}>
         {pair.multiline ? (
           <Textarea
             id={ruFieldId}
@@ -216,7 +210,17 @@ function BilingualFieldRow({
 
 // ===== 主组件 =====
 
-export function SupplierForm({ initialData }: { initialData?: SupplierFormInitialData }) {
+export function SupplierForm({
+  initialData,
+  availableTags = [],
+  initialTagIds = [],
+  locale = 'zh',
+}: {
+  initialData?: SupplierFormInitialData;
+  availableTags?: { id: number; nameZh: string; nameRu: string }[];
+  initialTagIds?: number[];
+  locale?: string;
+}) {
   const isEdit = Boolean(initialData);
   const action = isEdit
     ? updateSupplier.bind(null, initialData!.id)
@@ -240,13 +244,15 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
     { key: 'district', zhFieldName: 'districtZh', ruFieldName: 'districtRu', flagFieldName: 'districtRuAutoTranslated', zhLabel: t('labelDistrictZh'), ruLabel: t('labelDistrictRu') },
     { key: 'address', zhFieldName: 'addressZh', ruFieldName: 'addressRu', flagFieldName: 'addressRuAutoTranslated', zhLabel: t('labelAddressZh'), ruLabel: t('labelAddressRu') },
     { key: 'description', zhFieldName: 'descriptionZh', ruFieldName: 'descriptionRu', flagFieldName: 'descriptionRuAutoTranslated', zhLabel: t('labelDescriptionZh'), ruLabel: t('labelDescriptionRu'), multiline: true },
+    { key: 'mainProducts', zhFieldName: 'mainProductsZh', ruFieldName: 'mainProductsRu', flagFieldName: 'mainProductsRuAutoTranslated', zhLabel: t('labelMainProductsZh'), ruLabel: t('labelMainProductsRu'), multiline: true },
   ];
 
   const handleZhChange = (key: keyof BilingualState, value: string) => {
     setBi((s) => ({ ...s, [key]: value }));
   };
-  const handleRuChange = (ruKey: keyof BilingualState, flagKey: keyof BilingualState, value: string) => {
-    setBi((s) => ({ ...s, [ruKey]: value, [flagKey]: false }));
+  // 已去除"已手改"机制:用户改俄文不再翻 flag,重翻会覆盖
+  const handleRuChange = (ruKey: keyof BilingualState, _flagKey: keyof BilingualState, value: string) => {
+    setBi((s) => ({ ...s, [ruKey]: value }));
   };
 
   const handleTranslate = () => {
@@ -254,7 +260,7 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
     const requests = FIELD_PAIRS
       .filter((p) => {
         const zhValue = (bi[p.zhFieldName] as string).trim();
-        const isLocked = !(bi[p.flagFieldName] as boolean);
+        const isLocked = false;
         return zhValue.length > 0 && !isLocked;
       })
       .map((p) => ({ field: p.key, text: bi[p.zhFieldName] as string }));
@@ -332,7 +338,6 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
             errors={errors}
             onZhChange={handleZhChange}
             onRuChange={handleRuChange}
-            manualEditLockedLabel={tCommon('manualEditLocked')}
           />
         ))}
       </FormSection>
@@ -421,6 +426,14 @@ export function SupplierForm({ initialData }: { initialData?: SupplierFormInitia
             defaultValue={initialData?.website ?? ''}
           />
         </FormField>
+      </FormSection>
+
+      <FormSection title={t('sectionTags')} description={t('tagsHint')}>
+        <TagMultiSelect
+          availableTags={availableTags}
+          initialSelectedIds={initialTagIds}
+          locale={locale}
+        />
       </FormSection>
 
       <FormActions>

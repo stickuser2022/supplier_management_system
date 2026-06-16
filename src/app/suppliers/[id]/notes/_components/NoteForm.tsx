@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useTranslations } from 'next-intl';
-import { Lock, Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import {
   createNote,
   updateNote,
@@ -62,9 +62,6 @@ export function NoteForm({
 
   const [contentZh, setContentZh] = useState(initialData?.contentZh ?? '');
   const [contentRu, setContentRu] = useState(initialData?.contentRu ?? '');
-  const [autoTranslated, setAutoTranslated] = useState(
-    initialData?.contentRuAutoTranslated ?? true,
-  );
   const [isTranslating, startTranslating] = useTransition();
   const [translateError, setTranslateError] = useState<string | null>(null);
   const errors = state.errors;
@@ -72,19 +69,15 @@ export function NoteForm({
   const t = useTranslations('forms.note');
   const tCommon = useTranslations('forms.common');
 
+  // 已去除"已手改"机制:用户改俄文不再锁定,重翻会覆盖
   const handleContentRuChange = (value: string) => {
     setContentRu(value);
-    setAutoTranslated(false);
   };
 
   const handleTranslate = () => {
     setTranslateError(null);
     if (contentZh.trim().length === 0) {
       setTranslateError(t('errContentEmpty'));
-      return;
-    }
-    if (!autoTranslated) {
-      setTranslateError(t('errRuLocked'));
       return;
     }
     startTranslating(async () => {
@@ -94,7 +87,6 @@ export function NoteForm({
         return;
       }
       setContentRu(res.results[0].translated);
-      setAutoTranslated(true);
     });
   };
 
@@ -143,20 +135,7 @@ export function NoteForm({
               placeholder={t('contentZhPlaceholder')}
             />
           </FormField>
-          <FormField
-            label={
-              <>
-                <span>{t('labelContentRu')}</span>
-                {!autoTranslated && (
-                  <span className="inline-flex items-center gap-1 text-xs text-warning-fg ml-1">
-                    <Lock className="size-3" />
-                    {tCommon('manualEditLocked')}
-                  </span>
-                )}
-              </>
-            }
-            htmlFor="content-ru"
-          >
+          <FormField label={t('labelContentRu')} htmlFor="content-ru">
             <Textarea
               id="content-ru"
               name="contentRu"
@@ -164,7 +143,7 @@ export function NoteForm({
               onChange={(e) => handleContentRuChange(e.target.value)}
               rows={6}
             />
-            <input type="hidden" name="contentRuAutoTranslated" value={autoTranslated ? 'true' : 'false'} />
+            <input type="hidden" name="contentRuAutoTranslated" value="true" />
           </FormField>
         </div>
       </FormSection>
