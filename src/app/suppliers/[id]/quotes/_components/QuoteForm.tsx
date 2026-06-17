@@ -127,18 +127,20 @@ export function QuoteForm({
   const handleRuChange = (ruKey: keyof BilingualState, _flagKey: keyof BilingualState, value: string) =>
     setBi((s) => ({ ...s, [ruKey]: value }));
 
-  const handleTranslate = () => {
+  const runTranslate = (direction: 'zh-to-ru' | 'ru-to-zh') => {
     setTranslateError(null);
+    const srcField = direction === 'zh-to-ru' ? 'zhFieldName' : 'ruFieldName';
+    const dstField = direction === 'zh-to-ru' ? 'ruFieldName' : 'zhFieldName';
     const requests = FIELD_PAIRS
-      .filter((p) => (bi[p.zhFieldName] as string).trim().length > 0)
-      .map((p) => ({ field: p.key, text: bi[p.zhFieldName] as string }));
+      .filter((p) => (bi[p[srcField]] as string).trim().length > 0)
+      .map((p) => ({ field: p.key, text: bi[p[srcField]] as string }));
 
     if (requests.length === 0) {
-      setTranslateError(t('noTranslateTargets'));
+      setTranslateError(direction === 'zh-to-ru' ? tCommon('noZhContent') : tCommon('noRuContent'));
       return;
     }
     startTranslating(async () => {
-      const res = await translateQuoteFields(requests);
+      const res = await translateQuoteFields(requests, direction);
       if (!res.ok) {
         setTranslateError(res.error);
         return;
@@ -148,13 +150,15 @@ export function QuoteForm({
         for (const r of res.results) {
           const pair = FIELD_PAIRS.find((p) => p.key === r.field);
           if (!pair) continue;
-          (next as Record<string, string | boolean>)[pair.ruFieldName] = r.translated;
+          (next as Record<string, string | boolean>)[pair[dstField]] = r.translated;
           (next as Record<string, string | boolean>)[pair.flagFieldName] = true;
         }
         return next;
       });
     });
   };
+  const hasZhContent = FIELD_PAIRS.some((p) => (bi[p.zhFieldName] as string).trim().length > 0);
+  const hasRuContent = FIELD_PAIRS.some((p) => (bi[p.ruFieldName] as string).trim().length > 0);
 
   return (
     <form action={formAction} className="space-y-6">
@@ -169,21 +173,29 @@ export function QuoteForm({
         </div>
       )}
 
-      <div className="flex items-start gap-4 p-4 rounded-md border border-border bg-muted/40">
-        <Button
-          type="button"
-          onClick={handleTranslate}
-          disabled={isTranslating}
-          variant="secondary"
-          size="sm"
-          className="flex-shrink-0"
-        >
-          {isTranslating ? (
-            <><Loader2 className="size-4 animate-spin" />{tCommon('translating')}</>
-          ) : (
-            <><Sparkles className="size-4" />{t('autoTranslateButton')}</>
-          )}
-        </Button>
+      <div className="flex items-start gap-3 p-4 rounded-md border border-border bg-muted/40">
+        <div className="flex flex-col gap-2 flex-shrink-0">
+          <Button
+            type="button"
+            onClick={() => runTranslate('zh-to-ru')}
+            disabled={isTranslating || !hasZhContent}
+            variant="secondary"
+            size="sm"
+          >
+            {isTranslating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+            {tCommon('translateZhToRu')}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => runTranslate('ru-to-zh')}
+            disabled={isTranslating || !hasRuContent}
+            variant="secondary"
+            size="sm"
+          >
+            {isTranslating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+            {tCommon('translateRuToZh')}
+          </Button>
+        </div>
         <p className="text-xs text-muted-foreground leading-relaxed pt-1">
           {t('autoTranslateHint')}
         </p>

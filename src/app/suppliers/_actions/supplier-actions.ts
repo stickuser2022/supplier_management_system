@@ -107,17 +107,22 @@ export type TranslateSupplierFieldsResult =
     }
   | { ok: false; error: string };
 
-// 客户端按钮点击后调它,把待翻译的字段送来,返回俄文结果
+// 客户端按钮点击后调它,把待翻译的字段送来,返回译文结果。
+// direction = 'zh-to-ru' | 'ru-to-zh',双向支持(2026.6.16 改造,家人可以反向翻译)
 export async function translateSupplierFields(
   input: { field: SupplierTranslateField; text: string }[],
+  direction: 'zh-to-ru' | 'ru-to-zh' = 'zh-to-ru',
 ): Promise<TranslateSupplierFieldsResult> {
   if (input.length === 0) {
     return { ok: true, results: [] };
   }
 
+  const from = direction === 'zh-to-ru' ? 'zh' : 'ru';
+  const to = direction === 'zh-to-ru' ? 'ru' : 'zh';
+
   try {
     const translated = await translateBatch(
-      input.map((item) => ({ text: item.text, from: 'zh', to: 'ru' })),
+      input.map((item) => ({ text: item.text, from, to })),
     );
 
     return {

@@ -86,19 +86,21 @@ export function TagDialog({
     }
   }
 
-  const handleTranslate = () => {
+  const handleTranslate = (direction: 'zh-to-ru' | 'ru-to-zh') => {
     setTranslateError(null);
-    if (!nameZh.trim()) {
+    const src = direction === 'zh-to-ru' ? nameZh : nameRu;
+    if (!src.trim()) {
       setTranslateError(t('errZhEmpty'));
       return;
     }
     startTranslating(async () => {
-      const res = await translateTagName(nameZh);
+      const res = await translateTagName(src, direction);
       if (!res.ok) {
         setTranslateError(res.error);
         return;
       }
-      setNameRu(res.translated);
+      if (direction === 'zh-to-ru') setNameRu(res.translated);
+      else setNameZh(res.translated);
     });
   };
 
@@ -153,11 +155,22 @@ export function TagDialog({
             </select>
           </div>
 
-          {/* nameZh */}
+          {/* nameZh + 反向翻译按钮 */}
           <div className="space-y-1.5">
-            <Label htmlFor="nameZh">
-              {t('labelNameZh')} <span className="text-danger-fg">*</span>
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="nameZh">
+                {t('labelNameZh')} <span className="text-danger-fg">*</span>
+              </Label>
+              <button
+                type="button"
+                onClick={() => handleTranslate('ru-to-zh')}
+                disabled={isTranslating || !nameRu.trim()}
+                className="inline-flex items-center gap-1 text-xs text-warning-fg hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isTranslating ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                ← {t('autoTranslate')}
+              </button>
+            </div>
             <Input
               id="nameZh"
               name="nameZh"
@@ -179,16 +192,12 @@ export function TagDialog({
               </Label>
               <button
                 type="button"
-                onClick={handleTranslate}
+                onClick={() => handleTranslate('zh-to-ru')}
                 disabled={isTranslating || !nameZh.trim()}
                 className="inline-flex items-center gap-1 text-xs text-warning-fg hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isTranslating ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Sparkles className="size-3" />
-                )}
-                {t('autoTranslate')}
+                {isTranslating ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                {t('autoTranslate')} →
               </button>
             </div>
             <Input

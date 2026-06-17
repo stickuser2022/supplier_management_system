@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { pickLocalized } from '@/i18n/pick-localized';
 import { FormPage } from '@/components/forms/form-page';
 import { ContactForm, type ContactFormInitialData } from '../../_components/ContactForm';
 
@@ -14,7 +15,10 @@ export default async function EditContactPage({
   const contactId = parseInt(contactIdStr, 10);
   if (isNaN(supplierId) || isNaN(contactId)) notFound();
 
-  const t = await getTranslations('formPage');
+  const [t, locale] = await Promise.all([
+    getTranslations('formPage'),
+    getLocale(),
+  ]);
 
   const contact = await prisma.contact.findUnique({ where: { id: contactId } });
   if (!contact || contact.supplierId !== supplierId) notFound();
@@ -41,7 +45,7 @@ export default async function EditContactPage({
 
   return (
     <FormPage
-      title={t('editContact', { name: contact.nameZh })}
+      title={t('editContact', { name: pickLocalized(contact.nameZh, contact.nameRu, locale) })}
       backHref={`/suppliers/${supplierId}`}
       backLabel={t('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"

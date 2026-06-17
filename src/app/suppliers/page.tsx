@@ -217,7 +217,7 @@ export default async function SuppliersPage({
                 </TableCell>
                 <TableCell className="text-right">
                   <SupplierActionsCell
-                    supplier={{ id: s.id, nameZh: s.nameZh, isActive: s.isActive }}
+                    supplier={{ id: s.id, nameZh: s.nameZh, nameRu: s.nameRu, isActive: s.isActive }}
                     canEdit={isOwner(s, currentUser)}
                   />
                 </TableCell>

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { pickLocalized } from '@/i18n/pick-localized';
 import { FormPage } from '@/components/forms/form-page';
 import { NoteForm } from '../_components/NoteForm';
 
@@ -29,11 +30,15 @@ export default async function NewNotePage({
     }),
   ]);
 
-  const t = await getTranslations('formPage');
+  const [t, locale] = await Promise.all([
+    getTranslations('formPage'),
+    getLocale(),
+  ]);
+  const supplierName = pickLocalized(supplier.nameZh, supplier.nameRu, locale);
 
   return (
     <FormPage
-      title={t('newNote', { name: supplier.nameZh })}
+      title={t('newNote', { name: supplierName })}
       backHref={`/suppliers/${supplierId}`}
       backLabel={t('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"

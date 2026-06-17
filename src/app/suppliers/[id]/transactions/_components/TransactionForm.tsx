@@ -154,12 +154,14 @@ export function TransactionForm({
     setPayments((cur) => cur.map((p, i) => (i === idx ? { ...p, [key]: value } : p)));
   }
 
-  async function handleTranslateNotes() {
-    if (!notesZh.trim()) return;
+  async function handleTranslateNotes(direction: 'zh-to-ru' | 'ru-to-zh' = 'zh-to-ru') {
+    const src = direction === 'zh-to-ru' ? notesZh : notesRu;
+    if (!src.trim()) return;
     setTranslatingNotes(true);
-    const res = await translateTransactionText(notesZh);
+    const res = await translateTransactionText(src, direction);
     if (res.ok) {
-      setNotesRu(res.translated);
+      if (direction === 'zh-to-ru') setNotesRu(res.translated);
+      else setNotesZh(res.translated);
     } else {
       alert(res.error);
     }
@@ -235,7 +237,23 @@ export function TransactionForm({
           </select>
         </FormField>
 
-        <FormField label={t('fields.notesZh')} htmlFor="notesZh">
+        <FormField
+          label={
+            <span className="inline-flex items-center justify-between w-full">
+              <span>{t('fields.notesZh')}</span>
+              <button
+                type="button"
+                onClick={() => handleTranslateNotes('ru-to-zh')}
+                disabled={translatingNotes || !notesRu.trim()}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-50 transition-colors font-normal"
+              >
+                {translatingNotes ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                ← {t('translate')}
+              </button>
+            </span>
+          }
+          htmlFor="notesZh"
+        >
           <Textarea
             id="notesZh"
             name="notesZh"
@@ -251,16 +269,12 @@ export function TransactionForm({
               <span>{t('fields.notesRu')}</span>
               <button
                 type="button"
-                onClick={handleTranslateNotes}
+                onClick={() => handleTranslateNotes('zh-to-ru')}
                 disabled={translatingNotes || !notesZh.trim()}
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-50 transition-colors font-normal"
               >
-                {translatingNotes ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Sparkles className="size-3" />
-                )}
-                {t('translate')}
+                {translatingNotes ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                {t('translate')} →
               </button>
             </span>
           }

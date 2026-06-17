@@ -269,10 +269,13 @@ export type TranslateTransactionFieldResult =
 
 export async function translateTransactionText(
   text: string,
+  direction: 'zh-to-ru' | 'ru-to-zh' = 'zh-to-ru',
 ): Promise<TranslateTransactionFieldResult> {
-  if (!text.trim()) return { ok: false, error: '中文为空,无法翻译' };
+  if (!text.trim()) return { ok: false, error: '源语言文本为空,无法翻译' };
+  const from = direction === 'zh-to-ru' ? 'zh' : 'ru';
+  const to = direction === 'zh-to-ru' ? 'ru' : 'zh';
   try {
-    const translated = await translateBatch([{ text, from: 'zh', to: 'ru' }]);
+    const translated = await translateBatch([{ text, from, to }]);
     return { ok: true, translated: translated[0] };
   } catch (err) {
     return {

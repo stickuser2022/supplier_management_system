@@ -243,7 +243,11 @@
       "submitting": "保存中…",
       "update": "更新",
       "manualEditLocked": "已手改",
-      "translating": "翻译中…"
+      "translating": "翻译中…",
+      "translateZhToRu": "中 → 俄",
+      "translateRuToZh": "俄 → 中",
+      "noZhContent": "中文字段全为空,没东西可翻",
+      "noRuContent": "俄文字段全为空,没东西可翻"
     },
     "supplier": {
       "sectionBilingual": "基本信息(中俄对照)",

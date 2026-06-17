@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { pickLocalized } from '@/i18n/pick-localized';
 import { FormPage } from '@/components/forms/form-page';
 import { QuoteForm } from '../_components/QuoteForm';
 
@@ -31,10 +32,11 @@ export default async function NewQuotePage({
   ]);
 
   const t = await getTranslations('formPage');
+  const supplierName = pickLocalized(supplier.nameZh, supplier.nameRu, locale);
 
   return (
     <FormPage
-      title={t('newQuote', { name: supplier.nameZh })}
+      title={t('newQuote', { name: supplierName })}
       backHref={`/suppliers/${supplierId}`}
       backLabel={t('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"

@@ -75,6 +75,7 @@ export async function ContactsList({ supplierId }: { supplierId: number }) {
                         id: c.id,
                         supplierId: c.supplierId,
                         nameZh: c.nameZh,
+                        nameRu: c.nameRu,
                         status: c.status,
                         isPrimary: c.isPrimary,
                       }}

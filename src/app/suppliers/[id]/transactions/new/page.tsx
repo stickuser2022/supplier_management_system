@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { pickLocalized } from '@/i18n/pick-localized';
 import { FormPage } from '@/components/forms/form-page';
 import { TransactionForm } from '../_components/TransactionForm';
 
@@ -31,11 +32,15 @@ export default async function NewTransactionPage({
   ]);
   if (!supplier) notFound();
 
-  const t = await getTranslations('formPage');
+  const [t, locale] = await Promise.all([
+    getTranslations('formPage'),
+    getLocale(),
+  ]);
+  const supplierName = pickLocalized(supplier.nameZh, supplier.nameRu, locale);
 
   return (
     <FormPage
-      title={t('newTransaction', { name: supplier.nameZh })}
+      title={t('newTransaction', { name: supplierName })}
       backHref={`/suppliers/${supplierId}`}
       backLabel={t('backToSupplierDetail')}
       maxWidthClass="max-w-5xl"

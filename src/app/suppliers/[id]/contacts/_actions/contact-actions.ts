@@ -208,11 +208,14 @@ export type TranslateContactFieldsResult =
 
 export async function translateContactFields(
   input: { field: ContactTranslateField; text: string }[],
+  direction: 'zh-to-ru' | 'ru-to-zh' = 'zh-to-ru',
 ): Promise<TranslateContactFieldsResult> {
   if (input.length === 0) return { ok: true, results: [] };
+  const from = direction === 'zh-to-ru' ? 'zh' : 'ru';
+  const to = direction === 'zh-to-ru' ? 'ru' : 'zh';
   try {
     const translated = await translateBatch(
-      input.map((item) => ({ text: item.text, from: 'zh', to: 'ru' })),
+      input.map((item) => ({ text: item.text, from, to })),
     );
     return {
       ok: true,

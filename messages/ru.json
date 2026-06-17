@@ -242,7 +242,11 @@
       "submitting": "Сохранение…",
       "update": "Обновить",
       "manualEditLocked": "Изменено вручную",
-      "translating": "Перевод…"
+      "translating": "Перевод…",
+      "translateZhToRu": "中 → RU",
+      "translateRuToZh": "RU → 中",
+      "noZhContent": "Все китайские поля пусты, нечего переводить",
+      "noRuContent": "Все русские поля пусты, нечего переводить"
     },
     "supplier": {
       "sectionBilingual": "Основная информация (китайский / русский)",

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTransition } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Pencil, Archive, ArchiveRestore } from 'lucide-react';
 import { archiveSupplier, restoreSupplier } from '../_actions/supplier-actions';
 import { cn } from '@/lib/utils';
@@ -14,16 +14,19 @@ export function SupplierActionsCell({
   supplier,
   canEdit = true,
 }: {
-  supplier: { id: number; nameZh: string; isActive: boolean };
+  supplier: { id: number; nameZh: string; nameRu: string | null; isActive: boolean };
   canEdit?: boolean;
 }) {
   const t = useTranslations('suppliers.actions');
+  const locale = useLocale();
   const [isPending, startTransition] = useTransition();
 
   if (!canEdit) return null;
 
+  const displayName = locale === 'ru' && supplier.nameRu ? supplier.nameRu : supplier.nameZh;
+
   const handleArchive = () => {
-    if (!confirm(t('confirmArchive', { name: supplier.nameZh }))) return;
+    if (!confirm(t('confirmArchive', { name: displayName }))) return;
     startTransition(async () => {
       await archiveSupplier(supplier.id);
     });

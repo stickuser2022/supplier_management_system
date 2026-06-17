@@ -121,7 +121,7 @@ export default async function SupplierDetailPage({
         </div>
         <div className="flex-shrink-0">
           <SupplierActionsCell
-            supplier={{ id: supplier.id, nameZh: supplier.nameZh, isActive: supplier.isActive }}
+            supplier={{ id: supplier.id, nameZh: supplier.nameZh, nameRu: supplier.nameRu, isActive: supplier.isActive }}
           />
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { pickLocalized } from '@/i18n/pick-localized';
 import { FormPage } from '@/components/forms/form-page';
 import { SupplierForm, type SupplierFormInitialData } from '../../_components/SupplierForm';
 
@@ -65,7 +66,7 @@ export default async function EditSupplierPage({
 
   return (
     <FormPage
-      title={t('editSupplier', { name: supplier.nameZh })}
+      title={t('editSupplier', { name: pickLocalized(supplier.nameZh, supplier.nameRu, locale) })}
       backHref={`/suppliers/${id}`}
       backLabel={t('backToDetail')}
       maxWidthClass="max-w-5xl"

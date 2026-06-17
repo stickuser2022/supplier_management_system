@@ -147,11 +147,14 @@ export type TranslateNoteFieldsResult =
 
 export async function translateNoteFields(
   input: { field: NoteTranslateField; text: string }[],
+  direction: 'zh-to-ru' | 'ru-to-zh' = 'zh-to-ru',
 ): Promise<TranslateNoteFieldsResult> {
   if (input.length === 0) return { ok: true, results: [] };
+  const from = direction === 'zh-to-ru' ? 'zh' : 'ru';
+  const to = direction === 'zh-to-ru' ? 'ru' : 'zh';
   try {
     const translated = await translateBatch(
-      input.map((i) => ({ text: i.text, from: 'zh', to: 'ru' })),
+      input.map((i) => ({ text: i.text, from, to })),
     );
     return {
       ok: true,

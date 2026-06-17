@@ -1427,3 +1427,40 @@ RU    俄文
 ### 下一轮对话开始时的入口
 
 直接说:**「列表丰富化」** / **「家人开始用了」** / **「重启验证」** / 或具体业务功能
+
+---
+
+## 2026.6.16(晚段补丁)项目进度日志
+
+### 上午到下午的大块改造交付后,实际用起来发现的几个粗糙点,集中扫一遍
+
+#### 关键决策
+
+- **翻译改双向(zh↔ru)**:开放编辑权限后,家人会先用俄文录入字段,需要反向翻译填中文。原来只有 `自动翻译俄文` 单向按钮,现在变成 `中→俄` 和 `俄→中` 两个独立按钮,各自只翻译"源语言非空"的字段,**完全显式不靠 AI 猜方向**。每个 server action(supplier / contact / note / quote / transaction / tag)加 `direction: 'zh-to-ru' | 'ru-to-zh'` 参数,默认 `zh-to-ru` 保持向后兼容
+- **页面标题双语化**:6 个 page.tsx(supplier/contact 的 new + edit)标题里嵌的供应商/联系人名 改成 `pickLocalized(nameZh, nameRu, locale)`,俄文 locale 下显示俄文名。`SupplierActionsCell` / `ContactActionsCell` 归档确认弹窗同样改了,需要 consumer 多传一个 `nameRu` prop(`suppliers/page.tsx` / `ContactsList.tsx` 等)
+- **DropdownMenu z-index 修正**:Leaflet 内部 pane 的 z-index 最高 700,shadcn 默认给 DropdownMenuContent 的 `z-50` 完全打不过。地图页的"加标签筛选"下拉直接被地图盖死。修法:`SupplierSearchAndFilter` 里 DropdownMenuContent 显式加 `className="z-[1001]"`。**通用规则:当组件可能渲染在 Leaflet 之上时,z-index 必须 ≥ 1000**
+
+#### 已完成
+
+- ✅ 5 个 form + TagDialog UI 双按钮:**ContactForm / NoteForm / QuoteForm / SupplierForm**(垂直两按钮)+ **TransactionForm**(`← 翻译` / `翻译 →` 贴在两个 label 旁)+ **TagDialog**(同 TransactionForm 风格)
+- ✅ 6 个 server action 加 `direction` 参数
+- ✅ `forms.common` 加 4 个 key:`translateZhToRu / translateRuToZh / noZhContent / noRuContent`
+- ✅ 标题 pickLocalized 化 8 处(6 个 page + 2 个 ActionsCell)
+- ✅ 配套 consumer 改 prop:`suppliers/page.tsx` / `suppliers/[id]/page.tsx` / `ContactsList.tsx` 给 ActionsCell 多传 nameRu
+- ✅ `SupplierSearchAndFilter` 的 DropdownMenuContent 加 `z-[1001]`
+
+#### 项目导览本轮**不更新**
+
+这些都是已记录架构模式的应用(pickLocalized 已经在 i18n 章节讲过、双向翻译只是参数翻转、z-index 是 leaflet 边角细节)。导览第 6 章关键代码已经覆盖了所有需要"读懂才能改"的模式,加这些细节是噪音。
+
+### 现状
+
+跟下午相比唯一变化:
+
+- 家人 RU 录入俄文 → 点反向翻译 → 中文自动填,体验对等
+- 俄文 locale 下所有页面标题里嵌的公司/联系人名,会自动切到俄文显示
+- 地图筛选下拉永远在地图之上
+
+### 下一轮对话开始时的入口
+
+跟上面一样,直接说想做的事即可。

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTransition } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Pencil, Archive, ArchiveRestore, Star } from 'lucide-react';
 import { archiveContact, restoreContact, setPrimaryContact } from '../_actions/contact-actions';
 import { cn } from '@/lib/utils';
@@ -18,19 +18,23 @@ export function ContactActionsCell({
     id: number;
     supplierId: number;
     nameZh: string;
+    nameRu: string | null;
     status: 'ACTIVE' | 'ARCHIVED';
     isPrimary: boolean;
   };
   canEdit?: boolean;
 }) {
   const t = useTranslations('contacts.actions');
+  const locale = useLocale();
   const [isPending, startTransition] = useTransition();
 
   // 非创建者(且非 ADMIN)不显示任何操作按钮 —— 数据只读
   if (!canEdit) return null;
 
+  const displayName = locale === 'ru' && contact.nameRu ? contact.nameRu : contact.nameZh;
+
   const handleArchive = () => {
-    if (!confirm(t('confirmArchive', { name: contact.nameZh }))) return;
+    if (!confirm(t('confirmArchive', { name: displayName }))) return;
     startTransition(async () => {
       await archiveContact(contact.id);
     });

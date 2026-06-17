@@ -181,7 +181,7 @@ export function SupplierSearchAndFilter({
               <ChevronDown className="size-3" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="max-h-96 overflow-y-auto">
+          <DropdownMenuContent align="start" className="z-[1001] max-h-96 overflow-y-auto">
             {Object.entries(groupedAvailable).length === 0 && (
               <DropdownMenuLabel className="text-xs text-muted-foreground">
                 {t('noTagsLeft')}
