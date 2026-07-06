@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireCurrentUser, isOwner } from '@/lib/auth';
 import { pickLocalized } from '@/i18n/pick-localized';
 import { Button } from '@/components/ui/button';
+import { LightboxImage } from '@/components/ui/lightbox-image';
 import { DetailSection } from './detail-section';
 import { ClearOriginalIntentButton } from './ClearOriginalIntentButton';
 
@@ -117,20 +118,12 @@ export async function OriginalIntentSection({ supplierId }: { supplierId: number
               </span>
               <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {images.map((img) => (
-                  <a
+                  <LightboxImage
                     key={img.id}
-                    href={`/api/files/${img.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block aspect-square rounded-md border border-border overflow-hidden bg-muted hover:ring-2 hover:ring-primary/50 transition-all"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`/api/files/${img.id}?thumb=1`}
-                      alt=""
-                      className="size-full object-cover"
-                    />
-                  </a>
+                    src={`/api/files/${img.id}?thumb=1`}
+                    alt=""
+                    className="aspect-square rounded-md border border-border object-cover bg-muted hover:ring-2 hover:ring-primary/50 transition-all"
+                  />
                 ))}
               </div>
             </div>

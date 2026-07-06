@@ -17,6 +17,7 @@ import { SupplierSearchAndFilter } from "./_components/SupplierSearchAndFilter";
 import { CooperationLevelBadge } from "@/components/suppliers/cooperation-level-badge";
 import { COOPERATION_LEVELS } from "./_validations/supplier-schema";
 import { cn } from "@/lib/utils";
+import { LightboxImage } from "@/components/ui/lightbox-image";
 import type { Prisma } from "@/generated/prisma/client";
 
 export default async function SuppliersPage({
@@ -290,8 +291,7 @@ export default async function SuppliersPage({
                     <div className="flex gap-3">
                       <Link href={`/suppliers/${s.id}`} className="shrink-0">
                         {logoId ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <LightboxImage
                             src={`/api/files/${logoId}?thumb=1`}
                             alt=""
                             className="size-12 rounded-lg object-cover border border-border bg-muted"
@@ -508,8 +508,7 @@ export default async function SuppliersPage({
                 <div className="flex items-start gap-3">
                   <Link href={`/suppliers/${s.id}`} className="shrink-0">
                     {logoId ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <LightboxImage
                         src={`/api/files/${logoId}?thumb=1`}
                         alt=""
                         className="size-11 rounded-lg object-cover border border-border bg-muted"
@@ -541,13 +540,9 @@ export default async function SuppliersPage({
 
                 {/* 原始意图（如有） */}
                 {(s.originalIntentProductNameZh || s.originalIntentOverviewZh) && (
-                  <Link
-                    href={`/suppliers/${s.id}/original-intent/edit`}
-                    className="flex items-start gap-2 rounded-md bg-muted/50 p-2.5 hover:bg-muted transition-colors"
-                  >
+                  <div className="flex items-start gap-2 rounded-md bg-muted/50 p-2.5">
                     {intentImageId ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <LightboxImage
                         src={`/api/files/${intentImageId}?thumb=1`}
                         alt=""
                         className="size-9 rounded object-cover border border-border shrink-0"
@@ -555,9 +550,12 @@ export default async function SuppliersPage({
                     ) : null}
                     <div className="min-w-0 text-xs leading-relaxed">
                       {s.originalIntentProductNameZh && (
-                        <span className="font-medium text-foreground block">
+                        <Link
+                          href={`/suppliers/${s.id}/original-intent/edit`}
+                          className="font-medium text-foreground block hover:text-primary hover:underline"
+                        >
                           {pickLocalized(s.originalIntentProductNameZh, s.originalIntentProductNameRu, locale)}
-                        </span>
+                        </Link>
                       )}
                       {s.originalIntentOverviewZh && (
                         <span className="text-muted-foreground line-clamp-2">
@@ -565,7 +563,7 @@ export default async function SuppliersPage({
                         </span>
                       )}
                     </div>
-                  </Link>
+                  </div>
                 )}
 
                 {/* 地区 + 主营 */}
@@ -666,51 +664,40 @@ function OriginalIntentCell({
     );
   }
 
-  // 截断:俄语 ~20 词 (~160 字符),中文等量 (~60 字符)
-  const maxLen = locale === 'ru' ? 160 : 60;
-  const truncated = overview.length > maxLen
-    ? overview.slice(0, maxLen).replace(/\s+\S*$/, '') + '…'
-    : overview;
-
   return (
-    <Link
-      href={`/suppliers/${supplier.id}/original-intent/edit`}
-      className="block group"
-    >
-      <div className="flex gap-2.5">
-        {/* 缩略图 */}
-        <div className="shrink-0">
-          {imageId ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`/api/files/${imageId}?thumb=1`}
-              alt=""
-              className="size-10 rounded-md object-cover border border-border bg-muted"
-            />
-          ) : (
-            <span className="size-10 rounded-md bg-muted flex items-center justify-center border border-border">
-              <svg className="size-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-              </svg>
-            </span>
-          )}
+    <div className="flex flex-col gap-2">
+      {/* 缩略图 — 点击看大图，不跳转 */}
+      {imageId ? (
+        <LightboxImage
+          src={`/api/files/${imageId}?thumb=1`}
+          alt=""
+          className="w-full h-20 rounded-md object-contain border border-border bg-muted p-1"
+        />
+      ) : (
+        <div className="w-full h-20 rounded-md bg-muted flex items-center justify-center border border-border">
+          <svg className="size-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+          </svg>
         </div>
+      )}
 
-        {/* 文字 */}
-        <div className="min-w-0 flex-1">
-          {productName && (
-            <p className="text-sm font-medium text-foreground group-hover:text-primary group-hover:underline line-clamp-1">
-              {productName}
-            </p>
-          )}
-          {truncated && (
-            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-              {truncated}
-            </p>
-          )}
-        </div>
+      {/* 文字：产品名可点击跳转编辑页 */}
+      <div className="min-w-0">
+        {productName && (
+          <Link
+            href={`/suppliers/${supplier.id}/original-intent/edit`}
+            className="block text-sm font-medium text-foreground hover:text-primary hover:underline line-clamp-1"
+          >
+            {productName}
+          </Link>
+        )}
+        {overview && (
+          <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words mt-0.5">
+            {overview}
+          </p>
+        )}
       </div>
-    </Link>
+    </div>
   );
 }
 
