@@ -7,13 +7,16 @@
  * 例:
  *   npx tsx scripts/reset-password.ts qingger MyNewPassword123
  *
+ * ⚠️ 安全提醒:密码通过命令行参数传入,会留在 shell 历史记录中。
+ * 用完建议清一下历史(PowerShell: Clear-History; Bash: history -c)。
+ * 远期考虑改成交互式输入(readline)避免此问题。
+ *
  * 原理:
  * better-auth 把密码 hash 存在 Account 表的 password 字段(providerId='credential')。
  * 这里用 better-auth 同款 hashPassword 算法重新 hash 一遍,直接 update 进去 ——
  * 等价于"管理员强制重置某用户的密码"。
  *
  * 注意:这个脚本绕过了所有审计 / 验证流程,只在你忘了密码或者要给家人重置时用。
- * 用完不要留着自动跑,也不要进任何 cron / scheduled task。
  */
 import 'dotenv/config';
 import { hashPassword } from 'better-auth/crypto';

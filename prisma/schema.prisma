@@ -166,6 +166,12 @@ model Supplier {
   addressRuAutoTranslated     Boolean          @default(true) @map("address_ru_auto_translated") //地址是否自动翻译成俄语
   descriptionRuAutoTranslated Boolean          @default(true) @map("description_ru_auto_translated") //描述是否自动翻译成俄语
   mainProductsRuAutoTranslated Boolean         @default(true) @map("main_products_ru_auto_translated") //主营产品是否自动翻译成俄语
+  originalIntentProductNameZh  String?          @map("original_intent_product_name_zh") //原始意图-产品名称(中文)
+  originalIntentProductNameRu  String?          @map("original_intent_product_name_ru") //原始意图-产品名称(俄文)
+  originalIntentOverviewZh     String?          @map("original_intent_overview_zh") //原始意图-概述(中文)
+  originalIntentOverviewRu     String?          @map("original_intent_overview_ru") //原始意图-概述(俄文)
+  originalIntentProductNameRuAutoTranslated Boolean @default(true) @map("original_intent_product_name_ru_auto_translated")
+  originalIntentOverviewRuAutoTranslated    Boolean @default(true) @map("original_intent_overview_ru_auto_translated")
   createdAt                   DateTime         @default(now()) @map("created_at")
   updatedAt                   DateTime         @updatedAt @map("updated_at")
   createdById                 String           @map("created_by_id")
@@ -450,5 +456,6 @@ enum FileType {
   PAYMENT_SCREENSHOT
   NOTE_ATTACHMENT
   TRANSACTION_DOC
+  ORIGINAL_INTENT_IMAGE
   OTHER
 }

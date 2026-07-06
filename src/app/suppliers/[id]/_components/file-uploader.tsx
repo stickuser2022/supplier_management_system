@@ -15,7 +15,8 @@ type Props = {
     | 'NOTE_ATTACHMENT'
     | 'SUPPLIER_VIDEO'
     | 'PAYMENT_SCREENSHOT'
-    | 'TRANSACTION_DOC';
+    | 'TRANSACTION_DOC'
+    | 'ORIGINAL_INTENT_IMAGE';
   accept: string;
   maxBytes: number;
   label: string;

@@ -137,8 +137,8 @@ export default function MapView({ suppliers }: { suppliers: Supplier[] }) {
         />
       </MapContainer>
 
-      <div className="absolute top-4 right-4 z-1000 bg-white/95 rounded-lg shadow-md p-3 text-sm min-w-40">
-        <div className="font-semibold mb-2 text-gray-700 flex justify-between items-center">
+      <div className="absolute top-4 right-4 z-1000 bg-card/95 dark:bg-card/95 rounded-lg shadow-md p-3 text-sm min-w-40">
+        <div className="font-semibold mb-2 text-foreground flex justify-between items-center">
           <span>{t('legendTitle')}</span>
           {selectedLevel !== null && (
             <button

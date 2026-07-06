@@ -65,11 +65,8 @@ async function main() {
     });
   }
 
-  console.log('\n完成。初始密码:');
-  for (const v of VIEWERS) {
-    console.log(`  ${v.username} / ${v.password}`);
-  }
-  console.log('\n建议告诉家人登录后在右上角下拉菜单里改密码。');
+  console.log('\n完成。初始密码已通过其他渠道告知,此处不打印。');
+  console.log('建议告诉家人登录后在右上角下拉菜单里改密码。');
 }
 
 main()

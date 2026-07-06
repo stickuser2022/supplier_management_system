@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
+import { logActionError } from '@/lib/utils';
 import { requireUserId, requireCurrentUser, isOwner } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { tagCreateSchema } from '../_validations/tag-schema';
@@ -51,8 +52,7 @@ export async function createTag(
         errors: { nameZh: ['同 category 下已存在同名标签'] },
         message: '标签名重复',
       };
-    }
-    return {
+    }    logActionError('createTag', err);    return {
       status: 'error',
       message: '保存失败:' + (err instanceof Error ? err.message : '未知错误'),
     };
@@ -102,6 +102,7 @@ export async function updateTag(
         message: '标签名重复',
       };
     }
+    logActionError('updateTag', err);
     return {
       status: 'error',
       message: '保存失败:' + (err instanceof Error ? err.message : '未知错误'),

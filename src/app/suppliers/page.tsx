@@ -68,6 +68,11 @@ export default async function SuppliersPage({
         { descriptionZh: { contains: q } },
         { descriptionRu: { contains: q } },
         { discoveredVia: { contains: q } },
+        // 原始意图字段
+        { originalIntentProductNameZh: { contains: q } },
+        { originalIntentProductNameRu: { contains: q } },
+        { originalIntentOverviewZh: { contains: q } },
+        { originalIntentOverviewRu: { contains: q } },
         // 通过 Quote 关联查产品名
         { quotes: { some: { productNameZh: { contains: q } } } },
         { quotes: { some: { productNameRu: { contains: q } } } },
@@ -164,6 +169,23 @@ export default async function SuppliersPage({
     if (f.supplierId) logoMap.set(f.supplierId, f.id);
   }
 
+  // 一次性查原始意图图片,按 supplierId 索引
+  const intentImageFiles = await prisma.file.findMany({
+    where: {
+      supplierId: { in: suppliers.map((s) => s.id) },
+      type: "ORIGINAL_INTENT_IMAGE",
+      isActive: true,
+    },
+    select: { id: true, supplierId: true },
+    orderBy: { sortOrder: 'asc' },
+  });
+  const intentImageMap = new Map<number, number>();
+  for (const f of intentImageFiles) {
+    if (f.supplierId && !intentImageMap.has(f.supplierId)) {
+      intentImageMap.set(f.supplierId, f.id);
+    }
+  }
+
   return (
     <div className="w-full px-6 py-6">
       {/* 页面头部 */}
@@ -206,18 +228,21 @@ export default async function SuppliersPage({
 
       {/* 供应商表格 */}
       <div className="w-full overflow-x-auto rounded-md border border-border">
-        <Table className="table-fixed" style={{ minWidth: 1400 }}>
+        <Table className="table-fixed" style={{ minWidth: 1500 }}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-[42%]">
+              <TableHead className="w-[26%]">
                 {locale === "ru" ? "Поставщик" : "供应商"}
               </TableHead>
-              <TableHead className="w-[40%]">
+              <TableHead className="w-[14%]">
+                {locale === "ru" ? "Намерение" : "原始意图"}
+              </TableHead>
+              <TableHead className="w-[30%]">
                 {locale === "ru"
                   ? "Регион / Основная продукция"
                   : "地区 / 主营"}
               </TableHead>
-              <TableHead className="w-[10%]">
+              <TableHead className="w-[8%]">
                 {locale === "ru" ? "Данные" : "业务数据"}
               </TableHead>
               <TableHead className="w-[14%]">
@@ -232,7 +257,7 @@ export default async function SuppliersPage({
             {suppliers.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="text-center text-muted-foreground py-12"
                 >
                   {q || tagIds.length > 0 || levelParam
@@ -343,6 +368,15 @@ export default async function SuppliersPage({
                     </div>
                   </TableCell>
 
+                  {/* 原始意图 */}
+                  <TableCell className="py-4">
+                    <OriginalIntentCell
+                      supplier={s}
+                      imageId={intentImageMap.get(s.id)}
+                      locale={locale}
+                    />
+                  </TableCell>
+
                   <TableCell className="py-4">
                     <div className="space-y-1">
                       <div className="text-sm text-foreground line-clamp-2 break-words">
@@ -444,6 +478,92 @@ export default async function SuppliersPage({
         </Table>
       </div>
     </div>
+  );
+}
+
+function OriginalIntentCell({
+  supplier,
+  imageId,
+  locale,
+}: {
+  supplier: {
+    id: number;
+    originalIntentProductNameZh: string | null;
+    originalIntentProductNameRu: string | null;
+    originalIntentOverviewZh: string | null;
+    originalIntentOverviewRu: string | null;
+  };
+  imageId: number | undefined;
+  locale: string;
+}) {
+  const overview = pickLocalized(
+    supplier.originalIntentOverviewZh ?? '',
+    supplier.originalIntentOverviewRu,
+    locale,
+  );
+  const productName = pickLocalized(
+    supplier.originalIntentProductNameZh ?? '',
+    supplier.originalIntentProductNameRu,
+    locale,
+  );
+
+  const hasContent = Boolean(
+    supplier.originalIntentProductNameZh || supplier.originalIntentOverviewZh,
+  );
+
+  if (!hasContent) {
+    return (
+      <span className="text-xs text-muted-foreground italic">
+        {locale === 'ru' ? '—' : '—'}
+      </span>
+    );
+  }
+
+  // 截断:俄语 ~20 词 (~160 字符),中文等量 (~60 字符)
+  const maxLen = locale === 'ru' ? 160 : 60;
+  const truncated = overview.length > maxLen
+    ? overview.slice(0, maxLen).replace(/\s+\S*$/, '') + '…'
+    : overview;
+
+  return (
+    <Link
+      href={`/suppliers/${supplier.id}/original-intent/edit`}
+      className="block group"
+    >
+      <div className="flex gap-2.5">
+        {/* 缩略图 */}
+        <div className="shrink-0">
+          {imageId ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/files/${imageId}?thumb=1`}
+              alt=""
+              className="size-10 rounded-md object-cover border border-border bg-muted"
+            />
+          ) : (
+            <span className="size-10 rounded-md bg-muted flex items-center justify-center border border-border">
+              <svg className="size-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+              </svg>
+            </span>
+          )}
+        </div>
+
+        {/* 文字 */}
+        <div className="min-w-0 flex-1">
+          {productName && (
+            <p className="text-sm font-medium text-foreground group-hover:text-primary group-hover:underline line-clamp-1">
+              {productName}
+            </p>
+          )}
+          {truncated && (
+            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+              {truncated}
+            </p>
+          )}
+        </div>
+      </div>
+    </Link>
   );
 }
 

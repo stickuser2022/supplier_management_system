@@ -8,27 +8,23 @@ function createPrismaClient() {
     ? raw
     : path.resolve(process.cwd(), raw);
 
-  console.log('[prisma.ts] DATABASE_URL =', JSON.stringify(process.env.DATABASE_URL));
-  console.log('[prisma.ts] raw          =', JSON.stringify(raw));
-  console.log('[prisma.ts] dbPath       =', dbPath);
-  console.log('[prisma.ts] cwd          =', process.cwd());
-
   const adapter = new PrismaBetterSqlite3({ url: dbPath });
   return new PrismaClient({
   adapter,
-  log: ['query', 'warn', 'error'],
+  // 开发环境打印 SQL 方便调试,生产环境只打 warn/error
+  log: process.env.NODE_ENV === 'production'
+    ? ['warn', 'error']
+    : ['query', 'warn', 'error'],
 });
 }
 
-// ② 全局单例
+// 全局单例:开发环境挂到 globalThis 防止热重载反复创建连接
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma =globalForPrisma.prisma ?? createPrismaClient();
-/* TODO ② 用 ?? 操作符,全局有就用,没有就调 createPrismaClient() */;
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== 'production') {
-    globalForPrisma.prisma = prisma;
-  /* TODO ③ 把 prisma 挂到 globalForPrisma.prisma 上 */
+  globalForPrisma.prisma = prisma;
 }

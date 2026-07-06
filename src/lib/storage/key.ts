@@ -57,6 +57,8 @@ export function keyFor(
       return `notes/${ownerId}/${leaf}`;
     case 'TRANSACTION_DOC':
       return `transactions/${ownerId}/${leaf}`;
+    case 'ORIGINAL_INTENT_IMAGE':
+      return `suppliers/${ownerId}/intent/${leaf}`;
     case 'OTHER':
       return `misc/${ownerId}/${leaf}`;
     default: {

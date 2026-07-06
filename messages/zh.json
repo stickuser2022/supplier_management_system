@@ -353,6 +353,18 @@
       "autoTranslateButton": "自动翻译俄文",
       "autoTranslateHint": "翻译姓名和职位 2 个字段。每次翻译都会覆盖现有俄文。",
       "noTranslateTargets": "没有可翻译的字段(中文都为空)"
+    },
+    "originalIntent": {
+      "sectionInfo": "意图信息",
+      "labelProductNameZh": "产品名称(中文)",
+      "labelProductNameRu": "产品名称(俄文)",
+      "labelOverviewZh": "意图概述(中文)",
+      "labelOverviewRu": "意图概述(俄文)",
+      "autoTranslateHint": "翻译产品名称和概述 2 个字段。每次翻译都会覆盖现有俄文。",
+      "productNameZhPlaceholder": "如 玩具熊、EAC 认证塑料件",
+      "productNameRuPlaceholder": "如 Игрушечный медведь",
+      "overviewZhPlaceholder": "如:这家工厂专做毛绒玩具,有 EAC 认证,想先拿样品看看质量再决定是否下单",
+      "overviewRuPlaceholder": "Описание на русском..."
     }
   },
   "formPage": {
@@ -368,7 +380,8 @@
     "newQuote": "为「{name}」新建报价",
     "editQuote": "编辑报价 #{id}",
     "newTransaction": "为「{name}」新建订单",
-    "editTransaction": "编辑订单 #{id}"
+    "editTransaction": "编辑订单 #{id}",
+    "editOriginalIntent": "编辑「{name}」的原始意图"
   },
   "changePassword": {
     "title": "修改密码",
@@ -456,6 +469,18 @@
       "addButton": "+ 添加(尚未实现)",
       "notImplemented": "尚未实现"
     }
+  },
+  "originalIntent": {
+    "title": "原始意图",
+    "edit": "编辑",
+    "create": "创建原始意图",
+    "empty": "暂未填写原始意图,点击右上角按钮添加",
+    "imagesTitle": "意图图片",
+    "uploadImage": "上传图片",
+    "imageAcceptHint": "图片,最大 10MB",
+    "imagesEmpty": "暂无图片,可在此上传",
+    "clear": "清除",
+    "confirmClear": "确定清除原始意图吗？产品名称、概述和所有关联图片都会被删除。"
   },
   "map": {
     "legendTitle": "合作深度",

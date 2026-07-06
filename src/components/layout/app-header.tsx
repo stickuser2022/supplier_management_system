@@ -9,6 +9,7 @@ import { LogOut, ChevronDown, User, KeyRound } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "./theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -74,6 +75,8 @@ export function AppHeader() {
           Ру
         </button>
       </div>
+
+      <ThemeToggle />
 
       <Separator orientation="vertical" className="mx-1 h-4" />
 

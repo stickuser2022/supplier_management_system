@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { logActionError } from '@/lib/utils';
 import { requireUserId, requireCurrentUser, isOwner } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { contactCreateSchema } from '../_validations/contact-schema';
@@ -72,6 +73,7 @@ export async function createContact(
       }
     });
   } catch (err) {
+    logActionError('createContact', err);
     return {
       status: 'error',
       message: '保存失败:' + (err instanceof Error ? err.message : '未知错误'),
@@ -140,6 +142,7 @@ export async function updateContact(
       }
     });
   } catch (err) {
+    logActionError('updateContact', err);
     return {
       status: 'error',
       message: '保存失败:' + (err instanceof Error ? err.message : '未知错误'),

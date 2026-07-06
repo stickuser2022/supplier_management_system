@@ -44,13 +44,6 @@ function createProvider(): TranslationProvider {
       return new DeepSeekTranslationProvider(apiKey);
     }
 
-    // 未来接 DeepSeek 时,这里加一个 case 就好:
-    // case 'deepseek': {
-    //   const apiKey = process.env.DEEPSEEK_API_KEY;
-    //   if (!apiKey) throw new Error('DEEPSEEK_API_KEY 未配置');
-    //   return new DeepSeekTranslationProvider(apiKey);
-    // }
-
     default:
       throw new Error(`未知的 TRANSLATE_PROVIDER: "${name}"`);
   }

@@ -131,13 +131,13 @@ export function FileEditForm({
           <button
             type="submit"
             disabled={pending}
-            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm hover:opacity-90 disabled:opacity-50"
           >
             {pending ? t('saving') : t('save')}
           </button>
           <Link
             href={`/suppliers/${supplierId}`}
-            className="px-4 py-2 border rounded text-sm hover:bg-gray-50"
+            className="px-4 py-2 border rounded text-sm text-muted-foreground hover:bg-muted"
           >
             {t('cancel')}
           </Link>

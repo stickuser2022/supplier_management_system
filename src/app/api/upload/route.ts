@@ -60,6 +60,7 @@ const TYPE_RULES: Record<FileType, { maxBytes: number; allowedMime: RegExp }> = 
   PAYMENT_SCREENSHOT: { maxBytes:   5 * 1024 * 1024, allowedMime: /^image\// },
   NOTE_ATTACHMENT:    { maxBytes:  30 * 1024 * 1024, allowedMime: /./ },
   TRANSACTION_DOC:    { maxBytes:  30 * 1024 * 1024, allowedMime: /./ },
+  ORIGINAL_INTENT_IMAGE: { maxBytes: 10 * 1024 * 1024, allowedMime: /^image\// },
   OTHER:              { maxBytes:  30 * 1024 * 1024, allowedMime: /./ },
 };
 
@@ -70,6 +71,7 @@ function makeOwnerFk(type: FileType, ownerId: number) {
     case 'SUPPLIER_BROCHURE':
     case 'SUPPLIER_DOC':
     case 'SUPPLIER_VIDEO':
+    case 'ORIGINAL_INTENT_IMAGE':
     case 'OTHER':
       return { supplierId: ownerId };
     case 'QUOTE_IMAGE':
@@ -89,6 +91,7 @@ async function ownerExists(type: FileType, ownerId: number): Promise<boolean> {
     case 'SUPPLIER_BROCHURE':
     case 'SUPPLIER_DOC':
     case 'SUPPLIER_VIDEO':
+    case 'ORIGINAL_INTENT_IMAGE':
     case 'OTHER':
       return !!(await prisma.supplier.findUnique({ where: { id: ownerId }, select: { id: true } }));
     case 'QUOTE_IMAGE':
@@ -110,6 +113,7 @@ function revalidateFor(type: FileType, ownerId: number) {
     type === 'SUPPLIER_BROCHURE' ||
     type === 'SUPPLIER_DOC' ||
     type === 'SUPPLIER_VIDEO' ||
+    type === 'ORIGINAL_INTENT_IMAGE' ||
     type === 'OTHER'
   ) {
     revalidatePath(`/suppliers/${ownerId}`);

@@ -25,6 +25,7 @@ export const auth = betterAuth({
   trustedOrigins: [
     'http://localhost:3000',
     'https://qg-suppliermanagement.com',
+    'http://localhost:3001'
   ],
 });
 
@@ -56,7 +57,8 @@ export async function getOptionalUserId(): Promise<string | null> {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     return session?.user?.id ?? null;
-  } catch {
+  } catch (err) {
+    console.error('[auth.getOptionalUserId]', err);
     return null;
   }
 }
@@ -84,10 +86,13 @@ export async function requireCurrentUser(): Promise<CurrentUser> {
     select: { id: true, role: true },
   });
   if (!user) {
-    // 罕见:session 还在但 User 行被删了;弹回登录最稳
     redirect('/login');
   }
-  return { id: user.id, role: user.role as 'ADMIN' | 'EDITOR' };
+  // SQLite 不强制枚举,加运行时 guard 防止脏数据污染类型
+  if (user.role !== 'ADMIN' && user.role !== 'EDITOR') {
+    throw new Error(`Unexpected role value in DB: ${user.role} (user ${user.id})`);
+  }
+  return { id: user.id, role: user.role };
 }
 
 // 同步 helper:判断给定记录是否能被给定用户编辑

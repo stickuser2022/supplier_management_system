@@ -15,6 +15,7 @@ import { FileUploader } from './_components/file-uploader';
 import { BrochureGallery } from './_components/brochure-gallery';
 import { DocList } from './_components/doc-list';
 import { SupplierVideoGallery } from './_components/supplier-video-gallery';
+import { OriginalIntentSection } from './_components/OriginalIntentSection';
 import { DetailSection } from './_components/detail-section';
 import { DetailField, DetailFieldList } from './_components/detail-field-list';
 
@@ -132,6 +133,9 @@ export default async function SupplierDetailPage({
           {t('archivedWarning')}
         </div>
       )}
+
+      {/* 原始意图（最顶部，按输入逻辑） */}
+      <OriginalIntentSection supplierId={supplier.id} />
 
       {/* 基本信息 */}
       <DetailSection title={t('sections.basicInfo')}>

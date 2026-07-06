@@ -154,8 +154,8 @@ const admin = await prisma.user.findUniqueOrThrow({
 });
 console.log(`✓ Admin user id=${admin.id}`);
 if (!existing) {
-  console.log(`  ⚠️  首次创建账号: 用户名=${ADMIN_USERNAME}  密码=${ADMIN_PASSWORD}`);
-  console.log(`     登录后请立即改密码`);
+  console.log('  ⚠️  首次创建 Admin 账号,密码已通过其他渠道告知');
+  console.log('     登录后请立即改密码');
 }
 
   // --- 2. PRODUCT 标签(8 个,系统预置)---

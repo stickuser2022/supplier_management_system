@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { logActionError } from '@/lib/utils';
 import { requireUserId, requireCurrentUser, isOwner } from '@/lib/auth';
 import { translateBatch } from '@/lib/translate';
 import { transactionCreateSchema } from '../_validations/transaction-schema';
@@ -98,6 +99,7 @@ export async function createTransaction(
       }
     });
   } catch (err) {
+    logActionError('createTransaction', err);
     return {
       status: 'error',
       message: '保存失败:' + (err instanceof Error ? err.message : '未知错误'),
@@ -222,6 +224,7 @@ export async function updateTransaction(
       }
     });
   } catch (err) {
+    logActionError('updateTransaction', err);
     return {
       status: 'error',
       message: '保存失败:' + (err instanceof Error ? err.message : '未知错误'),

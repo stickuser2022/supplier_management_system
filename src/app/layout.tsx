@@ -44,7 +44,16 @@ export default async function RootLayout({
     <html
       lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} ${notoSansSC.variable} antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* 防闪烁:在 React 加载前从 localStorage 读主题偏好,立刻加上 dark class */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`,
+          }}
+        />
+      </head>
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <SidebarProvider>
