@@ -226,8 +226,8 @@ export default async function SuppliersPage({
         </nav>
       </div>
 
-      {/* 供应商表格 */}
-      <div className="w-full overflow-x-auto rounded-md border border-border">
+      {/* 供应商表格 — 桌面端 */}
+      <div className="hidden md:block w-full overflow-x-auto rounded-md border border-border">
         <Table className="table-fixed" style={{ minWidth: 1500 }}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -235,7 +235,7 @@ export default async function SuppliersPage({
                 {locale === "ru" ? "Поставщик" : "供应商"}
               </TableHead>
               <TableHead className="w-[14%]">
-                {locale === "ru" ? "Намерение" : "原始意图"}
+                {locale === "ru" ? "Оригинальное намерение" : "原始意图"}
               </TableHead>
               <TableHead className="w-[30%]">
                 {locale === "ru"
@@ -476,6 +476,153 @@ export default async function SuppliersPage({
             })}
           </TableBody>
         </Table>
+      </div>
+
+      {/* 移动端卡片 */}
+      <div className="md:hidden space-y-3">
+        {suppliers.length === 0 ? (
+          <p className="text-center text-muted-foreground py-12 text-sm">
+            {q || tagIds.length > 0 || levelParam
+              ? t("search.noResults")
+              : t("emptyList")}
+          </p>
+        ) : (
+          suppliers.map((s) => {
+            const logoId = logoMap.get(s.id);
+            const displayName = pickLocalized(s.nameZh, s.nameRu, locale);
+            const locationStr = [
+              pickLocalized(s.provinceZh, s.provinceRu, locale),
+              pickLocalized(s.cityZh, s.cityRu, locale),
+              pickLocalized(s.districtZh, s.districtRu, locale),
+            ].filter(Boolean).join(' / ') || (locale === 'ru' ? 'Регион не указан' : '未填写地区');
+            const mainProducts = pickLocalized(s.mainProductsZh, s.mainProductsRu, locale);
+            const primaryContact = s.contacts[0];
+            const intentImageId = intentImageMap.get(s.id);
+
+            return (
+              <div
+                key={s.id}
+                className="rounded-lg border border-border bg-card p-4 space-y-3"
+              >
+                {/* 头部: logo + 名称 + 等级 */}
+                <div className="flex items-start gap-3">
+                  <Link href={`/suppliers/${s.id}`} className="shrink-0">
+                    {logoId ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/api/files/${logoId}?thumb=1`}
+                        alt=""
+                        className="size-11 rounded-lg object-cover border border-border bg-muted"
+                      />
+                    ) : (
+                      <span className="size-11 rounded-lg bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground border border-border">
+                        {(s.nameZh ?? '?').slice(0, 1)}
+                      </span>
+                    )}
+                  </Link>
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/suppliers/${s.id}`}
+                      className="font-medium text-foreground hover:text-primary line-clamp-2 break-words"
+                    >
+                      {displayName}
+                    </Link>
+                    <div className="mt-0.5 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                      <span className="font-mono">{s.code}</span>
+                      {!s.isActive && (
+                        <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-destructive">
+                          {locale === 'ru' ? 'Архив' : '已归档'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <CooperationLevelBadge level={s.cooperationLevel} />
+                </div>
+
+                {/* 原始意图（如有） */}
+                {(s.originalIntentProductNameZh || s.originalIntentOverviewZh) && (
+                  <Link
+                    href={`/suppliers/${s.id}/original-intent/edit`}
+                    className="flex items-start gap-2 rounded-md bg-muted/50 p-2.5 hover:bg-muted transition-colors"
+                  >
+                    {intentImageId ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/api/files/${intentImageId}?thumb=1`}
+                        alt=""
+                        className="size-9 rounded object-cover border border-border shrink-0"
+                      />
+                    ) : null}
+                    <div className="min-w-0 text-xs leading-relaxed">
+                      {s.originalIntentProductNameZh && (
+                        <span className="font-medium text-foreground block">
+                          {pickLocalized(s.originalIntentProductNameZh, s.originalIntentProductNameRu, locale)}
+                        </span>
+                      )}
+                      {s.originalIntentOverviewZh && (
+                        <span className="text-muted-foreground line-clamp-2">
+                          {pickLocalized(s.originalIntentOverviewZh, s.originalIntentOverviewRu, locale)}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                )}
+
+                {/* 地区 + 主营 */}
+                <div className="text-xs space-y-0.5">
+                  <div className="text-foreground">{locationStr}</div>
+                  {mainProducts && (
+                    <div className="text-muted-foreground">
+                      {locale === 'ru' ? 'Осн. продукция' : '主营'}：{mainProducts}
+                    </div>
+                  )}
+                </div>
+
+                {/* 主联系人 */}
+                {primaryContact && (
+                  <div className="text-xs text-muted-foreground border-t border-border pt-2.5">
+                    <span className="text-foreground font-medium">
+                      {pickLocalized(primaryContact.nameZh, primaryContact.nameRu, locale)}
+                    </span>
+                    {pickLocalized(primaryContact.roleZh, primaryContact.roleRu, locale) && (
+                      <> · {pickLocalized(primaryContact.roleZh, primaryContact.roleRu, locale)}</>
+                    )}
+                    {primaryContact.phone && <> · {primaryContact.phone}</>}
+                    {!primaryContact.phone && primaryContact.wechat && <> · WeChat: {primaryContact.wechat}</>}
+                  </div>
+                )}
+
+                {/* 标签 */}
+                {s.supplierTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {s.supplierTags.slice(0, 4).map((st) => (
+                      <span
+                        key={st.tag.id}
+                        className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
+                        style={st.tag.color ? { borderColor: st.tag.color } : undefined}
+                      >
+                        {pickLocalized(st.tag.nameZh, st.tag.nameRu, locale)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* 底部：统计 + 操作 */}
+                <div className="flex items-center justify-between border-t border-border pt-2.5">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{locale === 'ru' ? 'Конт' : '联系人'} {s._count.contacts}</span>
+                    <span>{locale === 'ru' ? 'КП' : '报价'} {s._count.quotes}</span>
+                    <span>{locale === 'ru' ? 'Заказы' : '订单'} {s._count.transactions}</span>
+                  </div>
+                  <SupplierActionsCell
+                    supplier={{ id: s.id, nameZh: s.nameZh, nameRu: s.nameRu, isActive: s.isActive }}
+                    canEdit={isOwner(s, currentUser)}
+                  />
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

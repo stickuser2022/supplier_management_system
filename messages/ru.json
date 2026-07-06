@@ -357,8 +357,8 @@
       "sectionInfo": "Информация о намерении",
       "labelProductNameZh": "Название продукта (китайский)",
       "labelProductNameRu": "Название продукта (русский)",
-      "labelOverviewZh": "Описание намерения (китайский)",
-      "labelOverviewRu": "Описание намерения (русский)",
+      "labelOverviewZh": "Описание (китайский)",
+      "labelOverviewRu": "Описание (русский)",
       "autoTranslateHint": "Переводит название продукта и описание (2 поля). Каждый перевод перезаписывает существующий текст.",
       "productNameZhPlaceholder": "如 玩具熊、EAC 认证塑料件",
       "productNameRuPlaceholder": "如 Игрушечный медведь",
@@ -380,7 +380,7 @@
     "editQuote": "Редактирование предложения #{id}",
     "newTransaction": "Новый заказ для «{name}»",
     "editTransaction": "Редактирование заказа #{id}",
-    "editOriginalIntent": "Намерение для «{name}»"
+    "editOriginalIntent": "Оригинальное намерение — «{name}»"
   },
   "changePassword": {
     "title": "Сменить пароль",
@@ -470,7 +470,7 @@
     }
   },
   "originalIntent": {
-    "title": "Исходное намерение",
+    "title": "Оригинальное намерение",
     "edit": "Изменить",
     "create": "Создать намерение",
     "empty": "Намерение пока не указано. Нажмите кнопку вверху справа, чтобы добавить.",

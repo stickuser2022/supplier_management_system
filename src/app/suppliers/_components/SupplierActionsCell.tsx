@@ -40,7 +40,7 @@ export function SupplierActionsCell({
 
   if (supplier.isActive) {
     return (
-      <div className="flex items-center justify-end gap-4">
+      <div className="flex flex-col items-end gap-1">
         <Link
           href={`/suppliers/${supplier.id}/edit`}
           className={cn(baseClasses, 'text-muted-foreground hover:text-foreground')}
