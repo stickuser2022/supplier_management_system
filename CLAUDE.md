@@ -18,7 +18,7 @@
 本系统是**单管理员、多阅览者**的协作模式:
 
 - **Admin(1 人):** 项目主人(青格力),负责所有供应商数据的采集、录入、维护
-- **Viewer(若干人):** 海外家人(俄罗斯),纯阅览权限,用于查询供应商信息
+- **EDITOR(若干人):** 海外家人(俄罗斯),可新建和编辑自己创建的数据
 
 数据所有权统一,不区分"我的供应商"和"他们的供应商"。
 
@@ -35,7 +35,7 @@
 
 - **数据库:** 开发期 SQLite,长期可平滑迁移至 PostgreSQL,统一通过 Prisma ORM 访问
 - **文件存储:** 开发期本地文件系统(按供应商分目录),长期可迁移至对象存储(OSS/COS);代码层做存储抽象,业务层不感知底层
-- **翻译服务:** 通过抽象层接入,当前使用 DeepL,可热切换至 DeepSeek 等其他提供商
+- **翻译服务:** 通过抽象层接入,当前使用 DeepSeek,可热切换至 Google 等其他提供商
 - **部署形态:** 短期跑在 Admin 笔记本上,中长期迁移至国内云服务器
 
 
@@ -1464,3 +1464,60 @@ RU    俄文
 ### 下一轮对话开始时的入口
 
 跟上面一样,直接说想做的事即可。
+
+---
+
+## 2026.7.5-7.6 项目进度日志（原始意图 + 暗色模式 + 移动端 + 图片放大）
+
+### 当前阶段：功能补全 + 体验打磨
+
+系统核心功能已稳定,这两天的改动集中在：新增原始意图模块、暗色模式、移动端适配、图片点击放大。
+
+### 原始意图（Original Intent）
+
+每家供应商新增一对一"原始意图"记录,解决"供应商多了以后忘记为什么找到这家"的痛点。
+
+- **数据模型**:Supplier 表上加 6 个字段（productName/overview 的中俄双语 + 翻译标记）
+- **图片**:File 表新增 `ORIGINAL_INTENT_IMAGE` type,挂在 supplier 上
+- **路由**:`/suppliers/[id]/original-intent/edit` 编辑页,不走 new（一对一,直接编辑）
+- **列表页**:新增「原始意图」列,上下布局:上图下文字,图片可点开放大,产品名点击跳编辑
+- **详情页**:排在供应商详情最顶部 section,含产品名 + 概述 + 图片网格
+- **清除**:一键清空所有原始意图字段 + 归档关联图片
+- **翻译**:中→俄 / 俄→中双向,与其他 form 模式一致
+
+### 暗色模式
+
+- `globals.css` 新增 `.dark` 块,覆盖全部 30 个 CSS 变量（Notion 暗色风格）
+- `layout.tsx` 加防闪烁 script 读 localStorage
+- `ThemeToggle` 客户端组件（太阳/月亮图标）,放在 AppHeader 中/俄切换旁
+- `MapView.tsx` 和 `file-edit-form.tsx` 硬编码颜色改为 CSS 变量
+
+### 移动端优化
+
+- 供应商列表页:桌面端保持表格（`hidden md:block`）,移动端切换卡片布局（`md:hidden`）
+- 每张卡片纵向排列:头像 + 名称 + 等级 → 原始意图 → 地区/主营 → 联系人 → 标签 → 统计 + 操作
+- 操作按钮（编辑/归档）改为上下排列
+
+### LightboxImage 组件
+
+- 新建 `src/components/ui/lightbox-image.tsx`
+- 任意 `<img>` 替换为 `<LightboxImage>`,点击弹大图,Escape 或点背景关闭
+- 自动去掉 `?thumb=1` 参数取原图
+- 已覆盖:供应商列表 logo/原始意图图、详情页原始意图图
+
+### 技术债清理
+
+- `prisma.ts`:删 4 行 debug `console.log`;生产环境 query log 只打 warn/error;删 2 行过时 TODO
+- `auth.ts`:`requireCurrentUser()` 加运行时 role 校验;`getOptionalUserId()` 空 catch 加 `console.error`
+- `translate/index.ts`:删"未来接 DeepSeek"过时注释
+- `utils.ts`:新增 `logActionError()` 工具,7 个 action 文件共 14 个 catch 块统一接入
+- seed 脚本去掉密码打印;`reset-password.ts` 加安全警告
+- `supplier-actions.ts`/`contact-actions.ts`/... 等 7 个 action 文件 catch 块加 `logActionError`
+- 侧边栏 CSS 变量补全
+- 删 `.env.example`
+- `quotes.expired` 俄语翻译缺失修复
+- 俄语「原始意图」统一为 `Оригинальное намерение`
+
+### 下一轮对话开始时的入口
+
+直接说想做的事即可。

@@ -253,7 +253,8 @@
         ├── contacts/   ← 联系人相关:新建/编辑/列表/Form/Actions
         ├── quotes/     ← 报价相关
         ├── notes/      ← 沟通记录相关
-        └── transactions/ ← 订单相关</code></pre>
+        ├── transactions/ ← 订单相关
+        └── original-intent/ ← 原始意图(一对一,直接编辑)</code></pre>
     <div class="callout">
       <strong>命名约定:</strong>
       <ul style="margin: 4px 0;">
@@ -414,7 +415,7 @@
     <p style="margin: 6px 0 0;">最初设计:Admin 手改俄文 → flag=false(锁定)→ 下次翻译跳过这个字段(避免覆盖人工修正)。<strong>2026.6.16 移除了这个"锁"机制</strong>:实际用着反而麻烦,改完后想重翻全部,得逐个清锁。现在每次翻译都覆盖现有俄文,简单一致。<code>_auto_translated</code> 字段仍在 schema 里(向后兼容,不删数据),只是 UI 不再感知,业务层永远写 true。</p>
   </div>
 
-  <p>Supplier 表上有 <strong>8 组双语字段</strong>:nameZh+nameRu / shortName / province / city / district / address / description / <strong>mainProducts</strong>(2026.6.16 新增,"主营产品",支持搜索)。每组 3 个字段。</p>
+  <p>Supplier 表上有 <strong>11 组双语字段</strong>:nameZh+nameRu / shortName / province / city / district / address / description / mainProducts(2026.6.16 新增,"主营产品")/ <strong>originalIntentProductName / originalIntentOverview</strong>(2026.7.5 新增,"原始意图",列表页直读直显)。每组 3 个字段。</p>
 
   <h3>onDelete 4 种规则</h3>
   <p>外键删除时的连锁反应有 4 种,设计时不是凭感觉拍,是按"关系性质 + 字段可空性"两个维度决策的。</p>
@@ -556,7 +557,7 @@
   id                     <span class="ty">Int</span>      @id @default(autoincrement())
   code                   <span class="ty">String</span>   @unique         <span class="com">// 人类可读编号 GZ-001</span>
 
-  <span class="com">// 双语三件套(共 7 组,这里只列 name)</span>
+  <span class="com">// 双语三件套(共 11 组,这里只列 name)</span>
   nameZh                 <span class="ty">String</span>                    <span class="com">// 中文必填</span>
   nameRu                 <span class="ty">String?</span>                   <span class="com">// 俄文可空</span>
   nameRuAutoTranslated   <span class="ty">Boolean</span>  @default(true)   <span class="com">// 翻译锁标记</span>
@@ -593,7 +594,10 @@
     select: { id: <span class="kw">true</span>, role: <span class="kw">true</span> },
   });
   <span class="kw">if</span> (!user) <span class="fn">redirect</span>(<span class="str">'/login'</span>);  <span class="com">// session 引用了已删除的用户</span>
-  <span class="kw">return</span> { id: user.id, role: user.role <span class="kw">as</span> <span class="str">'ADMIN'</span> | <span class="str">'EDITOR'</span> };
+  <span class="kw">if</span> (user.role !== <span class="str">'ADMIN'</span> && user.role !== <span class="str">'EDITOR'</span>) {
+    <span class="kw">throw new</span> <span class="ty">Error</span>(...);  <span class="com">// 运行时校验,SQLite 软枚举兜底</span>
+  }
+  <span class="kw">return</span> { id: user.id, role: user.role };
 }
 
 <span class="kw">export function</span> <span class="fn">isOwner</span>(
@@ -884,7 +888,7 @@ Arguments:         node_modules\next\dist\bin\next start -p 3000
 </section>
 
 <footer>
-  📍 项目导览 · 2026.6.15 · 配套 CLAUDE.md 阅读效果最佳<br>
+  📋 项目导览 · 2026.7.6 · 配套 CLAUDE.md 阅读效果最佳<br>
   这份文档是 AI 帮写的,但描述的是<strong>你和它一起做出来的设计</strong>。任何看不懂的地方都可以再问 AI。
 </footer>
 
