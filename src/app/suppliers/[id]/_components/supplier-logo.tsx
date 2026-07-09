@@ -1,11 +1,19 @@
 'use client';
 
-import { useState, useRef, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Upload, ImageOff } from 'lucide-react';
+import { Upload, ImageOff, Loader2 } from 'lucide-react';
 import { clearSupplierLogo } from '@/app/suppliers/_actions/file-actions';
+import { compressImageForUpload } from '@/lib/compress-image';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { DropZone } from '@/components/ui/drop-zone';
 
 type LogoFile = {
   id: number;
@@ -21,34 +29,22 @@ export function SupplierLogo({
 }) {
   const router = useRouter();
   const t = useTranslations('files');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function openPicker() {
-    if (uploading || isPending) return;
-    inputRef.current?.click();
-  }
-
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  async function handleFiles(files: File[]) {
+    const file = files[0];
     if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError(t('errorTooLarge', { max: '5MB' }));
-      return;
-    }
-    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) {
-      setError(t('errorWrongType'));
-      return;
-    }
 
     setUploading(true);
     setError(null);
 
+    const compressed = await compressImageForUpload(file);
+
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append('file', compressed);
     fd.append('type', 'SUPPLIER_LOGO');
     fd.append('ownerId', String(supplierId));
 
@@ -57,14 +53,14 @@ export function SupplierLogo({
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error ?? `Upload failed: ${res.status}`);
-        return;
+      } else {
+        setDialogOpen(false);
+        router.refresh();
       }
-      router.refresh();
     } catch (err) {
       setError(String(err));
     } finally {
       setUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
     }
   }
 
@@ -82,11 +78,11 @@ export function SupplierLogo({
     <div className="flex items-start gap-2">
       <button
         type="button"
-        onClick={openPicker}
+        onClick={() => setDialogOpen(true)}
         disabled={uploading || isPending}
         className={cn(
           'relative size-16 rounded-md overflow-hidden flex items-center justify-center flex-shrink-0',
-          'border border-dashed border-border-strong bg-muted',
+          'border border-dashed border-border bg-muted',
           'hover:bg-muted/70 hover:border-foreground-subtle transition-colors',
           'disabled:opacity-50 disabled:cursor-not-allowed',
         )}
@@ -100,9 +96,9 @@ export function SupplierLogo({
             className="size-full object-contain"
           />
         ) : uploading ? (
-          <span className="text-xs text-muted-foreground">{t('uploading')}</span>
+          <Loader2 className="size-5 text-muted-foreground animate-spin" />
         ) : (
-          <Upload className="size-5 text-foreground-subtle" />
+          <Upload className="size-5 text-muted-foreground" />
         )}
       </button>
 
@@ -119,17 +115,26 @@ export function SupplierLogo({
               {t('removeLogo')}
             </button>
           )}
-          {error && <div className="text-danger-fg max-w-xs">{error}</div>}
+          {error && (
+            <span className="text-danger-fg">{error}</span>
+          )}
         </div>
       )}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
-        onChange={handleFile}
-        className="hidden"
-      />
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('uploadLogo')}</DialogTitle>
+          </DialogHeader>
+          <DropZone
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            maxBytes={5 * 1024 * 1024}
+            maxMB={5}
+            working={uploading}
+            onFiles={handleFiles}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

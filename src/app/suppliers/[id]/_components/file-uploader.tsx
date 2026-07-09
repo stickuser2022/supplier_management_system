@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DropZone } from '@/components/ui/drop-zone';
+import { compressImageForUpload } from '@/lib/compress-image';
 
 type Props = {
   ownerId: number;
@@ -53,40 +54,8 @@ export function FileUploader({
 
   const maxMB = Math.round(maxBytes / 1024 / 1024);
 
-  // 客户端图片压缩:缩小 + 转 WebP,大幅减小体积(肉眼无差异)
-  async function compressImage(file: File): Promise<File> {
-    if (!file.type.startsWith('image/')) return file;
-    if (file.type === 'image/gif' || file.type === 'image/svg+xml') return file;
-
-    try {
-      const bitmap = await createImageBitmap(file);
-      const maxDim = 1920;
-      let w = bitmap.width;
-      let h = bitmap.height;
-
-      if (w > maxDim || h > maxDim) {
-        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
-        else       { w = Math.round(w * maxDim / h); h = maxDim; }
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { bitmap.close(); return file; }
-      ctx.drawImage(bitmap, 0, 0, w, h);
-      bitmap.close();
-
-      // 转 WebP(质量 0.9,体积小 60-70%,肉眼无差异)
-      const blob = await new Promise<Blob>((resolve) =>
-        canvas.toBlob((b) => resolve(b!), 'image/webp', 0.9),
-      );
-      const name = file.name.replace(/\.[^.]+$/, '.webp');
-      return new File([blob], name, { type: 'image/webp' });
-    } catch {
-      return file;
-    }
-  }
+  // 图片压缩(委托给共享函数)
+  const compressImage = compressImageForUpload;
 
   // 上传引擎
   const processFiles = useCallback(
