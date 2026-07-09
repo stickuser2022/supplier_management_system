@@ -181,6 +181,11 @@ export async function POST(request: NextRequest) {
   const key = keyFor(type, ownerId, file.name);
   const buffer = Buffer.from(await file.arrayBuffer());
 
+  // 诊断:开发环境打印每步耗时
+  if (process.env.NODE_ENV !== 'production') {
+    console.time('[upload] thumbnail');
+  }
+
 // 6. 缩略图(图片直接 resize;视频抽帧;其他类型不做)
   let thumbnailKey: string | null = null;
   if (file.type.startsWith('image/')) {
@@ -205,6 +210,10 @@ export async function POST(request: NextRequest) {
       thumbnailKey = null;
     }
   }
+  if (process.env.NODE_ENV !== 'production') {
+    console.timeEnd('[upload] thumbnail');
+    console.time('[upload] storage.put');
+  }
 
   // 7. 写主文件到存储(失败则清理缩略图)
   try {
@@ -213,6 +222,10 @@ export async function POST(request: NextRequest) {
     if (thumbnailKey) await storage.delete(thumbnailKey).catch(() => {});
     console.error('[upload] storage.put failed:', err);
     return NextResponse.json({ error: 'Storage write failed' }, { status: 500 });
+  }
+  if (process.env.NODE_ENV !== 'production') {
+    console.timeEnd('[upload] storage.put');
+    console.time('[upload] db');
   }
 
 // 8. 标题翻译(仅 titleZh 非空时调一次)
@@ -258,6 +271,10 @@ export async function POST(request: NextRequest) {
     });
 
     revalidateFor(type, ownerId);
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.timeEnd('[upload] db');
+    }
 
     return NextResponse.json({
       id: created.id,

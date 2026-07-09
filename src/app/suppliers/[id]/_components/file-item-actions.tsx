@@ -4,8 +4,8 @@ import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Pencil, Archive, Loader2 } from 'lucide-react';
-import { archiveFile } from '@/app/suppliers/_actions/file-actions';
+import { Pencil, Trash2, Loader2 } from 'lucide-react';
+import { physicallyDeleteFile } from '@/app/suppliers/_actions/file-actions';
 import { cn } from '@/lib/utils';
 
 const baseClasses =
@@ -22,10 +22,10 @@ export function FileItemActions({
   const t = useTranslations('files');
   const [pending, startTransition] = useTransition();
 
-  function handleArchive() {
-    if (!confirm(t('confirmArchive'))) return;
+  function handleDelete() {
+    if (!confirm(t('confirmDeleteFile'))) return;
     startTransition(async () => {
-      const res = await archiveFile(fileId);
+      const res = await physicallyDeleteFile(fileId);
       if (res.error) alert(res.error);
       else router.refresh();
     });
@@ -42,16 +42,16 @@ export function FileItemActions({
       </Link>
       <button
         type="button"
-        onClick={handleArchive}
+        onClick={handleDelete}
         disabled={pending}
         className={cn(baseClasses, 'text-muted-foreground hover:text-danger-fg')}
       >
         {pending ? (
           <Loader2 className="size-3 animate-spin" />
         ) : (
-          <Archive className="size-3" />
+          <Trash2 className="size-3" />
         )}
-        {t('archiveFile')}
+        {t('deleteFile')}
       </button>
     </div>
   );

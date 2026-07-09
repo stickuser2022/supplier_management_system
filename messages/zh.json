@@ -100,6 +100,8 @@
   "archiveFile": "归档",
   "restoreFile": "恢复",
   "confirmArchive": "确定归档此文件?",
+  "deleteFile": "删除",
+  "confirmDeleteFile": "确定删除此文件？删除后不可恢复。",
   "translateTitle": "自动翻译俄文",
   "titleRuLocked": "已手工修正(自动翻译会跳过)",
   "uploadBatchDone": "上传完成:{ok} 成功,{fail} 失败",

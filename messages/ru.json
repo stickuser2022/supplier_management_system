@@ -99,6 +99,8 @@
   "archiveFile": "В архив",
   "restoreFile": "Восстановить",
   "confirmArchive": "Перенести файл в архив?",
+  "deleteFile": "Удалить",
+  "confirmDeleteFile": "Удалить файл безвозвратно?",
   "translateTitle": "Автоматически перевести",
   "titleRuLocked": "Изменено вручную (авто-перевод не перезапишет)",
   "uploadBatchDone": "Загрузка завершена: успешно {ok}, ошибок {fail}",

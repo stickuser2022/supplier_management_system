@@ -1,10 +1,17 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Upload, Check, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { DropZone } from '@/components/ui/drop-zone';
 
 type Props = {
   ownerId: number;
@@ -35,163 +42,212 @@ export function FileUploader({
   accept,
   maxBytes,
   label,
-  acceptHint,
+  acceptHint: _acceptHint,
 }: Props) {
   const router = useRouter();
   const t = useTranslations('files');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
   const [uploads, setUploads] = useState<UploadStatus[]>([]);
   const [working, setWorking] = useState(false);
+  const cancelledRef = useRef(false);
 
-  function openPicker() {
-    if (working) return;
-    inputRef.current?.click();
+  const maxMB = Math.round(maxBytes / 1024 / 1024);
+
+  // 客户端图片压缩:缩小 + 转 WebP,大幅减小体积(肉眼无差异)
+  async function compressImage(file: File): Promise<File> {
+    if (!file.type.startsWith('image/')) return file;
+    if (file.type === 'image/gif' || file.type === 'image/svg+xml') return file;
+
+    try {
+      const bitmap = await createImageBitmap(file);
+      const maxDim = 1920;
+      let w = bitmap.width;
+      let h = bitmap.height;
+
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else       { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { bitmap.close(); return file; }
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      bitmap.close();
+
+      // 转 WebP(质量 0.9,体积小 60-70%,肉眼无差异)
+      const blob = await new Promise<Blob>((resolve) =>
+        canvas.toBlob((b) => resolve(b!), 'image/webp', 0.9),
+      );
+      const name = file.name.replace(/\.[^.]+$/, '.webp');
+      return new File([blob], name, { type: 'image/webp' });
+    } catch {
+      return file;
+    }
   }
 
-  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // 上传引擎
+  const processFiles = useCallback(
+    async (files: File[]) => {
+      // 先压缩图片(Ctrl+V 的截图通常很大)
+      const compressed = await Promise.all(files.map(compressImage));
+      const initial: UploadStatus[] = compressed.map((file) => ({
+        file,
+        status: (file.size > maxBytes ? 'error' : 'pending') as UploadStatus['status'],
+        error: file.size > maxBytes ? t('errorTooLarge', { max: `${maxMB}MB` }) : undefined,
+      }));
 
-    const maxMB = Math.round(maxBytes / 1024 / 1024);
-    const initial: UploadStatus[] = Array.from(files).map((file) => ({
-      file,
-      status: file.size > maxBytes ? 'error' : 'pending',
-      error:
-        file.size > maxBytes
-          ? t('errorTooLarge', { max: `${maxMB}MB` })
-          : undefined,
-    }));
-    setUploads(initial);
-    setWorking(true);
+      setUploads(initial);
+      setWorking(true);
+      cancelledRef.current = false;
 
-    for (let i = 0; i < initial.length; i++) {
-      if (initial[i].status === 'error') continue;
+      for (let i = 0; i < initial.length; i++) {
+        if (cancelledRef.current) break;
+        if (initial[i].status === 'error') continue;
 
-      setUploads((cur) =>
-        cur.map((u, idx) => (idx === i ? { ...u, status: 'uploading' } : u)),
-      );
+        setUploads((cur) =>
+          cur.map((u, idx) => (idx === i ? { ...u, status: 'uploading' } : u)),
+        );
 
-      const fd = new FormData();
-      fd.append('file', initial[i].file);
-      fd.append('type', type);
-      fd.append('ownerId', String(ownerId));
+        const fd = new FormData();
+        fd.append('file', initial[i].file);
+        fd.append('type', type);
+        fd.append('ownerId', String(ownerId));
 
-      try {
-        const res = await fetch('/api/upload', { method: 'POST', body: fd });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
+        try {
+          const res = await fetch('/api/upload', { method: 'POST', body: fd });
+          if (cancelledRef.current) break;
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            setUploads((cur) =>
+              cur.map((u, idx) =>
+                idx === i
+                  ? { ...u, status: 'error', error: data.error ?? `HTTP ${res.status}` }
+                  : u,
+              ),
+            );
+          } else {
+            setUploads((cur) =>
+              cur.map((u, idx) => (idx === i ? { ...u, status: 'success' } : u)),
+            );
+          }
+        } catch (err) {
+          if (cancelledRef.current) break;
           setUploads((cur) =>
             cur.map((u, idx) =>
-              idx === i
-                ? { ...u, status: 'error', error: data.error ?? `HTTP ${res.status}` }
-                : u,
+              idx === i ? { ...u, status: 'error', error: String(err) } : u,
             ),
           );
-        } else {
-          setUploads((cur) =>
-            cur.map((u, idx) => (idx === i ? { ...u, status: 'success' } : u)),
-          );
         }
-      } catch (err) {
-        setUploads((cur) =>
-          cur.map((u, idx) =>
-            idx === i ? { ...u, status: 'error', error: String(err) } : u,
-          ),
-        );
       }
-    }
 
-    setWorking(false);
-    if (inputRef.current) inputRef.current.value = '';
-    router.refresh();
-  }
+      setWorking(false);
+      if (!cancelledRef.current) router.refresh();
+    },
+    [ownerId, type, maxBytes, t, router, maxMB],
+  );
 
   const okCount = uploads.filter((u) => u.status === 'success').length;
   const failCount = uploads.filter((u) => u.status === 'error').length;
   const allDone = uploads.length > 0 && !working;
 
+  function handleCancel() {
+    cancelledRef.current = true;
+    setUploads([]);
+    setWorking(false);
+  }
+
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      setOpen(true);
+    } else if (!working) {
+      setUploads([]);
+      setOpen(false);
+    }
+    // 上传中不响应外部关闭请求，由取消按钮处理
+  }
+
   return (
     <div className="mb-4">
-      <div className="flex items-center gap-3 mb-3">
-        <Button
-          type="button"
-          onClick={openPicker}
-          disabled={working}
-          variant="secondary"
-          size="sm"
-        >
-          {working ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              {t('uploading')}
-            </>
-          ) : (
-            <>
-              <Upload className="size-4" />
-              {label}
-            </>
+      <Button
+        type="button"
+        onClick={() => setOpen(true)}
+        variant="secondary"
+        size="sm"
+      >
+        <Upload className="size-4" />
+        {label}
+      </Button>
+
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{label}</DialogTitle>
+          </DialogHeader>
+
+          {/* DropZone: 点击/粘贴/拖拽 */}
+          <DropZone
+            accept={accept}
+            maxBytes={maxBytes}
+            maxMB={maxMB}
+            working={working}
+            onFiles={processFiles}
+          />
+
+          {/* 取消按钮（上传中显示） */}
+          {working && (
+            <div className="flex justify-center">
+              <Button type="button" variant="outline" size="sm" onClick={handleCancel}>
+                <X className="size-3.5" />
+                取消上传
+              </Button>
+            </div>
           )}
-        </Button>
-        <span className="text-xs text-muted-foreground">{acceptHint}</span>
-      </div>
 
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept={accept}
-        onChange={handleFiles}
-        className="hidden"
-      />
-
-      {uploads.length > 0 && (
-        <div className="space-y-1 text-sm border border-border rounded-md p-3 bg-muted/40">
-          {uploads.map((u, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <span className="flex-1 truncate text-xs text-foreground">
-                {u.file.name}
-              </span>
-              <span className="text-xs inline-flex items-center gap-1">
-                {u.status === 'pending' && (
-                  <span className="text-foreground-subtle">…</span>
-                )}
-                {u.status === 'uploading' && (
-                  <span className="inline-flex items-center gap-1 text-primary">
-                    <Loader2 className="size-3 animate-spin" />
-                    {t('uploading')}
+          {/* 进度列表 */}
+          {uploads.length > 0 && (
+            <div className="space-y-1 text-sm border border-border rounded-md p-3 bg-muted/40">
+              {uploads.map((u, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="flex-1 truncate text-xs text-foreground">
+                    {u.file.name}
                   </span>
-                )}
-                {u.status === 'success' && (
-                  <Check className="size-3.5 text-success-fg" />
-                )}
-                {u.status === 'error' && (
-                  <span
-                    className="inline-flex items-center gap-1 text-danger-fg"
-                    title={u.error}
+                  <span className="text-xs inline-flex items-center gap-1">
+                    {u.status === 'pending' && <span className="text-foreground-subtle">…</span>}
+                    {u.status === 'uploading' && (
+                      <span className="inline-flex items-center gap-1 text-primary">
+                        <Loader2 className="size-3 animate-spin" />
+                        {t('uploading')}
+                      </span>
+                    )}
+                    {u.status === 'success' && <Check className="size-3.5 text-success-fg" />}
+                    {u.status === 'error' && (
+                      <span className="inline-flex items-center gap-1 text-danger-fg" title={u.error}>
+                        <X className="size-3.5" />
+                        {u.error}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ))}
+              {allDone && (
+                <div className="text-xs text-muted-foreground pt-2 mt-1 border-t border-border flex items-center justify-between">
+                  <span>{t('uploadBatchDone', { ok: okCount, fail: failCount })}</span>
+                  <button
+                    type="button"
+                    onClick={() => setUploads([])}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <X className="size-3.5" />
-                    {u.error}
-                  </span>
-                )}
-              </span>
-            </div>
-          ))}
-          {allDone && (
-            <div className="text-xs text-muted-foreground pt-2 mt-1 border-t border-border flex items-center justify-between">
-              <span>
-                {t('uploadBatchDone', { ok: okCount, fail: failCount })}
-              </span>
-              <button
-                type="button"
-                onClick={() => setUploads([])}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t('clear')}
-              </button>
+                    {t('clear')}
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
